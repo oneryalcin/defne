@@ -1,0 +1,537 @@
+{
+  "description": "Enriched MVP vocabulary seed pack for the first playable app. These entries are ready for deterministic questions and mastery tracking.",
+  "version": 1,
+  "locale": "en-GB",
+  "entries": [
+    {
+      "word": "reluctant",
+      "difficulty": 3,
+      "definition": "not willing or not keen to do something",
+      "example": "Maya was reluctant to enter the dark room, even though her friends encouraged her.",
+      "synonyms": ["unwilling", "hesitant"],
+      "antonyms": ["eager", "willing"],
+      "spellingNote": "Ends with -ant, not -ent.",
+      "confusables": ["anxious", "reticent"]
+    },
+    {
+      "word": "cautious",
+      "difficulty": 2,
+      "definition": "careful because there may be danger or a problem",
+      "example": "He was cautious as he stepped across the icy path.",
+      "synonyms": ["careful", "wary"],
+      "antonyms": ["reckless", "careless"],
+      "spellingNote": "Remember cau + tious.",
+      "confusables": ["cowardly"]
+    },
+    {
+      "word": "fragile",
+      "difficulty": 2,
+      "definition": "easily broken or damaged",
+      "example": "The fragile glass ornament was wrapped carefully.",
+      "synonyms": ["delicate", "breakable"],
+      "antonyms": ["sturdy", "strong"],
+      "spellingNote": "The middle sounds like 'jile' but is spelled gile.",
+      "confusables": ["frail"]
+    },
+    {
+      "word": "abundant",
+      "difficulty": 3,
+      "definition": "more than enough; plentiful",
+      "example": "The forest had abundant berries in late summer.",
+      "synonyms": ["plentiful", "bountiful"],
+      "antonyms": ["scarce", "meagre"],
+      "spellingNote": "Starts with a-bun, like 'a bun'.",
+      "confusables": ["adequate"]
+    },
+    {
+      "word": "scarce",
+      "difficulty": 3,
+      "definition": "not enough; hard to find",
+      "example": "Water became scarce during the long drought.",
+      "synonyms": ["rare", "limited"],
+      "antonyms": ["abundant", "plentiful"],
+      "spellingNote": "The c comes before e.",
+      "confusables": ["sparse"]
+    },
+    {
+      "word": "genuine",
+      "difficulty": 3,
+      "definition": "real, honest, or sincere",
+      "example": "Her apology sounded genuine because she clearly meant it.",
+      "synonyms": ["authentic", "sincere"],
+      "antonyms": ["fake", "false"],
+      "spellingNote": "Starts gen- and ends -uine.",
+      "confusables": ["generous"]
+    },
+    {
+      "word": "authentic",
+      "difficulty": 3,
+      "definition": "real and not copied or false",
+      "example": "The museum displayed an authentic Roman coin.",
+      "synonyms": ["genuine", "real"],
+      "antonyms": ["fake", "imitation"],
+      "spellingNote": "au + then + tic.",
+      "confusables": ["ancient"]
+    },
+    {
+      "word": "compassion",
+      "difficulty": 3,
+      "definition": "kind concern for someone who is suffering",
+      "example": "She showed compassion by helping the injured runner.",
+      "synonyms": ["kindness", "sympathy"],
+      "antonyms": ["cruelty", "indifference"],
+      "spellingNote": "Double s in the middle.",
+      "confusables": ["compassionate"]
+    },
+    {
+      "word": "compassionate",
+      "difficulty": 3,
+      "definition": "showing kindness and concern for others",
+      "example": "The compassionate nurse comforted the frightened child.",
+      "synonyms": ["kind", "caring"],
+      "antonyms": ["cruel", "unkind"],
+      "spellingNote": "Compassion + ate.",
+      "confusables": ["passionate"]
+    },
+    {
+      "word": "diligent",
+      "difficulty": 3,
+      "definition": "working carefully and with effort",
+      "example": "The diligent pupil checked every answer before handing in the test.",
+      "synonyms": ["hard-working", "industrious"],
+      "antonyms": ["lazy", "careless"],
+      "spellingNote": "di + li + gent.",
+      "confusables": ["intelligent"]
+    },
+    {
+      "word": "industrious",
+      "difficulty": 4,
+      "definition": "hard-working and busy in a useful way",
+      "example": "The industrious team finished the project early.",
+      "synonyms": ["diligent", "hard-working"],
+      "antonyms": ["idle", "lazy"],
+      "spellingNote": "industry changes to industrious.",
+      "confusables": ["industrial"]
+    },
+    {
+      "word": "timid",
+      "difficulty": 2,
+      "definition": "shy, nervous, or lacking courage",
+      "example": "The timid kitten hid behind the chair.",
+      "synonyms": ["shy", "nervous"],
+      "antonyms": ["bold", "brave"],
+      "spellingNote": "Short word: ti + mid.",
+      "confusables": ["terrified"]
+    },
+    {
+      "word": "valiant",
+      "difficulty": 3,
+      "definition": "very brave, especially in difficulty",
+      "example": "The valiant firefighter entered the burning building.",
+      "synonyms": ["brave", "courageous"],
+      "antonyms": ["cowardly", "timid"],
+      "spellingNote": "va + liant.",
+      "confusables": ["violent"]
+    },
+    {
+      "word": "intrepid",
+      "difficulty": 4,
+      "definition": "fearless and adventurous",
+      "example": "The intrepid explorer crossed the icy mountains.",
+      "synonyms": ["fearless", "bold"],
+      "antonyms": ["fearful", "timid"],
+      "spellingNote": "Starts with in-, not en-.",
+      "confusables": ["interrupted"]
+    },
+    {
+      "word": "weary",
+      "difficulty": 3,
+      "definition": "very tired, especially after effort",
+      "example": "The weary hikers rested beside the stream.",
+      "synonyms": ["tired", "exhausted"],
+      "antonyms": ["energetic", "refreshed"],
+      "spellingNote": "Weary means tired; wary means careful.",
+      "confusables": ["wary"]
+    },
+    {
+      "word": "wary",
+      "difficulty": 3,
+      "definition": "careful because you think there may be danger",
+      "example": "The cat was wary of the noisy dog.",
+      "synonyms": ["cautious", "watchful"],
+      "antonyms": ["trusting", "careless"],
+      "spellingNote": "Wary has no e after w.",
+      "confusables": ["weary"]
+    },
+    {
+      "word": "fatigue",
+      "difficulty": 4,
+      "definition": "great tiredness",
+      "example": "After the long walk, fatigue made her legs ache.",
+      "synonyms": ["exhaustion", "weariness"],
+      "antonyms": ["energy", "freshness"],
+      "spellingNote": "Ends with -gue.",
+      "confusables": ["fidget"]
+    },
+    {
+      "word": "despondent",
+      "difficulty": 4,
+      "definition": "very unhappy and without hope",
+      "example": "He felt despondent after losing the final match.",
+      "synonyms": ["hopeless", "gloomy"],
+      "antonyms": ["hopeful", "cheerful"],
+      "spellingNote": "des + pond + ent.",
+      "confusables": ["disappointed"]
+    },
+    {
+      "word": "optimistic",
+      "difficulty": 3,
+      "definition": "hopeful that good things will happen",
+      "example": "She stayed optimistic even when the work was difficult.",
+      "synonyms": ["hopeful", "positive"],
+      "antonyms": ["pessimistic", "gloomy"],
+      "spellingNote": "op + ti + mis + tic.",
+      "confusables": ["opportunistic"]
+    },
+    {
+      "word": "pessimistic",
+      "difficulty": 4,
+      "definition": "expecting bad things to happen",
+      "example": "His pessimistic prediction made everyone worry.",
+      "synonyms": ["gloomy", "negative"],
+      "antonyms": ["optimistic", "hopeful"],
+      "spellingNote": "Double s in pessimistic.",
+      "confusables": ["persistent"]
+    },
+    {
+      "word": "peculiar",
+      "difficulty": 3,
+      "definition": "strange or unusual",
+      "example": "There was a peculiar smell coming from the old cupboard.",
+      "synonyms": ["strange", "odd"],
+      "antonyms": ["ordinary", "normal"],
+      "spellingNote": "pe + cu + liar.",
+      "confusables": ["particular"]
+    },
+    {
+      "word": "obstinate",
+      "difficulty": 4,
+      "definition": "stubborn and refusing to change your mind",
+      "example": "The obstinate mule refused to move.",
+      "synonyms": ["stubborn", "headstrong"],
+      "antonyms": ["flexible", "agreeable"],
+      "spellingNote": "ob + stin + ate.",
+      "confusables": ["persistent"]
+    },
+    {
+      "word": "persistent",
+      "difficulty": 3,
+      "definition": "continuing firmly and not giving up",
+      "example": "Her persistent practice helped her improve.",
+      "synonyms": ["determined", "persevering"],
+      "antonyms": ["wavering", "inconstant"],
+      "spellingNote": "per + sist + ent.",
+      "confusables": ["pessimistic"]
+    },
+    {
+      "word": "resilient",
+      "difficulty": 4,
+      "definition": "able to recover after difficulty",
+      "example": "The resilient plant grew again after the storm.",
+      "synonyms": ["tough", "recovering"],
+      "antonyms": ["fragile", "weak"],
+      "spellingNote": "re + sil + ient.",
+      "confusables": ["resistant"]
+    },
+    {
+      "word": "brittle",
+      "difficulty": 3,
+      "definition": "hard but easily broken",
+      "example": "The brittle twig snapped in her hand.",
+      "synonyms": ["fragile", "breakable"],
+      "antonyms": ["flexible", "tough"],
+      "spellingNote": "Double t in brittle.",
+      "confusables": ["fragile"]
+    },
+    {
+      "word": "fracture",
+      "difficulty": 3,
+      "definition": "to crack or break, or a crack or break",
+      "example": "The fall caused a small fracture in the bone.",
+      "synonyms": ["break", "crack"],
+      "antonyms": ["mend", "repair"],
+      "spellingNote": "frac + ture.",
+      "confusables": ["fragile"]
+    },
+    {
+      "word": "dwindle",
+      "difficulty": 4,
+      "definition": "to become smaller or less over time",
+      "example": "The pile of sweets began to dwindle.",
+      "synonyms": ["decrease", "shrink"],
+      "antonyms": ["increase", "grow"],
+      "spellingNote": "Starts dw-, like dwarf.",
+      "confusables": ["diminish"]
+    },
+    {
+      "word": "diminish",
+      "difficulty": 4,
+      "definition": "to become or make something smaller or less important",
+      "example": "The noise began to diminish as the train moved away.",
+      "synonyms": ["reduce", "lessen"],
+      "antonyms": ["increase", "amplify"],
+      "spellingNote": "di + min + ish.",
+      "confusables": ["dwindle"]
+    },
+    {
+      "word": "amplify",
+      "difficulty": 3,
+      "definition": "to make something louder, stronger, or greater",
+      "example": "The microphone helped amplify her voice.",
+      "synonyms": ["increase", "intensify"],
+      "antonyms": ["reduce", "diminish"],
+      "spellingNote": "am + pli + fy.",
+      "confusables": ["imply"]
+    },
+    {
+      "word": "hinder",
+      "difficulty": 3,
+      "definition": "to slow down or make progress more difficult",
+      "example": "The heavy rain hindered their journey.",
+      "synonyms": ["delay", "obstruct"],
+      "antonyms": ["help", "assist"],
+      "spellingNote": "hin + der.",
+      "confusables": ["hurtle"]
+    },
+    {
+      "word": "obstruction",
+      "difficulty": 4,
+      "definition": "something that blocks the way or prevents progress",
+      "example": "A fallen tree was an obstruction on the road.",
+      "synonyms": ["blockage", "barrier"],
+      "antonyms": ["opening", "clearance"],
+      "spellingNote": "ob + struct + ion.",
+      "confusables": ["obstinate"]
+    },
+    {
+      "word": "deceive",
+      "difficulty": 3,
+      "definition": "to make someone believe something that is not true",
+      "example": "The fake sign was designed to deceive visitors.",
+      "synonyms": ["trick", "mislead"],
+      "antonyms": ["inform", "reveal"],
+      "spellingNote": "i before e here: deceive.",
+      "confusables": ["deceived"]
+    },
+    {
+      "word": "bewildered",
+      "difficulty": 4,
+      "definition": "very confused",
+      "example": "She looked bewildered by the complicated instructions.",
+      "synonyms": ["confused", "perplexed"],
+      "antonyms": ["clear", "certain"],
+      "spellingNote": "be + wilder + ed.",
+      "confusables": ["perplexed"]
+    },
+    {
+      "word": "perplexed",
+      "difficulty": 4,
+      "definition": "confused because something is difficult to understand",
+      "example": "He was perplexed by the strange riddle.",
+      "synonyms": ["puzzled", "bewildered"],
+      "antonyms": ["certain", "clear"],
+      "spellingNote": "per + plex + ed.",
+      "confusables": ["peculiar"]
+    },
+    {
+      "word": "infer",
+      "difficulty": 3,
+      "definition": "to work out something from clues",
+      "example": "From the wet footprints, we could infer that someone had come in from the rain.",
+      "synonyms": ["deduce", "conclude"],
+      "antonyms": ["guess wildly", "ignore"],
+      "spellingNote": "in + fer.",
+      "confusables": ["imply"]
+    },
+    {
+      "word": "observe",
+      "difficulty": 2,
+      "definition": "to watch or notice carefully",
+      "example": "The scientist observed the insects through a magnifying glass.",
+      "synonyms": ["notice", "watch"],
+      "antonyms": ["ignore", "overlook"],
+      "spellingNote": "ob + serve.",
+      "confusables": ["notice"]
+    },
+    {
+      "word": "sincere",
+      "difficulty": 3,
+      "definition": "honest and truly meant",
+      "example": "His thanks were sincere, not just polite.",
+      "synonyms": ["genuine", "honest"],
+      "antonyms": ["false", "insincere"],
+      "spellingNote": "sin + cere.",
+      "confusables": ["serene"]
+    },
+    {
+      "word": "serene",
+      "difficulty": 3,
+      "definition": "calm and peaceful",
+      "example": "The lake looked serene in the early morning.",
+      "synonyms": ["calm", "peaceful"],
+      "antonyms": ["agitated", "chaotic"],
+      "spellingNote": "se + rene.",
+      "confusables": ["sincere"]
+    },
+    {
+      "word": "agitated",
+      "difficulty": 3,
+      "definition": "upset, nervous, or restless",
+      "example": "The agitated crowd waited for news.",
+      "synonyms": ["restless", "disturbed"],
+      "antonyms": ["calm", "serene"],
+      "spellingNote": "agitate + d.",
+      "confusables": ["agile"]
+    },
+    {
+      "word": "eloquent",
+      "difficulty": 4,
+      "definition": "able to express ideas clearly and beautifully",
+      "example": "Her eloquent speech persuaded the audience.",
+      "synonyms": ["fluent", "expressive"],
+      "antonyms": ["unclear", "inarticulate"],
+      "spellingNote": "elo + quent.",
+      "confusables": ["elegant"]
+    },
+    {
+      "word": "elegant",
+      "difficulty": 3,
+      "definition": "graceful, stylish, and attractive",
+      "example": "The dancer made an elegant turn.",
+      "synonyms": ["graceful", "stylish"],
+      "antonyms": ["clumsy", "awkward"],
+      "spellingNote": "el + e + gant.",
+      "confusables": ["eloquent"]
+    },
+    {
+      "word": "flamboyant",
+      "difficulty": 4,
+      "definition": "bright, confident, and attracting attention",
+      "example": "He wore a flamboyant jacket covered in gold patterns.",
+      "synonyms": ["showy", "extravagant"],
+      "antonyms": ["plain", "modest"],
+      "spellingNote": "flam + boy + ant.",
+      "confusables": ["flourish"]
+    },
+    {
+      "word": "modest",
+      "difficulty": 3,
+      "definition": "not boastful; not too proud",
+      "example": "Although she won, she remained modest about her success.",
+      "synonyms": ["humble", "unpretentious"],
+      "antonyms": ["boastful", "arrogant"],
+      "spellingNote": "mod + est.",
+      "confusables": ["moderate"]
+    },
+    {
+      "word": "arrogant",
+      "difficulty": 3,
+      "definition": "thinking you are better than other people",
+      "example": "His arrogant tone annoyed the rest of the team.",
+      "synonyms": ["proud", "conceited"],
+      "antonyms": ["humble", "modest"],
+      "spellingNote": "Double r in arrogant.",
+      "confusables": ["confident"]
+    },
+    {
+      "word": "humble",
+      "difficulty": 2,
+      "definition": "not proud or boastful",
+      "example": "The champion was humble and thanked her coach.",
+      "synonyms": ["modest", "unpretentious"],
+      "antonyms": ["arrogant", "boastful"],
+      "spellingNote": "The b is sounded softly: hum-ble.",
+      "confusables": ["humiliate"]
+    },
+    {
+      "word": "prestigious",
+      "difficulty": 4,
+      "definition": "respected and admired because of high quality or success",
+      "example": "She won a place at a prestigious music school.",
+      "synonyms": ["distinguished", "renowned"],
+      "antonyms": ["ordinary", "unknown"],
+      "spellingNote": "prestige becomes prestigious.",
+      "confusables": ["prosperous"]
+    },
+    {
+      "word": "prominent",
+      "difficulty": 3,
+      "definition": "important, well known, or easy to notice",
+      "example": "The castle stood in a prominent position above the town.",
+      "synonyms": ["important", "noticeable"],
+      "antonyms": ["hidden", "minor"],
+      "spellingNote": "prom + in + ent.",
+      "confusables": ["eminent"]
+    },
+    {
+      "word": "eminent",
+      "difficulty": 4,
+      "definition": "famous and respected in a particular area",
+      "example": "An eminent scientist gave the lecture.",
+      "synonyms": ["distinguished", "renowned"],
+      "antonyms": ["unknown", "ordinary"],
+      "spellingNote": "em + in + ent.",
+      "confusables": ["imminent", "prominent"]
+    },
+    {
+      "word": "prosperous",
+      "difficulty": 3,
+      "definition": "successful and wealthy",
+      "example": "The prosperous town had busy shops and fine houses.",
+      "synonyms": ["wealthy", "successful"],
+      "antonyms": ["poor", "struggling"],
+      "spellingNote": "prosper + ous.",
+      "confusables": ["prestigious"]
+    },
+    {
+      "word": "meagre",
+      "difficulty": 4,
+      "definition": "too small in amount; not enough",
+      "example": "They survived on a meagre supply of food.",
+      "synonyms": ["small", "scanty"],
+      "antonyms": ["abundant", "plentiful"],
+      "spellingNote": "British spelling: meagre.",
+      "confusables": ["eager"]
+    },
+    {
+      "word": "parched",
+      "difficulty": 3,
+      "definition": "very dry, especially because of heat",
+      "example": "The parched ground cracked in the drought.",
+      "synonyms": ["dry", "thirsty"],
+      "antonyms": ["soaked", "damp"],
+      "spellingNote": "parch + ed.",
+      "confusables": ["perched"]
+    },
+    {
+      "word": "sweltering",
+      "difficulty": 4,
+      "definition": "uncomfortably hot",
+      "example": "The classroom was sweltering by the afternoon.",
+      "synonyms": ["boiling", "scorching"],
+      "antonyms": ["freezing", "cool"],
+      "spellingNote": "swelter + ing.",
+      "confusables": ["sultry"]
+    },
+    {
+      "word": "verdant",
+      "difficulty": 4,
+      "definition": "green with healthy plants",
+      "example": "The valley was verdant after the spring rain.",
+      "synonyms": ["green", "lush"],
+      "antonyms": ["barren", "dry"],
+      "spellingNote": "ver + dant.",
+      "confusables": ["vibrant"]
+    }
+  ]
+}

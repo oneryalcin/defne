@@ -1,0 +1,11 @@
+.omx/
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.*
+*.log
+*.sqlite
+*.sqlite3
+*.db

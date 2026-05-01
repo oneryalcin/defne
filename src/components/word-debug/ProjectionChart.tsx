@@ -39,7 +39,13 @@ export function ProjectionChart({ projection }: { projection: DayProjection[] })
 
   return (
     <div className="projection">
-      <svg width="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Forecast over next 14 days">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label="Forecast over next 14 days"
+        style={{ overflow: "visible" }}
+      >
         {/* y gridlines + labels */}
         {[0, 0.25, 0.5, 0.72, 0.85, 1].map((v) => (
           <g key={v}>
@@ -81,6 +87,37 @@ export function ProjectionChart({ projection }: { projection: DayProjection[] })
         <path d={recallPath} fill="none" stroke="var(--hint-sky)" strokeWidth="2" />
         {/* Pick probability */}
         <path d={probPath} fill="none" stroke="var(--forest-green)" strokeWidth="2" />
+        {/* Inspectable data points — hover/title shows the breakdown */}
+        {projection.map((p) => {
+          const topFactor = [...p.breakdown.factors].sort(
+            (a, b) => b.contribution - a.contribution
+          )[0];
+          const title = `Day ${p.daysFromNow}\nRank ${p.projectedRank}\nScore ${p.projectedScore.toFixed(2)}\nPick chance ${(p.probability * 100).toFixed(0)}%\nTop factor: ${topFactor ? `${topFactor.name} (${topFactor.contribution >= 0 ? "+" : ""}${topFactor.contribution.toFixed(2)})` : "—"}`;
+          return (
+            <g key={p.daysFromNow}>
+              <circle
+                cx={x(p.daysFromNow)}
+                cy={y(p.probability)}
+                r={p.daysFromNow === likelyPickDay ? 4.5 : 3}
+                fill="var(--forest-green)"
+                stroke="var(--paper-canvas)"
+                strokeWidth={1}
+              >
+                <title>{title}</title>
+              </circle>
+              <circle
+                cx={x(p.daysFromNow)}
+                cy={y(p.recall)}
+                r={3}
+                fill="var(--hint-sky)"
+                stroke="var(--paper-canvas)"
+                strokeWidth={1}
+              >
+                <title>{title}</title>
+              </circle>
+            </g>
+          );
+        })}
         {/* Likely-pick marker */}
         {likelyPickDay !== undefined ? (
           <line
@@ -102,6 +139,20 @@ export function ProjectionChart({ projection }: { projection: DayProjection[] })
           strokeDasharray="2 4"
         />
       </svg>
+      <p
+        style={{
+          margin: 0,
+          fontFamily: "var(--font-body)",
+          fontSize: 13,
+          color: "var(--steel-secondary)",
+        }}
+      >
+        Hover any point to see the rank, score, and the largest factor
+        for that day. Spikes happen when a step-function bonus
+        (delayed-recall, almost-mastered) flips on for this word a day
+        or two before it flips on for the rest of the deck. Once the
+        others catch up the relative rank flattens.
+      </p>
       <ul className="projection__legend">
         <li>
           <span className="projection__swatch" style={{ background: "var(--hint-sky)" }} />

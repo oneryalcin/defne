@@ -19,7 +19,6 @@ export default async function SessionPage({
   if (attemptId) {
     const review = getAttemptReview(sessionId, attemptId);
     const isRoundReview = Boolean(review.roundStep);
-    const showCorrectionDetails = !review.isCorrect || review.revealAndMoveOn;
     const percent = review.totalQuestions > 0
       ? Math.min(isRoundReview && !review.isSessionComplete ? 92 : 100, Math.round((review.questionNumber / review.totalQuestions) * 100))
       : 0;
@@ -29,33 +28,17 @@ export default async function SessionPage({
 
     return (
       <main className="page">
-        <section className={`question-shell ${showCorrectionDetails ? "" : "question-focus-shell"}`}>
-          <div className={showCorrectionDetails ? undefined : "question-main"}>
+        <section className="question-shell question-focus-shell">
+          <div className="question-main">
             <div
-              className={`progress-track ${showCorrectionDetails ? "" : "progress-track-compact"}`}
+              className="progress-track progress-track-compact"
               aria-label={isRoundReview ? `${progressLabel}, question ${review.questionNumber} so far` : progressLabel}
             >
               <div className="progress-fill" style={{ width: `${percent}%` }} />
             </div>
             <p className="metric-label">{progressLabel}</p>
-            {isRoundReview && showCorrectionDetails ? (
-              <p className="progress-subcopy">Question {review.questionNumber} so far. Retry questions are added only for missed words.</p>
-            ) : null}
             <ReviewPanel review={review} />
           </div>
-
-          {showCorrectionDetails ? (
-            <aside className="helper-panel" aria-label="Attempt review">
-              <div className="review-sidecar">
-                <p className="metric-label">Your answer</p>
-                <strong>{review.submittedAnswer || "No answer entered"}</strong>
-                <p className="metric-label">Expected answer</p>
-                <strong>{review.canonicalAnswer}</strong>
-              </div>
-              {!review.isCorrect ? <HintReview hints={review.hints} openedCount={review.hintLevelUsed} /> : null}
-              {!review.isCorrect && review.spellingNote ? <div className="hint-box">Spelling note: {review.spellingNote}</div> : null}
-            </aside>
-          ) : null}
         </section>
       </main>
     );
@@ -270,6 +253,7 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
 function ReviewPanel({ review }: { review: AttemptReview }) {
   const nextHref = review.isSessionComplete ? `/child/session/${review.sessionId}/summary` : `/child/session/${review.sessionId}`;
   const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
+  const choicesShowCorrection = review.choices.length > 0;
 
   return (
     <div className="result-panel">
@@ -309,13 +293,10 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         <div className="result-callout result-recovery">
           <strong>Answer revealed so the round can keep moving.</strong>
           <span>This word will come back soon instead of blocking the round.</span>
-          <div className="canonical-answer">
-            <span>Expected answer</span>
-            <strong>{review.canonicalAnswer}</strong>
-          </div>
+          {!choicesShowCorrection ? <CanonicalAnswer answer={review.canonicalAnswer} /> : null}
         </div>
       ) : !review.isCorrect ? (
-        <RecoveryCallout review={review} />
+        <RecoveryCallout review={review} choicesShowCorrection={choicesShowCorrection} />
       ) : null}
 
       <div className="action-row">
@@ -327,13 +308,13 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
   );
 }
 
-function RecoveryCallout({ review }: { review: AttemptReview }) {
+function RecoveryCallout({ review, choicesShowCorrection }: { review: AttemptReview; choicesShowCorrection: boolean }) {
   if (review.failureType === "spelling_error") {
     return (
       <div className="result-callout result-recovery">
         <strong>Let&apos;s fix the spelling.</strong>
         <span>This word will come back so the correct spelling has another chance to stick.</span>
-        <SpellingDiff submitted={review.submittedAnswer} canonical={review.canonicalAnswer} />
+        {choicesShowCorrection ? null : <SpellingDiff submitted={review.submittedAnswer} canonical={review.canonicalAnswer} />}
       </div>
     );
   }
@@ -342,33 +323,16 @@ function RecoveryCallout({ review }: { review: AttemptReview }) {
     <div className="result-callout result-recovery">
       <strong>{recoveryTitle(review.failureType)}</strong>
       <span>{recoveryCopy(review.failureType)}</span>
-      <div className="canonical-answer">
-        <span>Expected answer</span>
-        <strong>{review.canonicalAnswer}</strong>
-      </div>
+      {!choicesShowCorrection ? <CanonicalAnswer answer={review.canonicalAnswer} /> : null}
     </div>
   );
 }
 
-function HintReview({ hints, openedCount }: { hints: string[]; openedCount: number }) {
-  if (hints.length === 0) return null;
+function CanonicalAnswer({ answer }: { answer: string }) {
   return (
-    <div className="hint-ladder compact-hint-ladder">
-      <div className="hint-ladder-header">
-        <strong>Hint ladder used</strong>
-        <span>
-          {openedCount} of {hints.length}
-        </span>
-      </div>
-      {hints.map((hint, index) => {
-        const wasOpened = index < openedCount;
-        return (
-          <div className={`hint-step${wasOpened ? " hint-step-open" : ""}`} key={`${hint}-${index}`}>
-            <span className="hint-index">Hint {index + 1}</span>
-            <span>{wasOpened ? hint : "Not used this time."}</span>
-          </div>
-        );
-      })}
+    <div className="canonical-answer">
+      <span>Expected answer</span>
+      <strong>{answer}</strong>
     </div>
   );
 }
@@ -423,7 +387,7 @@ function recoveryCopy(failureType: FailureType): string {
   if (failureType === "recognised_but_could_not_produce") {
     return "Seeing it and producing it are different skills. We will revisit this without making it feel punitive.";
   }
-  return "The correction matters more than the miss. Read the expected answer, then move on when it feels clear.";
+  return "Compare the highlighted answers. This word will come back in the repair pass.";
 }
 
 function normalise(value: string): string {

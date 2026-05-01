@@ -542,16 +542,6 @@ select {
   line-height: 1.45;
 }
 
-.hint-ladder {
-  display: grid;
-  gap: 10px;
-  margin-top: 24px;
-  border: 1px solid #b8d5e6;
-  border-radius: var(--radius);
-  background: #f5fbff;
-  padding: 14px;
-}
-
 .hint-inline {
   display: flex;
   gap: 12px;
@@ -565,36 +555,6 @@ select {
 
 .hint-inline p {
   margin: 0;
-  color: #153b55;
-}
-
-.compact-hint-ladder {
-  margin-top: 18px;
-}
-
-.hint-ladder-header,
-.hint-step {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.hint-ladder-header span,
-.hint-step:not(.hint-step-open) {
-  color: var(--muted);
-}
-
-.hint-step {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
-  padding: 12px;
-  line-height: 1.4;
-}
-
-.hint-step-open {
-  border-color: #8ebed9;
   color: #153b55;
 }
 
@@ -748,19 +708,6 @@ select {
 .letter-fix {
   background: #dff1e4;
   color: #1d6b3f;
-}
-
-.review-sidecar {
-  display: grid;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: #fbfdfc;
-  padding: 14px;
-}
-
-.review-sidecar strong {
-  overflow-wrap: anywhere;
 }
 
 .learn-card {

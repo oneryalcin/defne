@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
 import { masteryColourForState, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
-import { selectRoundWords } from "../learning/roundSelection";
+import { selectRoundWords, type RoundWordSelection } from "../learning/roundSelection";
 import {
   DEFAULT_ROUND_MAX_RETRY_PASSES,
   canUnlockMeaningStep,
@@ -241,8 +241,32 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
 export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   const db = getDb();
   const words = getPracticeWords();
-  const selection = selectRoundWords(words, new Date().toISOString(), targetQuestionCount, getRemediationWordIds(db));
   const byId = new Map(words.map((word) => [word.id, word]));
+
+  // If a round is already in progress, surface its committed word list
+  // instead of running the selector again. This keeps the cover preview
+  // aligned with the round the learner will actually load on Start, even
+  // across multiple sessions on the same day.
+  const liveRound = db
+    .prepare(
+      `SELECT word_ids_json, summary_json
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as
+    | { word_ids_json: string; summary_json: string }
+    | undefined;
+
+  const selection: RoundWordSelection = liveRound
+    ? roundSelectionFromLiveRound(liveRound, byId)
+    : selectRoundWords(
+        words,
+        new Date().toISOString(),
+        targetQuestionCount,
+        getRemediationWordIds(db)
+      );
   const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
   const realAttemptsByWordId = new Map(
     (db
@@ -277,6 +301,32 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
       };
     })
   };
+}
+
+function roundSelectionFromLiveRound(
+  row: { word_ids_json: string; summary_json: string },
+  byId: Map<string, PracticeWord>
+): RoundWordSelection {
+  const wordIds = (JSON.parse(row.word_ids_json) as string[]).filter((id) =>
+    byId.has(id)
+  );
+  const stored = JSON.parse(row.summary_json) as SessionSummary;
+  const reasonsByWordId = new Map(
+    (stored.round?.selectionReasons ?? []).map((reason) => [reason.wordId, reason])
+  );
+  const reasons: RoundSelectionReason[] = wordIds.map((wordId) => {
+    const word = byId.get(wordId);
+    const stored = reasonsByWordId.get(wordId);
+    if (stored) return stored;
+    return {
+      wordId,
+      word: word?.word ?? wordId,
+      reason: "priority",
+      label: "Already in this round",
+      detail: "Carried over from the round you started earlier."
+    };
+  });
+  return { wordIds, reasons };
 }
 
 export function startRoundMission(roundWordCount = 8): string {

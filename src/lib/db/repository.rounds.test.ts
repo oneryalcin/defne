@@ -29,12 +29,17 @@ afterEach(() => {
 });
 
 describe("round repository orchestration", () => {
-  it("previews the same round words that starting the round creates", () => {
-    const preview = getMissionPreview(6);
+  it("previews the in-progress round once it has been started", () => {
+    // Once a round is committed, the cover preview must reflect that
+    // round's word list — not run a fresh selection that could drift
+    // because of randomised tie-breaks or recently-changed mastery.
     const sessionId = startRoundMission(6);
     const view = getSessionView(sessionId);
+    const preview = getMissionPreview(6);
 
-    expect(view.round?.cards.map((card) => card.id)).toEqual(preview.words.map((word) => word.id));
+    expect(preview.words.map((word) => word.id)).toEqual(
+      view.round?.cards.map((card) => card.id)
+    );
     expect(preview.words.map((word) => word.selectionReason.reason)).toEqual(
       view.round?.cards.map((card) => card.selectionReason?.reason)
     );

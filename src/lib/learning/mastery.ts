@@ -231,20 +231,16 @@ export function selectSessionPlan(
   nowIso: string,
   targetCount = 15
 ): SessionPlanItem[] {
-  // Stable per-day tie-break: same shuffle from cover preview to round
-  // start within the same day, but different across days.
-  const dayBucket = nowIso.slice(0, 10);
   const ranked = [...words]
     .map((word) => ({
       word,
       score: priorityScore(word, nowIso),
-      colour: masteryColourForState(word.state),
-      tieKey: stableTieHash(word.id, dayBucket)
+      colour: masteryColourForState(word.state)
     }))
     .sort((a, b) => {
       const diff = b.score - a.score;
       if (diff !== 0) return diff;
-      return a.tieKey - b.tieKey;
+      return Math.random() - 0.5;
     });
 
   const struggling = ranked.filter(({ word, colour }) => {
@@ -321,14 +317,4 @@ function setDimension(state: LearnerWordState, dimension: MasteryDimension, valu
   if (dimension === "meaning") state.meaningMastery = value;
   if (dimension === "usage") state.usageMastery = value;
   if (dimension === "spelling") state.spellingMastery = value;
-}
-
-function stableTieHash(wordId: string, salt: string): number {
-  const input = `${salt}:${wordId}`;
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
 }

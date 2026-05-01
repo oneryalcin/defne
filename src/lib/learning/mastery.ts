@@ -237,7 +237,11 @@ export function selectSessionPlan(
       score: priorityScore(word, nowIso),
       colour: masteryColourForState(word.state)
     }))
-    .sort((a, b) => b.score - a.score || a.word.word.localeCompare(b.word.word));
+    .sort((a, b) => {
+      const diff = b.score - a.score;
+      if (diff !== 0) return diff;
+      return Math.random() - 0.5;
+    });
 
   const struggling = ranked.filter(({ word, colour }) => {
     if (word.state.attemptCount === 0) return false; // not yet started

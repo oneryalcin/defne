@@ -59,7 +59,13 @@ export function selectRoundWords(
 ): RoundWordSelection {
   const count = Math.max(6, Math.min(12, Math.round(targetCount)));
   const wordMap = new Map(words.map((word) => [word.id, word]));
-  const ranked = [...words].sort((a, b) => priorityScore(b, nowIso) - priorityScore(a, nowIso) || a.word.localeCompare(b.word));
+  // Randomise ties so a fresh deck (every word at the same priority) does
+  // not always serve the words in alphabetical order.
+  const ranked = [...words].sort((a, b) => {
+    const diff = priorityScore(b, nowIso) - priorityScore(a, nowIso);
+    if (diff !== 0) return diff;
+    return Math.random() - 0.5;
+  });
   const picked = new Map<string, RoundSelectionReason>();
 
   pickWords(picked, ranked.filter((word) => word.state.nearReview), count, reasonTemplates.nearReview);

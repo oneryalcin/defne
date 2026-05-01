@@ -29,19 +29,30 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
   ];
   const near = summary.round?.nearReviewWords ?? summary.revisitTomorrow ?? [];
 
-  const journey: Array<{ word: string; state: "done" | "current" | "locked"; note: string }> = [
-    ...secure.slice(0, 2).map((w) => ({ word: w, state: "done" as const, note: "Secure today." })),
-    ...recovered.slice(0, 1).map((w) => ({
-      word: w,
-      state: "current" as const,
-      note: "Recovered after a miss — back tomorrow.",
-    })),
-    ...near.slice(0, 2).map((w) => ({
-      word: w,
-      state: "locked" as const,
-      note: "Needs another pass.",
-    })),
-  ];
+  // Buckets can overlap (e.g. a word can be both 'recovered' and
+  // 'nearReview'). Dedupe with a strongest-state-wins precedence so the
+  // word only appears once on the legend and the SVG.
+  const stateBy = new Map<string, "done" | "current" | "locked">();
+  const noteBy = new Map<string, string>();
+  for (const w of secure.slice(0, 2)) {
+    stateBy.set(w, "done");
+    noteBy.set(w, "Secure today.");
+  }
+  for (const w of recovered.slice(0, 1)) {
+    if (stateBy.get(w) === "done") continue;
+    stateBy.set(w, "current");
+    noteBy.set(w, "Recovered after a miss — back tomorrow.");
+  }
+  for (const w of near.slice(0, 2)) {
+    if (stateBy.has(w)) continue;
+    stateBy.set(w, "locked");
+    noteBy.set(w, "Needs another pass.");
+  }
+  const journey = [...stateBy.entries()].map(([word, state]) => ({
+    word,
+    state,
+    note: noteBy.get(word) ?? "",
+  }));
 
   const stops = journey.slice(0, 6).map((entry, idx) => ({
     word: entry.word,
@@ -76,7 +87,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
           <ul className="story-legend">
             {journey.map((entry) => (
               <li
-                key={entry.word}
+                key={`${entry.state}-${entry.word}`}
                 className={`story-legend__item is-${entry.state}`}
               >
                 <span className="story-legend__word">{entry.word}</span>

@@ -55,7 +55,7 @@ export function PencilMap({
         <path d="M770 50 L795 55 L770 60 Z" fill="#D1495B" stroke="#D1495B" />
       </g>
 
-      {stops.map((stop) => {
+      {stops.map((stop, idx) => {
         const fill =
           stop.state === "done"
             ? "var(--mastery-light)"
@@ -67,7 +67,7 @@ export function PencilMap({
         const labelColor =
           stop.state === "locked" ? "var(--muted-slate)" : "var(--graphite-ink)";
         return (
-          <g key={stop.word} transform={`translate(${stop.x} ${stop.y})`}>
+          <g key={`${idx}-${stop.word}`} transform={`translate(${stop.x} ${stop.y})`}>
             <text
               x="0"
               y="-14"

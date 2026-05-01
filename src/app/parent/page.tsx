@@ -380,10 +380,17 @@ export default async function ParentDashboardPage({
                   {nextRound.words.slice(0, 8).map((w) => (
                     <li key={w.id} className="queue-row">
                       <span className="queue-row__word">{w.word}</span>
-                      <span className={`mastery-mini ${MASTERY_KEY[w.masteryColour]}`}>
-                        <span className="mastery-mini__dot" aria-hidden="true" />
-                        {MASTERY_LABELS[w.masteryColour]}
-                      </span>
+                      {w.masteryColour ? (
+                        <span className={`mastery-mini ${MASTERY_KEY[w.masteryColour]}`}>
+                          <span className="mastery-mini__dot" aria-hidden="true" />
+                          {MASTERY_LABELS[w.masteryColour]}
+                        </span>
+                      ) : (
+                        <span className="mastery-mini" style={{ background: "rgba(31,41,55,0.06)", color: "var(--steel-secondary)" }}>
+                          <span className="mastery-mini__dot" aria-hidden="true" style={{ background: "rgba(31,41,55,0.20)" }} />
+                          Not started
+                        </span>
+                      )}
                       <span className="queue-row__why">
                         {w.selectionReason.label}
                       </span>

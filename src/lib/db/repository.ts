@@ -95,7 +95,7 @@ export interface MissionPreview {
     id: string;
     word: string;
     definition: string;
-    masteryColour: LearnerWordState["masteryColour"];
+    masteryColour: LearnerWordState["masteryColour"] | null;
     selectionReason: RoundSelectionReason;
     weakestDimension: string;
   }>;
@@ -256,7 +256,12 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
         id: word.id,
         word: word.word,
         definition: word.definition,
-        masteryColour: word.state.masteryColour,
+        // Recompute live so child surfaces match the parent dashboard
+        // (the persisted column is stale until the next attempt writes it).
+        masteryColour:
+          word.state.attemptCount === 0
+            ? null
+            : masteryColourForState(word.state),
         selectionReason,
         weakestDimension: weakestDimensionLabel(word.state)
       };

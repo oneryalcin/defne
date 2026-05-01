@@ -1008,7 +1008,7 @@
 }
 
 /* Section heads (label · italic title · sub) */
-.section-head { display: grid; gap: 6px; max-width: 64ch; }
+.section-head { display: grid; gap: 6px; }
 .section-head__label {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1031,6 +1031,10 @@
   color: var(--steel-secondary);
   font-size: 14px;
   line-height: 1.55;
+  max-width: 64rem;
+}
+.section-head__title {
+  max-width: 64rem;
 }
 
 /* Stack within parent-spread */

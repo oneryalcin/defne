@@ -931,20 +931,18 @@ export function getWordDetail(wordId: string): WordDetailView | null {
   if (!wordRow) return null;
 
   const synonyms = db
-    .prepare(
-      `SELECT lemma FROM word_synonyms WHERE word_id = ? ORDER BY ordinal ASC`
-    )
+    .prepare(`SELECT synonym AS lemma FROM word_synonyms WHERE word_id = ?`)
     .all(wordId) as Array<{ lemma: string }>;
   const antonyms = db
-    .prepare(
-      `SELECT lemma FROM word_antonyms WHERE word_id = ? ORDER BY ordinal ASC`
-    )
+    .prepare(`SELECT antonym AS lemma FROM word_antonyms WHERE word_id = ?`)
     .all(wordId) as Array<{ lemma: string }>;
   const confusables = db
     .prepare(
-      `SELECT lemma FROM word_confusables WHERE word_id = ? ORDER BY ordinal ASC`
+      `SELECT COALESCE(confusable_text, (SELECT word FROM words WHERE id = wc.confusable_word_id)) AS lemma
+       FROM word_confusables wc
+       WHERE word_id = ?`
     )
-    .all(wordId) as Array<{ lemma: string }>;
+    .all(wordId) as Array<{ lemma: string | null }>;
 
   const stateRow = db
     .prepare(
@@ -1014,7 +1012,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       example: wordRow.example ?? "",
       synonyms: synonyms.map((s) => s.lemma),
       antonyms: antonyms.map((s) => s.lemma),
-      confusables: confusables.map((s) => s.lemma),
+      confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
       spellingNote: wordRow.spelling_note,
       state: liveState,
     };
@@ -1035,7 +1033,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
     spellingNote: wordRow.spelling_note,
     synonyms: synonyms.map((s) => s.lemma),
     antonyms: antonyms.map((s) => s.lemma),
-    confusables: confusables.map((s) => s.lemma),
+    confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
     state,
     masteryColour,
     scoreReasons,

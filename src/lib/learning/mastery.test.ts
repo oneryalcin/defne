@@ -6,6 +6,7 @@ import {
   selectSessionPlan,
   updateStateAfterAttempt
 } from "./mastery";
+import { scoreFromState } from "./scoring";
 import type { LearnerWordState, PracticeWord } from "../types";
 
 describe("mastery scoring", () => {
@@ -82,6 +83,62 @@ describe("mastery scoring", () => {
       lastSeenAt: "2026-04-30T20:00:00.000Z"
     });
     expect(masteryColourForState(survived)).toBe("green");
+  });
+
+  it("does not knock down a recent wrong after clean recovery proof", () => {
+    const now = "2026-05-01T19:30:00.000Z";
+    const state = makeState({
+      attemptCount: 10,
+      correctCount: 8,
+      wrongCount: 2,
+      lastSeenAt: "2026-05-01T19:10:38.557Z",
+      lastCorrectAt: "2026-05-01T19:10:38.557Z",
+      lastWrongAt: "2026-05-01T16:33:49.062Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 6
+    });
+    const attempts = [
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ].map((isCorrect, index) => ({
+      answeredAt: new Date(Date.parse("2026-05-01T16:32:44.875Z") + index * 1_000).toISOString(),
+      isCorrect,
+      hintLevelUsed: 0
+    }));
+    attempts[2] = {
+      answeredAt: "2026-05-01T16:33:49.062Z",
+      isCorrect: false,
+      hintLevelUsed: 0
+    };
+    attempts[9] = {
+      answeredAt: "2026-05-01T19:10:38.557Z",
+      isCorrect: true,
+      hintLevelUsed: 0
+    };
+
+    const recovered = scoreFromState(state, attempts, now);
+    const unresolved = scoreFromState(
+      {
+        ...state,
+        nearReview: true,
+        eligibleQuestionsSinceLastMistake: 2
+      },
+      attempts,
+      now
+    );
+
+    expect(recovered.colour).toBe("yellow");
+    expect(recovered.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(false);
+    expect(unresolved.colour).toBe("orange");
+    expect(unresolved.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(true);
   });
 
   it("ranks recently failed weak words above stable green words", () => {

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { recordCardViewAction, startMeaningRecognitionAction } from "@/app/actions";
 import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView } from "@/lib/db/repository";
-import type { FailureType } from "@/lib/types";
 import { QuestionForm } from "@/components/QuestionForm";
 
 export const dynamic = "force-dynamic";
@@ -23,33 +22,21 @@ export default async function SessionPage({
     const percent = review.totalQuestions > 0
       ? Math.min(isRoundReview && !review.isSessionComplete ? 92 : 100, Math.round((review.questionNumber / review.totalQuestions) * 100))
       : 0;
-    const progressLabel = isRoundReview
-      ? `${roundStepLabel(review.roundStep)} · pass ${review.passNumber ?? 1} review`
-      : `Question ${review.questionNumber} of ${review.totalQuestions}`;
 
-    const today = new Date().toLocaleDateString("en-GB", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
     return (
       <main className="spread">
         <article className="book-page book-page--ruled practice-spread">
-          <span className="folio">
-            Question {review.questionNumber} / {review.totalQuestions}
-          </span>
-          <header className="practice-crumbs">
-            <span>Round · {today}</span>
-            <span className="dotline" aria-hidden="true" />
-            <span>{review.questionNumber} of {review.totalQuestions}</span>
-          </header>
-          <div
-            className="progress-track progress-track-compact"
-            aria-label={isRoundReview ? `${progressLabel}, question ${review.questionNumber} so far` : progressLabel}
-          >
-            <div className="progress-fill" style={{ width: `${percent}%` }} />
+          <div className="practice-progress-row">
+            <div
+              className="progress-track progress-track-compact"
+              aria-label={`Progress ${review.questionNumber} of ${review.totalQuestions}`}
+            >
+              <div className="progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+            <span className="practice-progress-count">
+              {review.questionNumber}/{review.totalQuestions}
+            </span>
           </div>
-          <p className="metric-label">{progressLabel}</p>
           <ReviewPanel review={review} />
         </article>
       </main>
@@ -70,9 +57,8 @@ export default async function SessionPage({
   if (view.round?.currentStep === "learn_cards" && view.round.selectedCard) {
     return (
       <main className="page">
-        <section className="question-shell">
+        <section className="question-shell question-focus-shell">
           <LearnCardsPanel sessionId={sessionId} round={view.round} card={view.round.selectedCard} />
-          <RoundAside sessionId={sessionId} round={view.round} />
         </section>
       </main>
     );
@@ -102,41 +88,17 @@ export default async function SessionPage({
     );
   }
 
-  const today = new Date().toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-  const passLabel = view.round?.isRetryPass
-    ? `Repair pass · ${view.round.remainingInPass} left`
-    : view.round
-    ? `First pass · ${view.round.remainingInPass} left`
-    : null;
-
   return (
     <main className="spread">
       <article className="book-page book-page--ruled practice-spread">
-        <span className="folio">
-          Question {view.questionNumber} / {view.totalQuestions}
-        </span>
-        <header className="practice-crumbs">
-          <span>Round · {today}</span>
-          <span className="dotline" aria-hidden="true" />
-          <span>{view.questionNumber} of {view.totalQuestions}</span>
-        </header>
-        <div className="progress-track progress-track-compact" aria-label={view.round?.stepProgressLabel ?? `Question ${view.questionNumber} of ${view.totalQuestions}`}>
-          <div className="progress-fill" style={{ width: `${percent}%` }} />
-        </div>
-        {passLabel ? (
-          <div className="question-meta-row">
-            <span className="metric-label">
-              {view.round?.stepProgressLabel ?? `Question ${view.questionNumber} of ${view.totalQuestions}`}
-            </span>
-            <span className={`pass-pill ${view.round?.isRetryPass ? "repair-pass-pill" : "first-pass-pill"}`}>
-              {passLabel}
-            </span>
+        <div className="practice-progress-row">
+          <div className="progress-track progress-track-compact" aria-label={`Progress ${view.questionNumber} of ${view.totalQuestions}`}>
+            <div className="progress-fill" style={{ width: `${percent}%` }} />
           </div>
-        ) : null}
+          <span className="practice-progress-count">
+            {view.questionNumber}/{view.totalQuestions}
+          </span>
+        </div>
         <QuestionForm sessionId={sessionId} question={view.question} />
       </article>
     </main>
@@ -218,30 +180,26 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
           style={{ width: `${Math.round((readyCount / round.wordCount) * 100)}%` }}
         />
       </div>
-      <p className="metric-label">
-        Learn cards · {readyCount} / {round.wordCount} ready · card {card.viewCount} / 2 reviews
-      </p>
 
       <div className="learn-card">
         <div className="learn-card-header">
           <div className="learn-card-title-row">
-            <h1>{card.word}</h1>
-            {card.selectionReason ? (
-              <ReasonPill
-                reason={card.selectionReason}
-                history={card.history}
-                colour={card.history.masteryColour}
-              />
-            ) : null}
+            <h1>
+              {card.selectionReason ? (
+                <ReasonWord
+                  word={card.word}
+                  reason={card.selectionReason}
+                  history={card.history}
+                  colour={card.history.masteryColour}
+                />
+              ) : (
+                card.word
+              )}
+            </h1>
           </div>
           <p className="learn-card__meaning">
             <em>{card.definition}</em>
           </p>
-          {round.canUnlockMeaning ? (
-            <p>All cards are ready. Start the matching step when this word feels clear.</p>
-          ) : cardIsReady ? (
-            <p>This card is ready. Move to the next card that still needs a review.</p>
-          ) : null}
         </div>
 
         <CardSupport card={card} />
@@ -294,37 +252,33 @@ function CardViewForm({
 function CardSupport({ card }: { card: RoundLearnCardView }) {
   return (
     <div className="card-support-grid">
-      <div>
-        <span className="metric-label">Example</span>
-        <p>{card.example}</p>
-      </div>
       {card.synonyms.length > 0 ? (
         <div>
-          <span className="metric-label">Near words</span>
+          <span className="metric-label">Synonyms</span>
           <p>{card.synonyms.join(", ")}</p>
         </div>
       ) : null}
       {card.antonyms.length > 0 ? (
         <div>
-          <span className="metric-label">Contrast</span>
+          <span className="metric-label">Antonym</span>
           <p>{card.antonyms.join(", ")}</p>
         </div>
       ) : null}
-      {card.confusables.length > 0 ? (
-        <div>
-          <span className="metric-label">Careful with</span>
-          <p>{card.confusables.join(", ")}</p>
-        </div>
-      ) : null}
+      <div className="card-support-example">
+        <span className="metric-label">Example</span>
+        <blockquote>{card.example}</blockquote>
+      </div>
     </div>
   );
 }
 
-function ReasonPill({
+function ReasonWord({
+  word,
   reason,
   history,
   colour,
 }: {
+  word: string;
   reason: NonNullable<RoundLearnCardView["selectionReason"]>;
   history: RoundLearnCardView["history"];
   colour: RoundLearnCardView["history"]["masteryColour"];
@@ -333,16 +287,15 @@ function ReasonPill({
     history.attemptCount > 0
       ? `Seen ${history.attemptCount} time${history.attemptCount === 1 ? "" : "s"} · ✓ ${history.correctCount} · ✗ ${history.wrongCount}`
       : "Not started yet — first time on the page.";
-  const tone = colour ?? "untracked";
+  const tone = reason.reason === "near_review" ? "red" : colour ?? "untracked";
   return (
     <span
-      className={`reason-pill reason-pill--${tone}`}
+      className={`reason-word reason-word--${tone}`}
       tabIndex={0}
       role="button"
       aria-label={`Practice reason: ${reason.label}`}
     >
-      <span className="reason-pill__dot" aria-hidden="true" />
-      {reason.label}
+      {word}
       <span className="reason-pill__pop" role="tooltip">
         <strong>{reason.label}</strong>
         <span className="reason-pill__detail">{reason.detail}</span>
@@ -380,7 +333,6 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
 
 function ReviewPanel({ review }: { review: AttemptReview }) {
   const nextHref = reviewNextHref(review);
-  const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
   const choicesShowCorrection = review.choices.length > 0;
 
   // Mirror the question screen exactly: instruction, then either the
@@ -395,8 +347,8 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         fillPassage ? (
           <blockquote className="story-sentence">
             {fillPassage.before}
-            <span className="target target--blank" aria-label="Missing word">
-              _____
+            <span className="target target--filled" aria-label={`Answer: ${review.canonicalAnswer}`}>
+              {review.canonicalAnswer}
             </span>
             {fillPassage.after}
           </blockquote>
@@ -439,19 +391,12 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         </div>
       ) : null}
 
-      {showRecoveryExplanation ? (
-        <div className="result-callout result-correct">
-          <strong>Fixed now.</strong>
-          <span>This item is done for this step. It will still come back soon because the first try was missed.</span>
-        </div>
-      ) : review.revealAndMoveOn ? (
+      {review.revealAndMoveOn ? (
         <div className="result-callout result-recovery">
           <strong>Answer revealed so the round can keep moving.</strong>
           <span>This word will come back soon instead of blocking the round.</span>
           {!choicesShowCorrection ? <CanonicalAnswer answer={review.canonicalAnswer} /> : null}
         </div>
-      ) : !review.isCorrect ? (
-        <RecoveryCallout review={review} choicesShowCorrection={choicesShowCorrection} />
       ) : null}
 
       <div className="action-row">
@@ -463,68 +408,11 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
   );
 }
 
-function RecoveryCallout({ review, choicesShowCorrection }: { review: AttemptReview; choicesShowCorrection: boolean }) {
-  if (review.failureType === "spelling_error") {
-    return (
-      <div className="result-callout result-recovery">
-        <strong>Let&apos;s fix the spelling.</strong>
-        <span>This word will come back so the correct spelling has another chance to stick.</span>
-        {choicesShowCorrection ? null : <SpellingDiff submitted={review.submittedAnswer} canonical={review.canonicalAnswer} />}
-      </div>
-    );
-  }
-
-  return (
-    <div className="result-callout result-recovery">
-      <strong>{recoveryTitle(review.failureType)}</strong>
-      <span>{recoveryCopy(review.failureType)}</span>
-      {!choicesShowCorrection ? <CanonicalAnswer answer={review.canonicalAnswer} /> : null}
-    </div>
-  );
-}
-
 function CanonicalAnswer({ answer }: { answer: string }) {
   return (
     <div className="canonical-answer">
       <span>Expected answer</span>
       <strong>{answer}</strong>
-    </div>
-  );
-}
-
-function SpellingDiff({ submitted, canonical }: { submitted: string; canonical: string }) {
-  const submittedChars = submitted.trim().split("");
-  const canonicalChars = canonical.trim().split("");
-  const maxLength = Math.max(submittedChars.length, canonicalChars.length);
-
-  return (
-    <div className="spelling-diff" aria-label="Spelling comparison">
-      <div>
-        <span>Typed</span>
-        <strong>
-          {Array.from({ length: maxLength }, (_, index) => (
-            <mark
-              className={submittedChars[index] === canonicalChars[index] ? "letter-ok" : "letter-miss"}
-              key={`submitted-${index}`}
-            >
-              {submittedChars[index] ?? "·"}
-            </mark>
-          ))}
-        </strong>
-      </div>
-      <div>
-        <span>Correct</span>
-        <strong>
-          {Array.from({ length: maxLength }, (_, index) => (
-            <mark
-              className={submittedChars[index] === canonicalChars[index] ? "letter-ok" : "letter-fix"}
-              key={`canonical-${index}`}
-            >
-              {canonicalChars[index] ?? "·"}
-            </mark>
-          ))}
-        </strong>
-      </div>
     </div>
   );
 }
@@ -539,22 +427,6 @@ function splitFillPrompt(
     before: prompt.slice(0, idx),
     after: prompt.slice(idx + blank.length),
   };
-}
-
-function recoveryTitle(failureType: FailureType): string {
-  if (failureType === "confused_with_similar_word") return "Let's separate the close words.";
-  if (failureType === "recognised_but_could_not_produce") return "You recognised the idea; production needs another pass.";
-  return "Let's look closer.";
-}
-
-function recoveryCopy(failureType: FailureType): string {
-  if (failureType === "confused_with_similar_word") {
-    return "The answer was close enough to be tempting, so this word should return with a clearer contrast.";
-  }
-  if (failureType === "recognised_but_could_not_produce") {
-    return "Seeing it and producing it are different skills. We will revisit this without making it feel punitive.";
-  }
-  return "Compare the highlighted answers. This word will come back in the repair pass.";
 }
 
 function normalise(value: string): string {

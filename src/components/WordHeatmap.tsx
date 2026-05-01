@@ -138,21 +138,6 @@ export function WordHeatmap({
           pageParam={pageParam}
         />
       </footer>
-
-      {variant === "child" ? (
-        <p
-          style={{
-            margin: 0,
-            fontFamily: "var(--font-editorial)",
-            fontStyle: "italic",
-            fontWeight: 500,
-            fontSize: 14,
-            color: "var(--steel-secondary)",
-          }}
-        >
-          Each square is a word you have met. Brighter ones are the ones you know best.
-        </p>
-      ) : null}
     </div>
   );
 }

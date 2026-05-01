@@ -49,8 +49,8 @@ export default async function WordDetailPage({
       ? detail.attempts.filter((a) => a.isCorrect).length /
         detail.attempts.length
       : 0;
-  const recentWrong = detail.attempts.find(
-    (a) => !a.isCorrect && Date.now() - new Date(a.answeredAt).getTime() < 36 * 3600 * 1000
+  const activeRecentWrong = detail.scoreReasons.some((reason) =>
+    reason.startsWith("Recent wrong still in recovery")
   );
 
   return (
@@ -232,7 +232,7 @@ export default async function WordDetailPage({
                 learner forgets it.
               </p>
             )}
-            {recentWrong ? (
+            {activeRecentWrong ? (
               <p
                 style={{
                   margin: 0,
@@ -243,8 +243,8 @@ export default async function WordDetailPage({
                   color: "var(--mastery-red)",
                 }}
               >
-                ● Recent wrong (within 36h) — colour was knocked down one
-                bucket on top of the score.
+                ● Recent wrong still in recovery — colour was knocked down one
+                bucket until enough clean follow-up questions clear it.
               </p>
             ) : null}
           </div>

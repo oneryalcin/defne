@@ -1,7 +1,7 @@
 export type PilotRole = "child" | "parent";
 
 export type PilotSession = {
-  username: string;
+  accessCode: string;
   role: PilotRole;
 };
 
@@ -11,7 +11,7 @@ const SESSION_SEPARATOR = "|";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 const PILOT_USER_ROLES = {
-  defne: "child",
+  arina: "child",
   daria: "parent"
 } as const;
 
@@ -19,12 +19,12 @@ export function getSessionTtlSeconds(): number {
   return SESSION_TTL_SECONDS;
 }
 
-export function normalisePilotUsername(username: string): string {
-  return username.trim().toLowerCase();
+export function normalisePilotAccessCode(accessCode: string): string {
+  return accessCode.trim().toLowerCase();
 }
 
-export function resolvePilotRole(username: string): PilotRole | null {
-  const normalised = normalisePilotUsername(username);
+export function resolvePilotRole(accessCode: string): PilotRole | null {
+  const normalised = normalisePilotAccessCode(accessCode);
   const role = PILOT_USER_ROLES[normalised as keyof typeof PILOT_USER_ROLES];
   return role ?? null;
 }
@@ -42,7 +42,7 @@ function safeDecode(raw: string): string {
 }
 
 export function serializePilotSession(session: PilotSession): string {
-  return `${encodeURIComponent(session.username)}${SESSION_SEPARATOR}${session.role}`;
+  return `${encodeURIComponent(session.accessCode)}${SESSION_SEPARATOR}${session.role}`;
 }
 
 export function parsePilotSession(cookieValue: string | null | undefined): PilotSession | null {
@@ -51,16 +51,16 @@ export function parsePilotSession(cookieValue: string | null | undefined): Pilot
   const parts = cookieValue.split(SESSION_SEPARATOR);
   if (parts.length !== 2) return null;
 
-  const [encodedUsername, rolePart] = parts;
-  if (!encodedUsername || !isPilotRole(rolePart)) return null;
+  const [encodedAccessCode, rolePart] = parts;
+  if (!encodedAccessCode || !isPilotRole(rolePart)) return null;
 
-  const username = safeDecode(encodedUsername);
-  const resolvedRole = resolvePilotRole(username);
+  const accessCode = safeDecode(encodedAccessCode);
+  const resolvedRole = resolvePilotRole(accessCode);
 
   if (resolvedRole !== rolePart) return null;
 
   return {
-    username,
+    accessCode,
     role: resolvedRole
   };
 }

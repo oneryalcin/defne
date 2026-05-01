@@ -271,6 +271,7 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   // load on Start. Without this, the cover and the started round each
   // run the selector independently and the random tie-break causes them
   // to disagree.
+  abandonStaleInProgressRounds(db);
   if (!hasInProgressRound(db)) {
     startRoundMission(targetQuestionCount);
   }
@@ -372,6 +373,7 @@ function roundSelectionFromLiveRound(
 
 export function startRoundMission(roundWordCount = 8): string {
   const db = getDb();
+  abandonStaleInProgressRounds(db);
 
   // Reuse the in-progress round if one already exists. The cover preview
   // commits one when the user lands on /child, so the words shown there
@@ -439,6 +441,53 @@ export function startRoundMission(roundWordCount = 8): string {
   );
 
   return sessionId;
+}
+
+function abandonStaleInProgressRounds(db: DatabaseSync): void {
+  const learnerId = defaultLearnerId();
+  const rows = db
+    .prepare(
+      `SELECT id, session_id, started_at
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC, created_at DESC`
+    )
+    .all(learnerId) as Array<{ id: string; session_id: string; started_at: string }>;
+  if (rows.length === 0) return;
+
+  const latestCompleted = db
+    .prepare(
+      `SELECT MAX(ended_at) AS ended_at
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'completed'`
+    )
+    .get(learnerId) as { ended_at: string | null } | undefined;
+  const latestCompletedAt = latestCompleted?.ended_at
+    ? new Date(latestCompleted.ended_at).getTime()
+    : null;
+
+  const stillCurrent = rows.filter((row) => {
+    if (!latestCompletedAt) return true;
+    const startedAt = new Date(row.started_at).getTime();
+    return Number.isFinite(startedAt) && startedAt > latestCompletedAt;
+  });
+  const keepRoundId = stillCurrent[0]?.id ?? null;
+  const stale = rows.filter((row) => row.id !== keepRoundId);
+  if (stale.length === 0) return;
+
+  const now = new Date().toISOString();
+  for (const row of stale) {
+    db.prepare(
+      `UPDATE practice_rounds
+       SET status = 'abandoned', ended_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'in_progress'`
+    ).run(now, now, row.id);
+    db.prepare(
+      `UPDATE practice_sessions
+       SET status = 'abandoned', ended_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'in_progress'`
+    ).run(now, now, row.session_id);
+  }
 }
 
 export function startDailyMission(targetQuestionCount = 15): string {

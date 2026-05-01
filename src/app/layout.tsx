@@ -23,7 +23,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   const navItems: NavItem[] = session
     ? session.role === "child"
-      ? [{ href: "/child", label: "Child" }]
+      ? [
+        { href: "/child", label: "Child" },
+        { href: "/child/words", label: "Words" }
+        ]
       : [{ href: "/parent", label: "Parent" }]
     : [
       { href: "/child", label: "Child" },
@@ -45,7 +48,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 {item.label}
               </Link>
             ))}
-            {session ? <span className="role-chip">{session.username}</span> : null}
+            {session ? <span className="role-chip">{session.role}</span> : null}
             {session ? (
               <form action={logoutAction}>
                 <button className="button-secondary" type="submit">

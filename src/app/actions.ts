@@ -14,17 +14,17 @@ import {
   PILOT_SESSION_COOKIE,
   getSessionTtlSeconds,
   parsePilotSession,
-  normalisePilotUsername,
+  normalisePilotAccessCode,
   resolvePilotRole,
   roleHomePath,
   serializePilotSession
 } from "@/lib/pilotAuth";
 
-async function setPilotCookie(username: string, role: "child" | "parent"): Promise<void> {
+async function setPilotCookie(accessCode: string, role: "child" | "parent"): Promise<void> {
   const jar = await cookies();
   jar.set({
     name: PILOT_SESSION_COOKIE,
-    value: serializePilotSession({ username, role }),
+    value: serializePilotSession({ accessCode, role }),
     path: "/",
     httpOnly: true,
     sameSite: "lax",
@@ -42,15 +42,15 @@ async function requireRole(expectedRole: "child" | "parent"): Promise<void> {
 }
 
 export async function loginAction(formData: FormData): Promise<void> {
-  const username = normalisePilotUsername(String(formData.get("username") ?? ""));
-  const role = resolvePilotRole(username);
+  const accessCode = normalisePilotAccessCode(String(formData.get("accessCode") ?? ""));
+  const role = resolvePilotRole(accessCode);
   const next = String(formData.get("next") ?? "");
 
   if (!role) {
     redirect("/?error=unknown_user");
   }
 
-  await setPilotCookie(username, role);
+  await setPilotCookie(accessCode, role);
   redirect(next.startsWith("/") ? next : roleHomePath(role));
 }
 

@@ -7,6 +7,7 @@ Local-first vocabulary practice app for the family pilot.
 This is MVP-1A:
 
 - deterministic vocabulary missions
+- round-based learn-card, meaning, and context practice
 - SQLite persistence
 - seed vocabulary import
 - separate meaning, usage, and spelling mastery

@@ -12,8 +12,8 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
   return (
     <main className="page">
       <section className="page-title">
-        <h1>Mission summary</h1>
-        <p>What moved forward in this session, and what should come back tomorrow.</p>
+        <h1>Round summary</h1>
+        <p>{summary.round?.explanation ?? "What moved forward in this session, and what should come back tomorrow."}</p>
       </section>
 
       <section className="dashboard-grid">
@@ -31,10 +31,18 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
         />
         <SummaryPanel
           icon={<RotateCcw size={24} />}
-          title="Revisit tomorrow"
+          title={summary.round ? "Near review" : "Revisit tomorrow"}
           empty="Nothing urgent to revisit."
           items={summary.revisitTomorrow ?? []}
         />
+        {summary.round ? (
+          <SummaryPanel
+            icon={<CheckCircle2 size={24} />}
+            title="First-attempt secure"
+            empty="No words were secure on both first attempts yet."
+            items={summary.round.firstAttemptSecureWords}
+          />
+        ) : null}
       </section>
 
       <div className="action-row">

@@ -1,10 +1,31 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createOrUpdateParentWord, importWordShells, startDailyMission, submitSessionAnswer } from "@/lib/db/repository";
+import {
+  createOrUpdateParentWord,
+  importWordShells,
+  recordRoundCardView,
+  startRoundMeaningRecognition,
+  startRoundMission,
+  submitSessionAnswer
+} from "@/lib/db/repository";
 
 export async function startMissionAction(): Promise<void> {
-  const sessionId = startDailyMission(15);
+  const sessionId = startRoundMission(8);
+  redirect(`/child/session/${sessionId}`);
+}
+
+export async function recordCardViewAction(formData: FormData): Promise<void> {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const wordId = String(formData.get("wordId") ?? "");
+  const returnToWordId = String(formData.get("returnToWordId") ?? "");
+  recordRoundCardView(sessionId, wordId);
+  redirect(returnToWordId ? `/child/session/${sessionId}?card=${encodeURIComponent(returnToWordId)}` : `/child/session/${sessionId}`);
+}
+
+export async function startMeaningRecognitionAction(formData: FormData): Promise<void> {
+  const sessionId = String(formData.get("sessionId") ?? "");
+  startRoundMeaningRecognition(sessionId);
   redirect(`/child/session/${sessionId}`);
 }
 
@@ -21,7 +42,11 @@ export async function submitAnswerAction(formData: FormData): Promise<void> {
     responseTimeMs: Number.isFinite(responseTimeMs) ? responseTimeMs : 0
   });
 
-  redirect(result.completed ? `/child/session/${sessionId}/summary` : `/child/session/${sessionId}`);
+  redirect(
+    result.attemptId
+      ? `/child/session/${sessionId}?attemptId=${result.attemptId}`
+      : `/child/session/${sessionId}/summary`
+  );
 }
 
 export async function saveWordAction(formData: FormData): Promise<void> {

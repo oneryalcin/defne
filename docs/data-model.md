@@ -242,6 +242,10 @@ CREATE TABLE learner_word_state (
 
   failure_types_json TEXT NOT NULL DEFAULT '[]',
   confused_with_word_ids_json TEXT NOT NULL DEFAULT '[]',
+  near_review INTEGER NOT NULL DEFAULT 0 CHECK (near_review IN (0, 1)),
+  eligible_questions_since_last_mistake INTEGER NOT NULL DEFAULT 0 CHECK (
+    eligible_questions_since_last_mistake >= 0
+  ),
 
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -250,7 +254,9 @@ CREATE TABLE learner_word_state (
 );
 ```
 
-This table is the main input to decay-based session selection.
+This table is the main input to decay-based session selection. `near_review`
+is a scheduling flag for words that completed a round but still carry fresh
+mistake evidence; it is not a mastery colour.
 
 ### `practice_sessions`
 
@@ -272,6 +278,39 @@ CREATE TABLE practice_sessions (
 );
 ```
 
+### `practice_rounds`
+
+Stores one focused round inside a session. A round is narrower than a whole
+daily mission: it tracks the 6 to 10 words currently moving through learn cards,
+meaning recognition, context usage, and later spelling production.
+
+```sql
+CREATE TABLE practice_rounds (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+  learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'abandoned')),
+  current_step TEXT NOT NULL DEFAULT 'learn_cards' CHECK (current_step IN (
+    'learn_cards',
+    'meaning_recognition',
+    'context_usage',
+    'spelling_production'
+  )),
+  max_retry_passes INTEGER NOT NULL DEFAULT 3 CHECK (max_retry_passes > 0),
+  word_ids_json TEXT NOT NULL,
+  card_view_counts_json TEXT NOT NULL DEFAULT '{}',
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  summary_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+`summary_json` should include parent-facing distinctions such as first-attempt
+secure, eventually-correct, reveal-and-move-on, near-review, and spelling still
+weak.
+
 ### `practice_attempts`
 
 Stores every question attempt.
@@ -280,6 +319,7 @@ Stores every question attempt.
 CREATE TABLE practice_attempts (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES practice_sessions(id) ON DELETE CASCADE,
+  round_id TEXT REFERENCES practice_rounds(id) ON DELETE SET NULL,
   learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
   word_id TEXT NOT NULL REFERENCES words(id) ON DELETE CASCADE,
 
@@ -303,6 +343,20 @@ CREATE TABLE practice_attempts (
   max_hint_level_available INTEGER NOT NULL DEFAULT 0 CHECK (max_hint_level_available >= 0),
   response_time_ms INTEGER NOT NULL DEFAULT 0 CHECK (response_time_ms >= 0),
 
+  round_step TEXT CHECK (round_step IN (
+    'learn_cards',
+    'meaning_recognition',
+    'context_usage',
+    'spelling_production'
+  )),
+  pass_number INTEGER CHECK (pass_number IS NULL OR pass_number > 0),
+  attempt_number_for_word_in_step INTEGER CHECK (
+    attempt_number_for_word_in_step IS NULL OR attempt_number_for_word_in_step > 0
+  ),
+  first_attempt_correct INTEGER CHECK (first_attempt_correct IN (0, 1)),
+  eventually_correct INTEGER CHECK (eventually_correct IN (0, 1)),
+  reveal_and_move_on INTEGER NOT NULL DEFAULT 0 CHECK (reveal_and_move_on IN (0, 1)),
+
   failure_type TEXT CHECK (failure_type IN (
     'none',
     'meaning_unknown',
@@ -319,6 +373,10 @@ CREATE TABLE practice_attempts (
 ```
 
 `failure_type` should be `none` for correct answers unless a correct answer still required heavy hints and should be reviewed.
+
+Round fields are nullable because daily-mission attempts can exist outside the
+round-based mode. When present, they preserve the difference between mastery
+evidence and round-completion evidence.
 
 ### `generated_hints`
 
@@ -391,8 +449,12 @@ CREATE TABLE generated_images (
 CREATE INDEX idx_words_status ON words(status);
 CREATE INDEX idx_learner_word_state_learner_colour ON learner_word_state(learner_id, mastery_colour);
 CREATE INDEX idx_learner_word_state_next_review ON learner_word_state(learner_id, next_review_at);
+CREATE INDEX idx_learner_word_state_near_review ON learner_word_state(learner_id, near_review, next_review_at);
 CREATE INDEX idx_practice_sessions_learner_started ON practice_sessions(learner_id, started_at);
+CREATE INDEX idx_practice_rounds_session ON practice_rounds(session_id);
+CREATE INDEX idx_practice_rounds_learner_status ON practice_rounds(learner_id, status);
 CREATE INDEX idx_practice_attempts_session ON practice_attempts(session_id);
+CREATE INDEX idx_practice_attempts_round_step ON practice_attempts(round_id, round_step, pass_number);
 CREATE INDEX idx_practice_attempts_learner_word ON practice_attempts(learner_id, word_id, created_at);
 CREATE INDEX idx_generated_hints_word_status ON generated_hints(word_id, status);
 CREATE INDEX idx_generated_examples_word_status ON generated_examples(word_id, status);

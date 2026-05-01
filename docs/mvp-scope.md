@@ -106,6 +106,9 @@ MVP must include:
 - Daily mission session structure.
 
 See [Mastery Scoring And Session Selection](mastery-scoring-and-session-selection.md) for the learning algorithm.
+See [Round-Based Vocabulary Mode](round-based-vocabulary-mode.md) for the batch
+learning flow: learn cards, definition recognition, sentence-context use, retry
+of missed words, and first-attempt versus eventually-correct scoring.
 
 ## Exercise Types In MVP
 
@@ -119,6 +122,12 @@ Include these exercise types first:
 - Choose between confusable words.
 - Spot incorrect spelling.
 - Type the word from memory.
+
+The initial child mission may present these as a mixed daily mission or as a
+round-based vocabulary mission. In the round-based version, Step 2 tests
+definition recognition and Step 3 tests sentence-context usage. A child may retry
+missed words until all are eventually correct, but first-attempt mistakes still
+feed the mastery and scheduling engine.
 
 Do not build full crosswords or large puzzle modes in MVP. They belong in the roadmap.
 
@@ -236,6 +245,7 @@ MVP-1A is successful if:
 - The parent can paste at least 5 words in one batch and then complete missing canonical fields.
 - The app records every attempt with session, word, question type, correctness, hint level, response time, and failure type.
 - At least 5 exercise types are playable: definition, synonym, sentence usage, confusable word, and type-from-memory spelling.
+- Round-based sessions distinguish `first_attempt_correct` from `eventually_correct` when retries are allowed.
 - Mastery colours update after attempts and use separate meaning, usage, and spelling mastery.
 - A word with weak spelling cannot become green even if meaning questions are answered correctly.
 - Session selection shows weak or due words before stable green words in a seeded deterministic test.

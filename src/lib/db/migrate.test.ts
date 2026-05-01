@@ -25,10 +25,19 @@ describe("SQLite setup", () => {
     const words = db.prepare("SELECT COUNT(*) AS count FROM words").get() as { count: number };
     const states = db.prepare("SELECT COUNT(*) AS count FROM learner_word_state").get() as { count: number };
 
-    expect(migrations.count).toBe(1);
+    expect(migrations.count).toBe(3);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
+
+    const roundsTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'practice_rounds'").get();
+    const roundIdColumn = db.prepare("PRAGMA table_info(practice_attempts)").all() as Array<{ name: string }>;
+    expect(roundsTable).toBeTruthy();
+    expect(roundIdColumn.some((column) => column.name === "round_id")).toBe(true);
+    expect(roundIdColumn.some((column) => column.name === "first_attempt_correct")).toBe(true);
+
+    const stateColumns = db.prepare("PRAGMA table_info(learner_word_state)").all() as Array<{ name: string }>;
+    expect(stateColumns.some((column) => column.name === "near_review")).toBe(true);
   });
 
   it("enforces foreign keys", () => {

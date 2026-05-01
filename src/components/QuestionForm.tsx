@@ -15,7 +15,6 @@ export function QuestionForm({
   const [hintLevel, setHintLevel] = useState(0);
   const responseTimeRef = useRef<HTMLInputElement>(null);
   const startedAtRef = useRef<number>(Date.now());
-  const visibleHints = question.hints.slice(0, hintLevel);
 
   return (
     <form
@@ -53,13 +52,23 @@ export function QuestionForm({
         />
       )}
 
-      {visibleHints.length > 0 ? (
-        <div className="choice-grid" aria-live="polite">
-          {visibleHints.map((hint, index) => (
-            <div className="hint-box" key={`${hint}-${index}`}>
-              Hint {index + 1}: {hint}
-            </div>
-          ))}
+      {question.hints.length > 0 ? (
+        <div className="hint-ladder" aria-live="polite">
+          <div className="hint-ladder-header">
+            <strong>Hint ladder</strong>
+            <span>
+              {hintLevel} of {question.hints.length} opened
+            </span>
+          </div>
+          {question.hints.map((hint, index) => {
+            const isOpen = index < hintLevel;
+            return (
+              <div className={`hint-step${isOpen ? " hint-step-open" : ""}`} key={`${hint}-${index}`}>
+                <span className="hint-index">Hint {index + 1}</span>
+                <span>{isOpen ? hint : "Locked until you ask for the next hint."}</span>
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
@@ -74,7 +83,6 @@ export function QuestionForm({
         </button>
         <SubmitButton />
       </div>
-
     </form>
   );
 }

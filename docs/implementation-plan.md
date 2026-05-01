@@ -131,6 +131,10 @@ Build:
 
 - Daily mission route.
 - 12 to 20 question session.
+- Optional round-based mission structure for a 6 to 10 word batch:
+  - Step 1: learn cards with word, definition, context, synonyms, antonyms, spelling note, and confusable support.
+  - Step 2: definition recognition with retry of missed words only.
+  - Step 3: sentence gap-fill with retry of missed sentences only.
 - Progress indicator.
 - Hint button using deterministic hints.
 - Attempt recording.
@@ -140,6 +144,9 @@ Build:
 Acceptance checks:
 
 - Child can complete a session without parent/admin controls visible.
+- In round-based mode, Step 1 stays locked until every card has been viewed at least twice.
+- In round-based mode, Step 2 and Step 3 repeat only missed words until all are eventually correct.
+- In round-based mode, first-attempt correctness and eventual correctness are recorded separately.
 - Every question creates one `practice_attempts` row.
 - Completing the session updates `practice_sessions.status` to `completed`.
 - End screen shows words improved, spelling traps, and words to revisit.

@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { openDatabase } from "./client";
+import { closeDatabaseForTests, openDatabase } from "./client";
 import { runMigrations } from "./migrate";
 import { seedInitialData } from "./seed";
 
@@ -13,4 +13,9 @@ export function getDb(): DatabaseSync {
     initialized = true;
   }
   return db;
+}
+
+export function resetDbForTests(): void {
+  closeDatabaseForTests();
+  initialized = false;
 }

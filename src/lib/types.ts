@@ -48,6 +48,8 @@ export interface LearnerWordState {
   averageResponseTimeMs: number;
   failureTypes: FailureType[];
   confusedWithWordIds: string[];
+  nearReview: boolean;
+  eligibleQuestionsSinceLastMistake: number;
 }
 
 export interface PracticeWord {
@@ -72,6 +74,7 @@ export interface PracticeAttemptOutcome {
   responseTimeMs: number;
   failureType: FailureType;
   answeredAt: string;
+  masteryCredit?: "normal" | "recovery";
 }
 
 export interface SessionPlanItem {
@@ -84,5 +87,14 @@ export interface SessionSummary {
   wordsImproved?: string[];
   spellingTraps?: string[];
   revisitTomorrow?: string[];
+  round?: {
+    roundId: string;
+    firstAttemptSecureWords: string[];
+    eventuallyCorrectWords: string[];
+    revealAndMoveOnWords: string[];
+    nearReviewWords: string[];
+    spellingStillWeakWords: string[];
+    explanation: string;
+  };
   completedAt?: string;
 }

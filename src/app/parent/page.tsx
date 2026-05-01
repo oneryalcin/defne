@@ -42,6 +42,20 @@ export default function ParentDashboardPage() {
         </Link>
       </div>
 
+      {dashboard.latestRound ? (
+        <section className="panel round-parent-panel">
+          <ListChecks size={24} />
+          <h2>Latest round evidence</h2>
+          <p>{dashboard.latestRound.explanation}</p>
+          <div className="round-evidence-grid">
+            <EvidenceList title="First-attempt secure" items={dashboard.latestRound.firstAttemptSecureWords} />
+            <EvidenceList title="Completed with recovery" items={dashboard.latestRound.eventuallyCorrectWords} />
+            <EvidenceList title="Near review" items={dashboard.latestRound.nearReviewWords} />
+            <EvidenceList title="Spelling still weak" items={dashboard.latestRound.spellingStillWeakWords} />
+          </div>
+        </section>
+      ) : null}
+
       <section className="dashboard-grid">
         <Panel title="Red and orange words" icon={<AlertTriangle size={24} />}>
           <WordList words={dashboard.redOrangeWords} />
@@ -75,6 +89,23 @@ export default function ParentDashboardPage() {
         </Panel>
       </section>
     </main>
+  );
+}
+
+function EvidenceList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <span className="metric-label">{title}</span>
+      {items.length > 0 ? (
+        <ul className="mini-list">
+          {items.slice(0, 6).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="empty-state compact-empty">None yet.</p>
+      )}
+    </div>
   );
 }
 

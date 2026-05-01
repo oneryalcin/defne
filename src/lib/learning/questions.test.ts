@@ -7,7 +7,8 @@ describe("question generation", () => {
     makeWord("reluctant", "not willing to do something", ["hesitant"], ["eager"], ["reticent"]),
     makeWord("abundant", "more than enough", ["plentiful"], ["scarce"], []),
     makeWord("vivid", "bright and clear", ["bright"], ["dull"], []),
-    makeWord("timid", "shy or nervous", ["shy"], ["bold"], [])
+    makeWord("timid", "shy or nervous", ["shy"], ["bold"], []),
+    makeWord("remote", "far away from other places", ["distant"], ["near"], [])
   ];
 
   it("creates deterministic definition questions with one expected answer", () => {
@@ -35,6 +36,50 @@ describe("question generation", () => {
   it("includes the canonical spelling among spelling-choice options", () => {
     const question = generateQuestion("spelling_choice", words[0], words);
     expect(question.choices).toContain("reluctant");
+  });
+
+  it("does not reveal the canonical answer before the final hint", () => {
+    const definitionQuestion = generateQuestion("definition_choice", words[0], words);
+    const synonymQuestion = generateQuestion("synonym_choice", words[0], words);
+    const spellingQuestion = generateQuestion("type_from_memory", words[0], words);
+
+    expect(definitionQuestion.canonicalAnswer).toBe("not willing to do something");
+    expect(definitionQuestion.hints.slice(0, -1).join(" ").toLowerCase()).not.toContain("not willing to do something");
+    expect(synonymQuestion.canonicalAnswer).toBe("hesitant");
+    expect(synonymQuestion.hints.slice(0, -1).join(" ").toLowerCase()).not.toContain("hesitant");
+    expect(spellingQuestion.canonicalAnswer).toBe("reluctant");
+    expect(spellingQuestion.hints.slice(0, -1).join(" ").toLowerCase()).not.toContain("reluctant");
+    expect(synonymQuestion.hints.at(-1)).toContain("hesitant");
+    expect(spellingQuestion.hints.at(-1)).toContain("reluctant");
+  });
+
+  it("uses a blanked example for hidden-target hints", () => {
+    const question = generateQuestion(
+      "type_from_memory",
+      {
+        ...words[0],
+        word: "hinder",
+        normalizedWord: "hinder",
+        example: "The heavy rain hindered their journey.",
+        spellingNote: "hin + der"
+      },
+      words
+    );
+
+    expect(question.hints[0]).toContain("The heavy rain _____ their journey.");
+    expect(question.hints[0].toLowerCase()).not.toContain("hinder");
+    expect(question.hints.slice(0, -1).join(" ").toLowerCase()).not.toContain("hin + der");
+  });
+
+  it("prefers same-round words as multiple-choice distractors", () => {
+    const question = generateQuestion("definition_choice", words[0], words, {
+      preferredDistractorWordIds: [words[1].id, words[2].id, words[3].id]
+    });
+
+    expect(question.choices).toContain("more than enough");
+    expect(question.choices).toContain("bright and clear");
+    expect(question.choices).toContain("shy or nervous");
+    expect(question.choices).not.toContain("far away from other places");
   });
 });
 
@@ -81,6 +126,8 @@ function makeState(wordId: string): LearnerWordState {
     averageHintLevelUsed: 0,
     averageResponseTimeMs: 0,
     failureTypes: [],
-    confusedWithWordIds: []
+    confusedWithWordIds: [],
+    nearReview: false,
+    eligibleQuestionsSinceLastMistake: 0
   };
 }

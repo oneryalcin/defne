@@ -16,14 +16,23 @@ export interface PracticeQuestion {
   targetWord: string;
 }
 
+export interface QuestionGenerationOptions {
+  preferredDistractorWordIds?: string[];
+}
+
 export interface AnswerAssessment {
   isCorrect: boolean;
   failureType: FailureType;
   normalizedSubmitted: string;
 }
 
-export function generateQuestion(questionType: QuestionType, target: PracticeWord, allWords: PracticeWord[]): PracticeQuestion {
-  const distractors = stableDistractors(target, allWords);
+export function generateQuestion(
+  questionType: QuestionType,
+  target: PracticeWord,
+  allWords: PracticeWord[],
+  options: QuestionGenerationOptions = {}
+): PracticeQuestion {
+  const distractors = stableDistractors(target, allWords, options.preferredDistractorWordIds ?? []);
   const definitionDistractors = distractors.map((word) => word.definition).filter(Boolean);
   const synonymDistractors = distractors.flatMap((word) => word.synonyms).filter(Boolean);
   const antonymDistractors = distractors.flatMap((word) => word.antonyms).filter(Boolean);
@@ -88,7 +97,7 @@ export function generateQuestion(questionType: QuestionType, target: PracticeWor
         choices: shuffleChoices(target.word, choices, target.id),
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target),
+        hints: deterministicHints(target, target.word),
         targetWord: target.word
       };
     }
@@ -103,7 +112,7 @@ export function generateQuestion(questionType: QuestionType, target: PracticeWor
         choices,
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target),
+        hints: deterministicHints(target, target.word),
         targetWord: target.word
       };
     }
@@ -117,7 +126,7 @@ export function generateQuestion(questionType: QuestionType, target: PracticeWor
         choices: [],
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target),
+        hints: deterministicHints(target, target.word),
         targetWord: target.word
       };
   }
@@ -163,25 +172,44 @@ function choiceQuestion(
     choices,
     expectedAnswers: [normaliseAnswer(canonicalAnswer)],
     canonicalAnswer,
-    hints: deterministicHints(target),
+    hints: deterministicHints(target, canonicalAnswer),
     targetWord: target.word
   };
 }
 
-function deterministicHints(word: PracticeWord): string[] {
-  const hints = [
-    `It has a meaning close to: ${word.synonyms[0] ?? word.definition}.`,
-    word.example,
-    word.spellingNote ? `Spelling trap: ${word.spellingNote}` : `It begins with "${word.word.slice(0, 1)}".`,
-    `Answer reveal: ${word.word}`
-  ];
-  return hints;
+function deterministicHints(word: PracticeWord, canonicalAnswer: string): string[] {
+  const answerIsTargetWord = normaliseAnswer(canonicalAnswer) === normaliseAnswer(word.word);
+  const contextSentence = answerIsTargetWord ? sentenceWithTargetBlanked(word) : word.example.trim();
+  const thinkingPrompt = contextSentence
+    ? answerIsTargetWord
+      ? `Context clue: What action, feeling, or quality fits this sentence? ${contextSentence}`
+      : `Context clue: In this sentence, what is happening around "${word.word}"? ${contextSentence}`
+    : answerIsTargetWord
+      ? "Context clue: Think about the situation first, then choose the word that fits it."
+      : `Context clue: Think about whether "${word.word}" describes a feeling, an action, a quality, or a result.`;
+  const contrastPrompt = answerIsTargetWord
+    ? "Careful comparison: remove choices that do not fit the sentence or clue."
+    : word.confusables[0]
+      ? `Careful comparison: do not just pick a word that looks or sounds like "${word.confusables[0]}"; check the sentence meaning.`
+      : `Careful comparison: remove choices that do not fit how "${word.word}" is used.`;
+  const shapeHint = "Word-shape clue: say the word slowly in your head and listen for its parts before choosing.";
+
+  return [thinkingPrompt, contrastPrompt, shapeHint, `Answer reveal: ${canonicalAnswer}`];
 }
 
-function stableDistractors(target: PracticeWord, allWords: PracticeWord[]): PracticeWord[] {
+function stableDistractors(target: PracticeWord, allWords: PracticeWord[], preferredWordIds: string[]): PracticeWord[] {
+  const preferred = new Set(preferredWordIds);
   return allWords
     .filter((word) => word.id !== target.id)
-    .sort((a, b) => stableHash(`${target.id}:${a.id}`) - stableHash(`${target.id}:${b.id}`))
+    .sort((a, b) => {
+      const preferredDelta = Number(preferred.has(b.id)) - Number(preferred.has(a.id));
+      if (preferredDelta !== 0) return preferredDelta;
+      const confusableDelta =
+        Number(target.confusables.some((confusable) => normaliseAnswer(confusable) === normaliseAnswer(b.word))) -
+        Number(target.confusables.some((confusable) => normaliseAnswer(confusable) === normaliseAnswer(a.word)));
+      if (confusableDelta !== 0) return confusableDelta;
+      return stableHash(`${target.id}:${a.id}`) - stableHash(`${target.id}:${b.id}`);
+    })
     .slice(0, 8);
 }
 
@@ -218,6 +246,15 @@ function sentenceWithBlank(target: PracticeWord): string {
     return target.example.replace(pattern, "_____");
   }
   return `A word meaning "${target.definition}" is _____.`;
+}
+
+function sentenceWithTargetBlanked(target: PracticeWord): string {
+  const escaped = target.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\b${escaped}(?:s|ed|ing)?\\b`, "i");
+  if (pattern.test(target.example)) {
+    return target.example.replace(pattern, "_____");
+  }
+  return "";
 }
 
 function replaceWordInSentence(sentence: string, originalWord: string, replacement: string): string {

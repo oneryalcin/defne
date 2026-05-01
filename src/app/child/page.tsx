@@ -7,20 +7,20 @@ import { MasteryBadge } from "@/components/MasteryBadge";
 export const dynamic = "force-dynamic";
 
 export default function ChildPage() {
-  const preview = getMissionPreview(15);
+  const preview = getMissionPreview(8);
 
   return (
     <main className="page">
       <section className="two-column">
         <div className="mission-panel">
           <div className="page-title">
-            <h1>Today&apos;s word mission</h1>
-            <p>Short, focused practice. Answer carefully, use hints when stuck, and rescue the words that need work.</p>
+            <h1>Today&apos;s word round</h1>
+            <p>Learn a small set first, then prove meaning and usage. Mistakes get repaired without pretending they were first-try recall.</p>
           </div>
 
           <div className="mission-strip">
             <div className="metric-strip">
-              <span className="metric-label">Questions</span>
+              <span className="metric-label">Words</span>
               <span className="metric-value">{preview.targetQuestionCount}</span>
             </div>
             <div className="metric-strip">
@@ -29,7 +29,7 @@ export default function ChildPage() {
             </div>
             <div className="metric-strip">
               <span className="metric-label">Focus</span>
-              <span className="metric-value">Recall</span>
+              <span className="metric-value">Round</span>
             </div>
           </div>
 
@@ -48,7 +48,7 @@ export default function ChildPage() {
           <form action={startMissionAction} className="action-row">
             <button className="button" type="submit">
               <Target size={18} />
-              Start mission
+              Start round
             </button>
             <span className="button-secondary" aria-label="Estimated time">
               <Clock size={18} />

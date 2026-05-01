@@ -122,6 +122,8 @@ function makeState(overrides: Partial<LearnerWordState> = {}): LearnerWordState 
     averageResponseTimeMs: 0,
     failureTypes: [],
     confusedWithWordIds: [],
+    nearReview: false,
+    eligibleQuestionsSinceLastMistake: 0,
     ...overrides
   };
 }

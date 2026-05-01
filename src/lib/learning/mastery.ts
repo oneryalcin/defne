@@ -7,6 +7,7 @@ import type {
   QuestionType,
   SessionPlanItem
 } from "../types";
+import { mistakeRecencyWeight } from "./rounds";
 
 const MINUTES_TOO_RECENT = 12;
 const REVIEW_THRESHOLD = 0.72;
@@ -80,8 +81,8 @@ export function priorityScore(word: PracticeWord, nowIso: string): number {
   const dueScore = 1 - recall;
   const weaknessScore = 1 - weakestMastery(state);
 
-  const recentWrongDays = daysBetween(state.lastWrongAt, nowIso);
-  const recentFailureBonus = recentWrongDays <= 2 ? 0.45 : 0;
+  const hoursSinceWrong = daysBetween(state.lastWrongAt, nowIso) * 24;
+  const recentFailureBonus = Number.isFinite(hoursSinceWrong) ? 0.45 * mistakeRecencyWeight(hoursSinceWrong) : 0;
   const spellingTrapBonus = word.spellingNote && state.spellingMastery < 0.75 ? 0.25 : 0;
   const weakest = weakestMastery(state);
   const almostMasteredBonus = weakest >= 0.75 && weakest < 0.9 ? 0.18 : 0;
@@ -101,7 +102,7 @@ export function updateStateAfterAttempt(state: LearnerWordState, outcome: Practi
   const speedPenalty = outcome.responseTimeMs > 18_000 ? 0.015 : 0;
 
   const baseIncrease = 0.12 + productionBonus + delayBonus - hintPenalty - speedPenalty;
-  const increase = Math.max(0.018, baseIncrease);
+  const increase = outcome.masteryCredit === "recovery" ? Math.max(0, Math.min(0.015, baseIncrease * 0.18)) : Math.max(0.018, baseIncrease);
   const decrease = outcome.hintLevelUsed > 0 ? 0.08 : 0.12;
 
   const next: LearnerWordState = {
@@ -118,11 +119,14 @@ export function updateStateAfterAttempt(state: LearnerWordState, outcome: Practi
   if (outcome.isCorrect) {
     next.correctCount += 1;
     next.lastCorrectAt = outcome.answeredAt;
-    next.stabilityDays = state.stabilityDays * (daysSinceSeen >= 1 ? 1.4 : 1.1);
+    next.stabilityDays =
+      outcome.masteryCredit === "recovery" ? state.stabilityDays : state.stabilityDays * (daysSinceSeen >= 1 ? 1.4 : 1.1);
     setDimension(next, dimension, clamp01(getDimension(next, dimension) + increase));
   } else {
     next.wrongCount += 1;
     next.lastWrongAt = outcome.answeredAt;
+    next.nearReview = true;
+    next.eligibleQuestionsSinceLastMistake = 0;
     next.stabilityDays = Math.max(1, state.stabilityDays * 0.5);
     setDimension(next, dimension, clamp01(getDimension(next, dimension) - decrease));
     if (outcome.failureType !== "none" && !next.failureTypes.includes(outcome.failureType)) {

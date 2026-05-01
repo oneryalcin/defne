@@ -213,6 +213,58 @@ wrong without hint: stronger decrease
 
 Delayed recall should count more than immediate repetition.
 
+## First Attempt Versus Eventually Correct
+
+For round-based practice, distinguish two different signals:
+
+```text
+first_attempt_correct
+eventually_correct
+```
+
+`eventually_correct` is useful for finishing a round and keeping the child moving.
+It should not erase the learning evidence from an earlier miss.
+
+`first_attempt_correct` is the stronger mastery signal. A word answered correctly
+only after two or three attempts should remain higher priority than a word
+answered correctly immediately.
+
+This distinction is especially important in the round-based mode described in
+[Round-Based Vocabulary Mode](round-based-vocabulary-mode.md).
+
+Suggested interpretation:
+
+```text
+first_attempt_correct:
+  apply the normal scoring weights from Updating Mastery After An Attempt
+
+eventually_correct after one or more mistakes:
+  allow progression within the round
+  apply only a small mastery increase, or no increase
+  keep a recent-failure bonus for near review
+
+wrong and not yet recovered:
+  decrease relevant mastery
+  increase recent-failure bonus
+```
+
+Round mistakes feed `recent_failure_bonus` using the 24-hour exponential decay
+defined in [Round-Based Vocabulary Mode](round-based-vocabulary-mode.md). That
+formula should be the only source of the round-mistake recency bonus.
+
+The implementation stores `near_review` on `learner_word_state` when a round
+word had a fresh mistake, including reveal-and-move-on. New rounds consider
+those words before ordinary decay-ranked candidates, but the score still comes
+from the same recent-mistake decay rather than a second hidden bonus.
+
+The child experience should remain forgiving. The data model should remain
+honest.
+
+The parent dashboard must explain the difference between effort and mastery.
+For example: "Defne completed 3 rounds for `cautious`, but it is still Building
+because two answers were eventually-correct rather than first-attempt." Without
+that explanation, a correct learning model can look unfair or broken.
+
 ## Updating Stability
 
 Stability should increase when the child recalls a word correctly after a meaningful delay.

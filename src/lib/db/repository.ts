@@ -1,7 +1,19 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { priorityScore, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import {
+  DEFAULT_ROUND_MAX_RETRY_PASSES,
+  canUnlockMeaningStep,
+  evaluateRoundStepProgress,
+  learnCardSupportMode,
+  nextRoundStepQuestion,
+  shouldKeepNearReview,
+  type LearnCardSupportMode,
+  type RoundLearningStep,
+  type RoundStep,
+  type RoundStepAttempt
+} from "../learning/rounds";
 import type {
   FailureType,
   LearnerWordState,
@@ -44,6 +56,8 @@ interface StateRow {
   average_response_time_ms: number;
   failure_types_json: string;
   confused_with_word_ids_json: string;
+  near_review: number;
+  eligible_questions_since_last_mistake: number;
 }
 
 interface SessionRow {
@@ -55,6 +69,22 @@ interface SessionRow {
   started_at: string;
   ended_at: string | null;
   summary_json: string;
+}
+
+interface PracticeRoundRow {
+  id: string;
+  session_id: string;
+  learner_id: string;
+  status: "in_progress" | "completed" | "abandoned";
+  current_step: RoundLearningStep;
+  max_retry_passes: number;
+  word_ids_json: string;
+  card_view_counts_json: string;
+  started_at: string;
+  ended_at: string | null;
+  summary_json: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MissionPreview {
@@ -69,12 +99,72 @@ export interface MissionPreview {
 }
 
 export interface SessionView {
+  mode: "daily_mission" | "round_mission";
   sessionId: string;
   status: SessionRow["status"];
   questionNumber: number;
   totalQuestions: number;
   question: PracticeQuestion | null;
   word: PracticeWord | null;
+  round: RoundSessionView | null;
+}
+
+export interface RoundSessionView {
+  roundId: string;
+  status: PracticeRoundRow["status"];
+  currentStep: RoundLearningStep;
+  wordCount: number;
+  cardViewCounts: Record<string, number>;
+  cards: RoundLearnCardView[];
+  selectedCard: RoundLearnCardView | null;
+  canUnlockMeaning: boolean;
+  question: PracticeQuestion | null;
+  word: PracticeWord | null;
+  passNumber: number | null;
+  attemptNumberForWordInStep: number | null;
+  isRetryPass: boolean;
+  remainingInPass: number;
+  stepProgressLabel: string;
+}
+
+export interface RoundLearnCardView {
+  id: string;
+  word: string;
+  definition: string;
+  example: string;
+  synonyms: string[];
+  antonyms: string[];
+  confusables: string[];
+  spellingNote: string | null;
+  viewCount: number;
+  supportMode: LearnCardSupportMode;
+  activeRecallPrompt: string;
+}
+
+export interface AttemptReview {
+  sessionId: string;
+  attemptId: string;
+  questionNumber: number;
+  totalQuestions: number;
+  isSessionComplete: boolean;
+  questionType: QuestionType;
+  prompt: string;
+  instruction: string;
+  choices: string[];
+  targetWord: string;
+  submittedAnswer: string;
+  canonicalAnswer: string;
+  isCorrect: boolean;
+  failureType: FailureType;
+  hintLevelUsed: number;
+  hints: string[];
+  spellingNote: string | null;
+  roundStep: RoundLearningStep | null;
+  passNumber: number | null;
+  attemptNumberForWordInStep: number | null;
+  firstAttemptCorrect: boolean | null;
+  eventuallyCorrect: boolean | null;
+  revealAndMoveOn: boolean;
 }
 
 export interface ParentWordListItem {
@@ -99,6 +189,7 @@ export interface ParentDashboard {
   spellingMistakes: Array<{ word: string; mistakes: number; note: string | null }>;
   dueWords: ParentWordListItem[];
   closeToGreen: ParentWordListItem[];
+  latestRound: SessionSummary["round"] | null;
 }
 
 export interface WordFormInput {
@@ -132,7 +223,7 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
   return { wordCount, completeWordCount, learnerName: learner?.display_name ?? "Learner" };
 }
 
-export function getMissionPreview(targetQuestionCount = 15): MissionPreview {
+export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   const words = getPracticeWords();
   const plan = selectSessionPlan(words, new Date().toISOString(), targetQuestionCount);
   const byId = new Map(words.map((word) => [word.id, word]));
@@ -150,6 +241,48 @@ export function getMissionPreview(targetQuestionCount = 15): MissionPreview {
       };
     })
   };
+}
+
+export function startRoundMission(roundWordCount = 8): string {
+  const db = getDb();
+  const words = getPracticeWords();
+  const wordIds = selectRoundWordIds(db, words, new Date().toISOString(), roundWordCount);
+  if (wordIds.length === 0) {
+    throw new Error("No complete vocabulary words are available for a round.");
+  }
+
+  const now = new Date().toISOString();
+  const sessionId = randomUUID();
+  const roundId = randomUUID();
+  const plan: SessionPlanItem[] = wordIds.flatMap((wordId) => [
+    { wordId, questionType: "definition_choice" },
+    { wordId, questionType: "fill_sentence" }
+  ]);
+  const summary: SessionSummary = { plan };
+
+  db.prepare(
+    `INSERT INTO practice_sessions
+      (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
+     VALUES (?, ?, 'daily_mission', 'in_progress', ?, 0, ?, ?, ?, ?)`
+  ).run(sessionId, defaultLearnerId(), plan.length, now, JSON.stringify(summary), now, now);
+
+  db.prepare(
+    `INSERT INTO practice_rounds
+      (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
+       card_view_counts_json, started_at, summary_json, created_at, updated_at)
+     VALUES (?, ?, ?, 'in_progress', 'learn_cards', ?, ?, '{}', ?, '{}', ?, ?)`
+  ).run(
+    roundId,
+    sessionId,
+    defaultLearnerId(),
+    DEFAULT_ROUND_MAX_RETRY_PASSES,
+    JSON.stringify(wordIds),
+    now,
+    now,
+    now
+  );
+
+  return sessionId;
 }
 
 export function startDailyMission(targetQuestionCount = 15): string {
@@ -171,9 +304,14 @@ export function startDailyMission(targetQuestionCount = 15): string {
   return sessionId;
 }
 
-export function getSessionView(sessionId: string): SessionView {
+export function getSessionView(sessionId: string, selectedCardId?: string): SessionView {
   const db = getDb();
   const session = getSessionRow(db, sessionId);
+  const round = getRoundRowForSession(db, sessionId);
+  if (round) {
+    return getRoundSessionView(db, session, round, selectedCardId);
+  }
+
   const plan = readSessionPlan(session);
   const attempts = getSessionAttemptCount(db, sessionId);
   const words = getPracticeWords();
@@ -186,7 +324,9 @@ export function getSessionView(sessionId: string): SessionView {
       questionNumber: Math.min(attempts, plan.length),
       totalQuestions: plan.length,
       question: null,
-      word: null
+      word: null,
+      mode: "daily_mission",
+      round: null
     };
   }
 
@@ -200,7 +340,9 @@ export function getSessionView(sessionId: string): SessionView {
     questionNumber: attempts + 1,
     totalQuestions: plan.length,
     question: generateQuestion(current.questionType, word, words),
-    word
+    word,
+    mode: "daily_mission",
+    round: null
   };
 }
 
@@ -209,17 +351,20 @@ export function submitSessionAnswer(input: {
   submittedAnswer: string;
   hintLevelUsed: number;
   responseTimeMs: number;
-}): { completed: boolean } {
+}): { completed: boolean; attemptId: string | null } {
   const db = getDb();
   const session = getSessionRow(db, input.sessionId);
-  if (session.status !== "in_progress") return { completed: true };
+  const round = getRoundRowForSession(db, input.sessionId);
+  if (round) return submitRoundAnswer(db, session, round, input);
+
+  if (session.status !== "in_progress") return { completed: true, attemptId: null };
 
   const plan = readSessionPlan(session);
   const attemptIndex = getSessionAttemptCount(db, input.sessionId);
   const current = plan[attemptIndex];
   if (!current) {
     completeSession(db, session.id);
-    return { completed: true };
+    return { completed: true, attemptId: null };
   }
 
   const words = getPracticeWords();
@@ -239,18 +384,25 @@ export function submitSessionAnswer(input: {
     answeredAt: now
   };
 
+  const attemptId = randomUUID();
   db.prepare(
     `INSERT INTO practice_attempts
       (id, session_id, learner_id, word_id, question_type, prompt_json, expected_answer_json,
        submitted_answer, is_correct, hint_level_used, max_hint_level_available, response_time_ms, failure_type, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    randomUUID(),
+    attemptId,
     session.id,
     defaultLearnerId(),
     word.id,
     current.questionType,
-    JSON.stringify({ prompt: question.prompt, instruction: question.instruction, choices: question.choices }),
+    JSON.stringify({
+      prompt: question.prompt,
+      instruction: question.instruction,
+      choices: question.choices,
+      hints: question.hints,
+      targetWord: question.targetWord
+    }),
     JSON.stringify({ expectedAnswers: question.expectedAnswers, canonicalAnswer: question.canonicalAnswer }),
     input.submittedAnswer,
     assessment.isCorrect ? 1 : 0,
@@ -275,7 +427,127 @@ export function submitSessionAnswer(input: {
     );
   }
 
-  return { completed };
+  return { completed, attemptId };
+}
+
+export function recordRoundCardView(sessionId: string, wordId: string): void {
+  const db = getDb();
+  const round = getRoundRowForSession(db, sessionId);
+  if (!round || round.status !== "in_progress" || round.current_step !== "learn_cards") return;
+
+  const wordIds = readRoundWordIds(round);
+  if (!wordIds.includes(wordId)) throw new Error(`Word ${wordId} is not part of round ${round.id}`);
+
+  const counts = readCardViewCounts(round);
+  counts[wordId] = (counts[wordId] ?? 0) + 1;
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `UPDATE practice_rounds
+     SET card_view_counts_json = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(JSON.stringify(counts), now, round.id);
+}
+
+export function startRoundMeaningRecognition(sessionId: string): void {
+  const db = getDb();
+  const round = getRoundRowForSession(db, sessionId);
+  if (!round || round.status !== "in_progress" || round.current_step !== "learn_cards") return;
+
+  const wordIds = readRoundWordIds(round);
+  if (!canUnlockMeaningStep(readCardViewCounts(round), wordIds)) {
+    throw new Error("Every round card must be reviewed twice before meaning recognition starts.");
+  }
+
+  db.prepare("UPDATE practice_rounds SET current_step = 'meaning_recognition', updated_at = ? WHERE id = ?").run(
+    new Date().toISOString(),
+    round.id
+  );
+}
+
+export function getAttemptReview(sessionId: string, attemptId: string): AttemptReview {
+  const db = getDb();
+  const session = getSessionRow(db, sessionId);
+  const plan = readSessionPlan(session);
+  const row = db
+    .prepare(
+      `SELECT a.id, a.session_id, a.word_id, a.question_type, a.prompt_json, a.expected_answer_json,
+              a.submitted_answer, a.is_correct, a.hint_level_used, a.failure_type, a.created_at,
+              a.round_step, a.pass_number, a.attempt_number_for_word_in_step,
+              a.first_attempt_correct, a.eventually_correct, a.reveal_and_move_on,
+              w.word, sn.note AS spelling_note
+       FROM practice_attempts a
+       JOIN words w ON w.id = a.word_id
+       LEFT JOIN spelling_notes sn ON sn.word_id = w.id
+       WHERE a.session_id = ? AND a.id = ?`
+    )
+    .get(sessionId, attemptId) as unknown as
+    | {
+        id: string;
+        session_id: string;
+        word_id: string;
+        question_type: QuestionType;
+        prompt_json: string;
+        expected_answer_json: string;
+        submitted_answer: string | null;
+        is_correct: number;
+        hint_level_used: number;
+        failure_type: FailureType;
+        created_at: string;
+        round_step: RoundLearningStep | null;
+        pass_number: number | null;
+        attempt_number_for_word_in_step: number | null;
+        first_attempt_correct: number | null;
+        eventually_correct: number | null;
+        reveal_and_move_on: number;
+        word: string;
+        spelling_note: string | null;
+      }
+    | undefined;
+
+  if (!row) throw new Error(`Unknown attempt ${attemptId} for session ${sessionId}`);
+
+  const prompt = JSON.parse(row.prompt_json) as {
+    prompt?: string;
+    instruction?: string;
+    choices?: string[];
+    hints?: string[];
+    targetWord?: string;
+  };
+  const expected = JSON.parse(row.expected_answer_json) as {
+    canonicalAnswer?: string;
+  };
+  const attemptIds = db
+    .prepare("SELECT id FROM practice_attempts WHERE session_id = ? ORDER BY created_at ASC, id ASC")
+    .all(sessionId) as unknown as Array<{ id: string }>;
+  const questionNumber = Math.max(1, attemptIds.findIndex((attempt) => attempt.id === attemptId) + 1);
+  const isRoundAttempt = row.round_step !== null;
+
+  return {
+    sessionId,
+    attemptId,
+    questionNumber,
+    totalQuestions: isRoundAttempt ? Math.max(plan.length, attemptIds.length) : plan.length,
+    isSessionComplete: isRoundAttempt ? session.status === "completed" : session.status === "completed" || questionNumber >= plan.length,
+    questionType: row.question_type,
+    prompt: prompt.prompt ?? "",
+    instruction: prompt.instruction ?? "",
+    choices: prompt.choices ?? [],
+    targetWord: prompt.targetWord ?? row.word,
+    submittedAnswer: row.submitted_answer ?? "",
+    canonicalAnswer: expected.canonicalAnswer ?? row.word,
+    isCorrect: row.is_correct === 1,
+    failureType: row.failure_type,
+    hintLevelUsed: row.hint_level_used,
+    hints: prompt.hints ?? [],
+    spellingNote: row.spelling_note,
+    roundStep: row.round_step,
+    passNumber: row.pass_number,
+    attemptNumberForWordInStep: row.attempt_number_for_word_in_step,
+    firstAttemptCorrect: row.first_attempt_correct === null ? null : row.first_attempt_correct === 1,
+    eventuallyCorrect: row.eventually_correct === null ? null : row.eventually_correct === 1,
+    revealAndMoveOn: row.reveal_and_move_on === 1
+  };
 }
 
 export function getSessionSummary(sessionId: string): SessionSummary {
@@ -312,6 +584,19 @@ export function getParentDashboard(): ParentDashboard {
     | { started_at: string; actual_question_count: number; summary_json: string }
     | undefined;
 
+  const latestRoundRow = db
+    .prepare(
+      `SELECT summary_json
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'completed'
+       ORDER BY ended_at DESC, started_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { summary_json: string } | undefined;
+  const latestRound = latestRoundRow
+    ? ((JSON.parse(latestRoundRow.summary_json) as SessionSummary).round ?? null)
+    : null;
+
   const spellingRows = db
     .prepare(
       `SELECT w.word, COUNT(*) AS mistakes, sn.note
@@ -338,7 +623,8 @@ export function getParentDashboard(): ParentDashboard {
     redOrangeWords,
     spellingMistakes: spellingRows,
     dueWords,
-    closeToGreen
+    closeToGreen,
+    latestRound
   };
 }
 
@@ -406,6 +692,474 @@ export function importWordShells(text: string): number {
     createOrUpdateParentWord({ word, difficultyLevel: 2 });
   }
   return unique.length;
+}
+
+function selectRoundWordIds(db: DatabaseSync, words: PracticeWord[], nowIso: string, targetCount: number): string[] {
+  const count = Math.max(6, Math.min(12, Math.round(targetCount)));
+  const wordMap = new Map(words.map((word) => [word.id, word]));
+  const ranked = [...words].sort((a, b) => priorityScore(b, nowIso) - priorityScore(a, nowIso) || a.word.localeCompare(b.word));
+  const remediation = getRemediationWordIds(db);
+  const picked = new Map<string, PracticeWord>();
+
+  pickWords(picked, ranked.filter((word) => word.state.nearReview), count);
+  pickWordIds(picked, wordMap, remediation.revealAndMoveOnWordIds, count);
+  pickWordIds(picked, wordMap, remediation.eventuallyCorrectNotFirstAttemptWordIds, count);
+  pickWords(picked, ranked.filter((word) => word.state.attemptCount === 0 || word.state.masteryColour === "red"), count);
+  pickWords(picked, ranked.filter((word) => isDueForReview(word, nowIso)), count);
+  pickWords(picked, ranked.filter((word) => isNearGreenProofWord(word)), count);
+  pickWords(picked, selectSessionPlan(words, nowIso, count).map((item) => wordMap.get(item.wordId)).filter((word): word is PracticeWord => Boolean(word)), count);
+  pickWords(picked, ranked, count);
+
+  return [...picked.keys()];
+}
+
+function getRemediationWordIds(db: DatabaseSync): {
+  revealAndMoveOnWordIds: string[];
+  eventuallyCorrectNotFirstAttemptWordIds: string[];
+} {
+  const revealRows = db
+    .prepare(
+      `SELECT word_id
+       FROM practice_attempts
+       WHERE learner_id = ? AND reveal_and_move_on = 1
+       GROUP BY word_id
+       ORDER BY MAX(created_at) DESC`
+    )
+    .all(defaultLearnerId()) as Array<{ word_id: string }>;
+
+  const recoveredRows = db
+    .prepare(
+      `SELECT word_id
+       FROM practice_attempts
+       WHERE learner_id = ?
+         AND eventually_correct = 1
+         AND first_attempt_correct = 0
+         AND reveal_and_move_on = 0
+       GROUP BY word_id
+       ORDER BY MAX(created_at) DESC`
+    )
+    .all(defaultLearnerId()) as Array<{ word_id: string }>;
+
+  return {
+    revealAndMoveOnWordIds: revealRows.map((row) => row.word_id),
+    eventuallyCorrectNotFirstAttemptWordIds: recoveredRows.map((row) => row.word_id)
+  };
+}
+
+function pickWordIds(
+  picked: Map<string, PracticeWord>,
+  wordMap: Map<string, PracticeWord>,
+  wordIds: string[],
+  count: number
+): void {
+  for (const wordId of wordIds) {
+    if (picked.size >= count) return;
+    const word = wordMap.get(wordId);
+    if (word && !picked.has(word.id)) picked.set(word.id, word);
+  }
+}
+
+function pickWords(picked: Map<string, PracticeWord>, words: PracticeWord[], count: number): void {
+  for (const word of words) {
+    if (picked.size >= count) return;
+    if (!picked.has(word.id)) picked.set(word.id, word);
+  }
+}
+
+function isDueForReview(word: PracticeWord, nowIso: string): boolean {
+  return word.state.nextReviewAt ? new Date(word.state.nextReviewAt).getTime() <= new Date(nowIso).getTime() : false;
+}
+
+function isNearGreenProofWord(word: PracticeWord): boolean {
+  const weakest = Math.min(word.state.meaningMastery, word.state.usageMastery, word.state.spellingMastery);
+  return weakest >= 0.75 && weakest < 0.9;
+}
+
+function getRoundRowForSession(db: DatabaseSync, sessionId: string): PracticeRoundRow | null {
+  const row = db.prepare("SELECT * FROM practice_rounds WHERE session_id = ? ORDER BY started_at DESC LIMIT 1").get(sessionId) as
+    | PracticeRoundRow
+    | undefined;
+  return row ?? null;
+}
+
+function getRoundSessionView(
+  db: DatabaseSync,
+  session: SessionRow,
+  round: PracticeRoundRow,
+  selectedCardId?: string
+): SessionView {
+  const wordIds = readRoundWordIds(round);
+  const cardViewCounts = readCardViewCounts(round);
+  const words = getPracticeWords();
+  const wordMap = new Map(words.map((word) => [word.id, word]));
+  const roundWords = wordIds.map((wordId) => {
+    const word = wordMap.get(wordId);
+    if (!word) throw new Error(`Round word ${wordId} is not available.`);
+    return word;
+  });
+  const attempts = getRoundStepAttempts(db, round.id);
+  const attemptCount = getSessionAttemptCount(db, session.id);
+  const cards = roundWords.map((word) => toRoundLearnCardView(word, cardViewCounts[word.id] ?? 0));
+  const selectedCard =
+    (selectedCardId ? cards.find((card) => card.id === selectedCardId) : null) ??
+    cards.find((card) => card.viewCount < 2) ??
+    cards[0] ??
+    null;
+  const canUnlockMeaning = canUnlockMeaningStep(cardViewCounts, wordIds);
+
+  let question: PracticeQuestion | null = null;
+  let word: PracticeWord | null = null;
+  let passNumber: number | null = null;
+  let attemptNumberForWordInStep: number | null = null;
+  let isRetryPass = false;
+  let remainingInPass = 0;
+  let stepProgressLabel = stepLabel(round.current_step);
+
+  if (round.status === "in_progress" && isScoredRoundStep(round.current_step)) {
+    const cursor = nextRoundStepQuestion(wordIds, round.current_step, attempts, round.max_retry_passes);
+    if (cursor) {
+      word = wordMap.get(cursor.wordId) ?? null;
+      if (!word) throw new Error(`Round word ${cursor.wordId} is not available.`);
+      const questionType: QuestionType = cursor.step === "meaning_recognition" ? "definition_choice" : "fill_sentence";
+      question = generateQuestion(questionType, word, words, { preferredDistractorWordIds: wordIds });
+      passNumber = cursor.passNumber;
+      attemptNumberForWordInStep = cursor.attemptNumberForWordInStep;
+      isRetryPass = cursor.isRetryPass;
+      remainingInPass = cursor.remainingInPass;
+      stepProgressLabel = `${stepLabel(cursor.step)} · pass ${cursor.passNumber}`;
+    }
+  }
+
+  return {
+    mode: "round_mission",
+    sessionId: session.id,
+    status: session.status,
+    questionNumber: attemptCount + 1,
+    totalQuestions: Math.max(session.target_question_count, attemptCount + remainingInPass),
+    question,
+    word,
+    round: {
+      roundId: round.id,
+      status: round.status,
+      currentStep: round.current_step,
+      wordCount: wordIds.length,
+      cardViewCounts,
+      cards,
+      selectedCard,
+      canUnlockMeaning,
+      question,
+      word,
+      passNumber,
+      attemptNumberForWordInStep,
+      isRetryPass,
+      remainingInPass,
+      stepProgressLabel
+    }
+  };
+}
+
+function submitRoundAnswer(
+  db: DatabaseSync,
+  session: SessionRow,
+  round: PracticeRoundRow,
+  input: {
+    sessionId: string;
+    submittedAnswer: string;
+    hintLevelUsed: number;
+    responseTimeMs: number;
+  }
+): { completed: boolean; attemptId: string | null } {
+  if (session.status !== "in_progress" || round.status !== "in_progress") return { completed: true, attemptId: null };
+  if (!isScoredRoundStep(round.current_step)) {
+    throw new Error("This round is not ready for scored answers yet.");
+  }
+
+  const wordIds = readRoundWordIds(round);
+  const attempts = getRoundStepAttempts(db, round.id);
+  const cursor = nextRoundStepQuestion(wordIds, round.current_step, attempts, round.max_retry_passes);
+  if (!cursor) {
+    advanceRoundAfterStepIfReady(db, session.id, round);
+    return { completed: false, attemptId: null };
+  }
+
+  const words = getPracticeWords();
+  const word = words.find((candidate) => candidate.id === cursor.wordId);
+  if (!word) throw new Error(`Round word ${cursor.wordId} is not available.`);
+
+  const questionType: QuestionType = cursor.step === "meaning_recognition" ? "definition_choice" : "fill_sentence";
+  const question = generateQuestion(questionType, word, words, { preferredDistractorWordIds: wordIds });
+  const assessment = assessAnswer(question, input.submittedAnswer);
+  const now = new Date().toISOString();
+  const revealAndMoveOn = !assessment.isCorrect && cursor.passNumber >= round.max_retry_passes;
+  const firstAttemptCorrect = cursor.attemptNumberForWordInStep === 1 ? assessment.isCorrect : false;
+  const outcome: PracticeAttemptOutcome = {
+    questionType,
+    isCorrect: assessment.isCorrect,
+    hintLevelUsed: input.hintLevelUsed,
+    maxHintLevelAvailable: question.hints.length,
+    responseTimeMs: input.responseTimeMs,
+    failureType: assessment.failureType,
+    answeredAt: now,
+    masteryCredit: cursor.attemptNumberForWordInStep === 1 ? "normal" : "recovery"
+  };
+
+  const attemptId = randomUUID();
+  db.prepare(
+    `INSERT INTO practice_attempts
+      (id, session_id, learner_id, word_id, question_type, prompt_json, expected_answer_json,
+       submitted_answer, is_correct, hint_level_used, max_hint_level_available, response_time_ms, failure_type,
+       round_id, round_step, pass_number, attempt_number_for_word_in_step,
+       first_attempt_correct, eventually_correct, reveal_and_move_on, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    attemptId,
+    session.id,
+    defaultLearnerId(),
+    word.id,
+    questionType,
+    JSON.stringify({
+      prompt: question.prompt,
+      instruction: question.instruction,
+      choices: question.choices,
+      hints: question.hints,
+      targetWord: question.targetWord
+    }),
+    JSON.stringify({ expectedAnswers: question.expectedAnswers, canonicalAnswer: question.canonicalAnswer }),
+    input.submittedAnswer,
+    assessment.isCorrect ? 1 : 0,
+    input.hintLevelUsed,
+    question.hints.length,
+    input.responseTimeMs,
+    assessment.failureType,
+    round.id,
+    cursor.step,
+    cursor.passNumber,
+    cursor.attemptNumberForWordInStep,
+    firstAttemptCorrect ? 1 : 0,
+    assessment.isCorrect ? 1 : 0,
+    revealAndMoveOn ? 1 : 0,
+    now
+  );
+
+  saveLearnerWordState(db, updateStateAfterAttempt(word.state, outcome));
+  db.prepare("UPDATE practice_sessions SET actual_question_count = actual_question_count + 1, updated_at = ? WHERE id = ?").run(
+    now,
+    session.id
+  );
+
+  const refreshedRound = getRoundRowForSession(db, session.id);
+  if (!refreshedRound) throw new Error(`Round missing for session ${session.id}`);
+  const completed = advanceRoundAfterStepIfReady(db, session.id, refreshedRound);
+
+  return { completed, attemptId };
+}
+
+function advanceRoundAfterStepIfReady(db: DatabaseSync, sessionId: string, round: PracticeRoundRow): boolean {
+  if (!isScoredRoundStep(round.current_step)) return false;
+
+  const wordIds = readRoundWordIds(round);
+  const attempts = getRoundStepAttempts(db, round.id);
+  const progress = evaluateRoundStepProgress(wordIds, round.current_step, attempts, round.max_retry_passes);
+  if (!progress.canAdvanceStep) return false;
+
+  const now = new Date().toISOString();
+  if (round.current_step === "meaning_recognition") {
+    db.prepare("UPDATE practice_rounds SET current_step = 'context_usage', updated_at = ? WHERE id = ?").run(now, round.id);
+    return false;
+  }
+
+  const summary = buildCompletedRoundSummary(db, round, now);
+  db.prepare(
+    `UPDATE practice_rounds
+     SET status = 'completed', ended_at = ?, summary_json = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(now, JSON.stringify(summary), now, round.id);
+
+  db.prepare(
+    `UPDATE practice_sessions
+     SET status = 'completed', ended_at = ?, summary_json = ?, updated_at = ?
+     WHERE id = ?`
+  ).run(now, JSON.stringify(summary), now, sessionId);
+
+  return true;
+}
+
+function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, completedAt: string): SessionSummary {
+  const wordIds = readRoundWordIds(round);
+  const attempts = getRoundStepAttempts(db, round.id);
+  const meaningProgress = evaluateRoundStepProgress(wordIds, "meaning_recognition", attempts, round.max_retry_passes);
+  const contextProgress = evaluateRoundStepProgress(wordIds, "context_usage", attempts, round.max_retry_passes);
+  const meaningByWord = new Map(meaningProgress.statuses.map((status) => [status.wordId, status]));
+  const contextByWord = new Map(contextProgress.statuses.map((status) => [status.wordId, status]));
+  const nowPlusNearReview = new Date(new Date(completedAt).getTime() + 12 * 3_600_000).toISOString();
+
+  const words = getPracticeWords();
+  const wordMap = new Map(words.map((word) => [word.id, word]));
+  const wordName = (wordId: string) => wordMap.get(wordId)?.word ?? wordId;
+  const hasMistake = (wordId: string) => {
+    const meaning = meaningByWord.get(wordId);
+    const context = contextByWord.get(wordId);
+    return Boolean((meaning?.mistakeCount ?? 0) > 0 || (context?.mistakeCount ?? 0) > 0);
+  };
+
+  const firstAttemptSecureWordIds = wordIds.filter(
+    (wordId) => meaningByWord.get(wordId)?.firstAttemptCorrect === true && contextByWord.get(wordId)?.firstAttemptCorrect === true
+  );
+  const revealAndMoveOnWordIds = wordIds.filter(
+    (wordId) => meaningByWord.get(wordId)?.shouldRevealAndMoveOn || contextByWord.get(wordId)?.shouldRevealAndMoveOn
+  );
+  const eventuallyCorrectWordIds = wordIds.filter((wordId) => {
+    if (revealAndMoveOnWordIds.includes(wordId)) return false;
+    const meaning = meaningByWord.get(wordId);
+    const context = contextByWord.get(wordId);
+    return Boolean(
+      (meaning?.eventuallyCorrect && meaning.firstAttemptCorrect === false) ||
+        (context?.eventuallyCorrect && context.firstAttemptCorrect === false)
+    );
+  });
+  const mistakeWordIds = wordIds.filter((wordId) => hasMistake(wordId));
+  updateNearReviewAfterRound(db, wordIds, mistakeWordIds, completedAt, nowPlusNearReview);
+
+  const refreshedWords = getPracticeWords();
+  const refreshedWordMap = new Map(refreshedWords.map((word) => [word.id, word]));
+  const nearReviewWordIds = wordIds.filter((wordId) => refreshedWordMap.get(wordId)?.state.nearReview);
+  const spellingStillWeakWordIds = wordIds.filter((wordId) => (refreshedWordMap.get(wordId)?.state.spellingMastery ?? 0) < 0.78);
+  const nearReviewWords = nearReviewWordIds.map(wordName);
+  const eventuallyCorrectWords = eventuallyCorrectWordIds.map(wordName);
+  const revealAndMoveOnWords = revealAndMoveOnWordIds.map(wordName);
+  const firstAttemptSecureWords = firstAttemptSecureWordIds.map(wordName);
+  const spellingStillWeakWords = spellingStillWeakWordIds.map(wordName);
+
+  const explanation =
+    eventuallyCorrectWords.length > 0 || revealAndMoveOnWords.length > 0
+      ? `Defne completed the cautious round, but it is still Building because ${eventuallyCorrectWords.length + revealAndMoveOnWords.length} word${eventuallyCorrectWords.length + revealAndMoveOnWords.length === 1 ? "" : "s"} needed recovery rather than first-attempt recall.`
+      : "Defne completed this round with first-attempt meaning and context recall; spelling still needs separate proof before words turn green.";
+
+  return {
+    plan: wordIds.flatMap((wordId) => [
+      { wordId, questionType: "definition_choice" },
+      { wordId, questionType: "fill_sentence" }
+    ]),
+    wordsImproved: unique([...firstAttemptSecureWords, ...eventuallyCorrectWords]).slice(0, 8),
+    spellingTraps: spellingStillWeakWords.slice(0, 8),
+    revisitTomorrow: unique([...nearReviewWords, ...revealAndMoveOnWords]).slice(0, 8),
+    round: {
+      roundId: round.id,
+      firstAttemptSecureWords,
+      eventuallyCorrectWords,
+      revealAndMoveOnWords,
+      nearReviewWords,
+      spellingStillWeakWords,
+      explanation
+    },
+    completedAt
+  };
+}
+
+function updateNearReviewAfterRound(db: DatabaseSync, wordIds: string[], mistakeWordIds: string[], now: string, nextReviewAt: string): void {
+  const mistakeSet = new Set(mistakeWordIds);
+  for (const wordId of wordIds) {
+    if (mistakeSet.has(wordId)) {
+      db.prepare(
+        `UPDATE learner_word_state
+         SET near_review = 1,
+             eligible_questions_since_last_mistake = 0,
+             next_review_at = ?,
+             updated_at = ?
+         WHERE learner_id = ? AND word_id = ?`
+      ).run(nextReviewAt, now, defaultLearnerId(), wordId);
+      continue;
+    }
+
+    const row = db
+      .prepare(
+        `SELECT near_review, eligible_questions_since_last_mistake
+         FROM learner_word_state
+         WHERE learner_id = ? AND word_id = ?`
+      )
+      .get(defaultLearnerId(), wordId) as
+      | { near_review: number; eligible_questions_since_last_mistake: number }
+      | undefined;
+
+    if (!row || row.near_review !== 1) continue;
+
+    const eligibleQuestions = row.eligible_questions_since_last_mistake + 2;
+    const keepNearReview = shouldKeepNearReview(1, eligibleQuestions);
+    db.prepare(
+      `UPDATE learner_word_state
+       SET near_review = ?,
+           eligible_questions_since_last_mistake = ?,
+           updated_at = ?
+       WHERE learner_id = ? AND word_id = ?`
+    ).run(keepNearReview ? 1 : 0, eligibleQuestions, now, defaultLearnerId(), wordId);
+  }
+}
+
+function getRoundStepAttempts(db: DatabaseSync, roundId: string): RoundStepAttempt[] {
+  const rows = db
+    .prepare(
+      `SELECT word_id, round_step, pass_number, is_correct
+       FROM practice_attempts
+       WHERE round_id = ? AND round_step IN ('meaning_recognition', 'context_usage')
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(roundId) as unknown as Array<{
+    word_id: string;
+    round_step: RoundStep;
+    pass_number: number | null;
+    is_correct: number;
+  }>;
+
+  return rows.map((row) => ({
+    wordId: row.word_id,
+    step: row.round_step,
+    passNumber: row.pass_number ?? 1,
+    isCorrect: row.is_correct === 1
+  }));
+}
+
+function toRoundLearnCardView(word: PracticeWord, viewCount: number): RoundLearnCardView {
+  return {
+    id: word.id,
+    word: word.word,
+    definition: word.definition,
+    example: word.example,
+    synonyms: word.synonyms,
+    antonyms: word.antonyms,
+    confusables: word.confusables,
+    spellingNote: word.spellingNote,
+    viewCount,
+    supportMode: learnCardSupportMode(viewCount),
+    activeRecallPrompt: activeRecallPrompt(word)
+  };
+}
+
+function activeRecallPrompt(word: PracticeWord): string {
+  const escaped = word.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\b${escaped}(?:s|ed|ing)?\\b`, "i");
+  if (pattern.test(word.example)) {
+    return word.example.replace(pattern, "_____");
+  }
+  return "Before revealing the support, say what this word means and imagine a sentence where it fits.";
+}
+
+function readRoundWordIds(round: PracticeRoundRow): string[] {
+  return JSON.parse(round.word_ids_json) as string[];
+}
+
+function readCardViewCounts(round: PracticeRoundRow): Record<string, number> {
+  return JSON.parse(round.card_view_counts_json) as Record<string, number>;
+}
+
+function isScoredRoundStep(step: RoundLearningStep): step is RoundStep {
+  return step === "meaning_recognition" || step === "context_usage";
+}
+
+function stepLabel(step: RoundLearningStep): string {
+  if (step === "learn_cards") return "Learn cards";
+  if (step === "meaning_recognition") return "Meaning recognition";
+  if (step === "context_usage") return "Context usage";
+  return "Spelling production";
 }
 
 function getPracticeWords(): PracticeWord[] {
@@ -587,6 +1341,8 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
        average_response_time_ms = ?,
        failure_types_json = ?,
        confused_with_word_ids_json = ?,
+       near_review = ?,
+       eligible_questions_since_last_mistake = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -607,6 +1363,8 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
     state.averageResponseTimeMs,
     JSON.stringify(state.failureTypes),
     JSON.stringify(state.confusedWithWordIds),
+    state.nearReview ? 1 : 0,
+    state.eligibleQuestionsSinceLastMistake,
     new Date().toISOString(),
     state.id
   );
@@ -641,7 +1399,9 @@ function mapState(row: StateRow): LearnerWordState {
     averageHintLevelUsed: row.average_hint_level_used,
     averageResponseTimeMs: row.average_response_time_ms,
     failureTypes: JSON.parse(row.failure_types_json) as FailureType[],
-    confusedWithWordIds: JSON.parse(row.confused_with_word_ids_json) as string[]
+    confusedWithWordIds: JSON.parse(row.confused_with_word_ids_json) as string[],
+    nearReview: row.near_review === 1,
+    eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake
   };
 }
 

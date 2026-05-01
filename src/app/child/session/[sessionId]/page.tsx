@@ -202,13 +202,11 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
           <p className="learn-card__meaning">
             <em>{card.definition}</em>
           </p>
-          <p>
-            {round.canUnlockMeaning
-              ? "All cards are ready. Start the matching step when this word feels clear."
-              : cardIsReady
-                ? "This card is ready. Move to the next card that still needs a review."
-                : "Read the example, say one sentence with this word, then continue."}
-          </p>
+          {round.canUnlockMeaning ? (
+            <p>All cards are ready. Start the matching step when this word feels clear.</p>
+          ) : cardIsReady ? (
+            <p>This card is ready. Move to the next card that still needs a review.</p>
+          ) : null}
         </div>
 
         <CardSupport card={card} />
@@ -278,12 +276,6 @@ function CardSupport({ card }: { card: RoundLearnCardView }) {
         <div>
           <span className="metric-label">Careful with</span>
           <p>{card.confusables.join(", ")}</p>
-        </div>
-      ) : null}
-      {card.spellingNote ? (
-        <div>
-          <span className="metric-label">Spelling note</span>
-          <p>{card.spellingNote}</p>
         </div>
       ) : null}
     </div>

@@ -41,6 +41,8 @@ console.log("== Start round, walk learn cards ==");
 await page.locator('main .cover-actions button[type="submit"]').first().click();
 await page.waitForURL(/\/child\/session\//, { timeout: 8000 });
 await page.waitForLoadState("domcontentloaded");
+await page.waitForTimeout(800);
+await shot("01b-learn-card");
 
 for (let i = 0; i < 25; i++) {
   if ((await page.locator('.choice-row').count()) > 0) break;

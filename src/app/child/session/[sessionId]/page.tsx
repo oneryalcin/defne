@@ -193,21 +193,22 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
       <div className="learn-card">
         <div className="learn-card-header">
           <span className="metric-label">{card.viewCount >= 2 ? `${card.viewCount} reviews · ready` : `${card.viewCount} of 2 reviews`}</span>
-          <h1>{card.word}</h1>
+          <div className="learn-card-title-row">
+            <h1>{card.word}</h1>
+            {card.selectionReason ? (
+              <ReasonPill reason={card.selectionReason} history={card.history} />
+            ) : null}
+          </div>
+          <p className="learn-card__meaning">
+            <em>{card.definition}</em>
+          </p>
           <p>
             {round.canUnlockMeaning
               ? "All cards are ready. Start the matching step when this word feels clear."
               : cardIsReady
                 ? "This card is ready. Move to the next card that still needs a review."
-                : "Read the meaning and example, say one sentence with this word, then continue."}
+                : "Read the example, say one sentence with this word, then continue."}
           </p>
-          {card.selectionReason ? (
-            <div className="selection-reason">
-              <span>Practice reason</span>
-              <strong>{card.selectionReason.label}</strong>
-              <p>{card.selectionReason.detail}</p>
-            </div>
-          ) : null}
         </div>
 
         <CardSupport card={card} />
@@ -258,10 +259,6 @@ function CardSupport({ card }: { card: RoundLearnCardView }) {
   return (
     <div className="card-support-grid">
       <div>
-        <span className="metric-label">Meaning</span>
-        <p>{card.definition}</p>
-      </div>
-      <div>
         <span className="metric-label">Example</span>
         <p>{card.example}</p>
       </div>
@@ -290,6 +287,35 @@ function CardSupport({ card }: { card: RoundLearnCardView }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ReasonPill({
+  reason,
+  history,
+}: {
+  reason: NonNullable<RoundLearnCardView["selectionReason"]>;
+  history: RoundLearnCardView["history"];
+}) {
+  const stats =
+    history.attemptCount > 0
+      ? `Seen ${history.attemptCount} time${history.attemptCount === 1 ? "" : "s"} · ✓ ${history.correctCount} · ✗ ${history.wrongCount}`
+      : "Not started yet — first time on the page.";
+  return (
+    <span
+      className="reason-pill"
+      tabIndex={0}
+      role="button"
+      aria-label={`Practice reason: ${reason.label}`}
+    >
+      <span className="reason-pill__dot" aria-hidden="true" />
+      {reason.label}
+      <span className="reason-pill__pop" role="tooltip">
+        <strong>{reason.label}</strong>
+        <span className="reason-pill__detail">{reason.detail}</span>
+        <span className="reason-pill__stats">{stats}</span>
+      </span>
+    </span>
   );
 }
 

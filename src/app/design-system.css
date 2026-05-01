@@ -786,9 +786,14 @@
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.2rem;
+  line-height: 1.2;
   letter-spacing: -0.01em;
   color: var(--graphite-ink);
   margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .bento__eyebrow {
   font-family: var(--font-mono);
@@ -796,6 +801,10 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--steel-secondary);
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .bento__lede {
   margin: 0;
@@ -1224,6 +1233,99 @@
 .mastery-mini.is-yellow .mastery-mini__dot { background: var(--mastery-yellow); }
 .mastery-mini.is-light_green  .mastery-mini__dot { background: var(--mastery-light); }
 .mastery-mini.is-green  .mastery-mini__dot { background: var(--mastery-green); }
+
+/* Learn-card title row + inline meaning + practice-reason pill */
+.learn-card-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.learn-card-title-row h1 { margin: 0; }
+.learn-card__meaning {
+  margin: 6px 0 0;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  line-height: 1.45;
+  color: var(--graphite-ink);
+  max-width: 60ch;
+}
+
+.reason-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 10px;
+  border: 1px solid rgba(63, 125, 92, 0.32);
+  border-radius: 999px;
+  background: rgba(63, 125, 92, 0.08);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--forest-green-press);
+  cursor: help;
+  outline: none;
+}
+.reason-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--forest-green);
+  flex: 0 0 auto;
+}
+.reason-pill__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  max-width: 320px;
+  padding: 12px 14px;
+  background: var(--notebook-surface);
+  border: 1px solid var(--whisper-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -8px rgba(31, 41, 55, 0.18);
+  color: var(--graphite-ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+.reason-pill__pop strong {
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--graphite-ink);
+}
+.reason-pill__detail {
+  color: var(--steel-secondary);
+}
+.reason-pill__stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-slate);
+}
+.reason-pill:hover .reason-pill__pop,
+.reason-pill:focus-visible .reason-pill__pop,
+.reason-pill:focus-within .reason-pill__pop {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
 
 /* Disabled / demo annotation — bright red so missing data is unmistakable */
 .demo-tag {

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { masteryColourForState, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
 import { selectRoundWords } from "../learning/roundSelection";
 import {
   DEFAULT_ROUND_MAX_RETRY_PASSES,
@@ -144,6 +144,12 @@ export interface RoundLearnCardView {
   supportMode: LearnCardSupportMode;
   activeRecallPrompt: string;
   selectionReason: RoundSelectionReason | null;
+  history: {
+    attemptCount: number;
+    correctCount: number;
+    wrongCount: number;
+    masteryColour: LearnerWordState["masteryColour"] | null;
+  };
 }
 
 export interface AttemptReview {
@@ -658,7 +664,14 @@ export function getParentWords(): ParentWordListItem[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example, s.mastery_colour
+      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example,
+              s.meaning_mastery, s.usage_mastery, s.spelling_mastery,
+              s.stability_days, s.attempt_count, s.correct_count, s.wrong_count,
+              s.last_hint_level_used, s.average_hint_level_used,
+              s.average_response_time_ms, s.last_seen_at, s.last_correct_at,
+              s.last_wrong_at, s.next_review_at, s.failure_types_json,
+              s.confused_with_word_ids_json, s.near_review,
+              s.eligible_questions_since_last_mistake, s.mastery_colour
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
@@ -672,18 +685,72 @@ export function getParentWords(): ParentWordListItem[] {
     difficulty_level: number;
     definition: string | null;
     example: string | null;
+    meaning_mastery: number | null;
+    usage_mastery: number | null;
+    spelling_mastery: number | null;
+    stability_days: number | null;
+    attempt_count: number | null;
+    correct_count: number | null;
+    wrong_count: number | null;
+    last_hint_level_used: number | null;
+    average_hint_level_used: number | null;
+    average_response_time_ms: number | null;
+    last_seen_at: string | null;
+    last_correct_at: string | null;
+    last_wrong_at: string | null;
+    next_review_at: string | null;
+    failure_types_json: string | null;
+    confused_with_word_ids_json: string | null;
+    near_review: number | null;
+    eligible_questions_since_last_mistake: number | null;
     mastery_colour: LearnerWordState["masteryColour"] | null;
   }>;
 
-  return rows.map((row) => ({
-    id: row.id,
-    word: row.word,
-    definition: row.definition,
-    example: row.example,
-    masteryColour: row.mastery_colour,
-    difficultyLevel: row.difficulty_level,
-    isComplete: Boolean(row.definition && row.example)
-  }));
+  return rows.map((row) => {
+    // Recompute the mastery colour from current state so the dashboard
+    // reflects the live algorithm (not whatever was persisted last write).
+    let masteryColour: LearnerWordState["masteryColour"] | null = null;
+    if (row.attempt_count !== null) {
+      const state: LearnerWordState = {
+        id: `state_${defaultLearnerId()}_${row.id}`,
+        learnerId: defaultLearnerId(),
+        wordId: row.id,
+        meaningMastery: row.meaning_mastery ?? 0,
+        usageMastery: row.usage_mastery ?? 0,
+        spellingMastery: row.spelling_mastery ?? 0,
+        stabilityDays: row.stability_days ?? 1,
+        masteryColour: row.mastery_colour ?? "red",
+        lastSeenAt: row.last_seen_at,
+        lastCorrectAt: row.last_correct_at,
+        lastWrongAt: row.last_wrong_at,
+        nextReviewAt: row.next_review_at,
+        attemptCount: row.attempt_count ?? 0,
+        correctCount: row.correct_count ?? 0,
+        wrongCount: row.wrong_count ?? 0,
+        lastHintLevelUsed: row.last_hint_level_used,
+        averageHintLevelUsed: row.average_hint_level_used ?? 0,
+        averageResponseTimeMs: row.average_response_time_ms ?? 0,
+        failureTypes: row.failure_types_json
+          ? (JSON.parse(row.failure_types_json) as LearnerWordState["failureTypes"])
+          : [],
+        confusedWithWordIds: row.confused_with_word_ids_json
+          ? (JSON.parse(row.confused_with_word_ids_json) as string[])
+          : [],
+        nearReview: row.near_review === 1,
+        eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0
+      };
+      masteryColour = state.attemptCount === 0 ? null : masteryColourForState(state);
+    }
+    return {
+      id: row.id,
+      word: row.word,
+      definition: row.definition,
+      example: row.example,
+      masteryColour,
+      difficultyLevel: row.difficulty_level,
+      isComplete: Boolean(row.definition && row.example)
+    };
+  });
 }
 
 export function createOrUpdateParentWord(input: WordFormInput): string {
@@ -1133,7 +1200,14 @@ function toRoundLearnCardView(
     viewCount,
     supportMode: learnCardSupportMode(viewCount),
     activeRecallPrompt: activeRecallPrompt(word),
-    selectionReason
+    selectionReason,
+    history: {
+      attemptCount: word.state.attemptCount,
+      correctCount: word.state.correctCount,
+      wrongCount: word.state.wrongCount,
+      masteryColour:
+        word.state.attemptCount === 0 ? null : masteryColourForState(word.state)
+    }
   };
 }
 

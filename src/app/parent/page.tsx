@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { ListChecks, Plus } from "lucide-react";
-import { getMissionPreview, getParentDashboard } from "@/lib/db/repository";
+import {
+  getMissionPreview,
+  getParentDashboard,
+  getParentWords,
+} from "@/lib/db/repository";
 import type { MasteryColour } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -60,15 +64,14 @@ export default function ParentDashboardPage() {
     .filter((word, idx, list) => list.findIndex((w) => w.id === word.id) === idx)
     .slice(0, 6);
 
+  // True deck-wide distribution from the actual learner state (one row per word).
+  const allWords = getParentWords();
   const distribution = countMastery(
-    [
-      ...dashboard.redOrangeWords,
-      ...dashboard.dueWords,
-      ...dashboard.closeToGreen,
-    ]
+    allWords
       .map((w) => w.masteryColour)
       .filter((c): c is MasteryColour => Boolean(c))
   );
+  const untracked = allWords.filter((w) => !w.masteryColour).length;
   const distTotal = Object.values(distribution).reduce((a, b) => a + b, 0) || 1;
 
   const todayLabel = new Date().toLocaleDateString("en-GB", {
@@ -148,10 +151,14 @@ export default function ParentDashboardPage() {
           </header>
 
           <div className="bento-grid">
-            <div className="bento col-5 bento--accent">
+            <div className="bento col-4 bento--accent">
               <span className="bento__eyebrow">Mastery snapshot</span>
               <h3>Where the deck sits</h3>
-              <Distribution distribution={distribution} total={distTotal} />
+              <Distribution
+                distribution={distribution}
+                total={distTotal}
+                untracked={untracked}
+              />
             </div>
 
             <div className="bento col-4">
@@ -165,11 +172,9 @@ export default function ParentDashboardPage() {
               </p>
             </div>
 
-            <div className="bento col-3">
-              <span className="bento__eyebrow">
-                Time on practice <DemoTag />
-              </span>
-              <h3>Latest session</h3>
+            <div className="bento col-4">
+              <span className="bento__eyebrow">Latest session</span>
+              <h3>Time on practice <DemoTag /></h3>
               <div className="bento-stats">
                 <div className="bento-stats__row">
                   <span>Questions</span>
@@ -431,9 +436,11 @@ export default function ParentDashboardPage() {
 function Distribution({
   distribution,
   total,
+  untracked,
 }: {
   distribution: Record<MasteryColour, number>;
   total: number;
+  untracked: number;
 }) {
   const order: MasteryColour[] = ["red", "orange", "yellow", "light_green", "green"];
   const palette: Record<MasteryColour, string> = {
@@ -446,8 +453,18 @@ function Distribution({
   return (
     <div className="dist">
       <div className="dist__bar" role="presentation">
+        {untracked > 0 ? (
+          <span
+            className="dist__seg"
+            style={{
+              width: `${(untracked / (total + untracked)) * 100}%`,
+              background: "rgba(31,41,55,0.18)",
+              minWidth: 6,
+            }}
+          />
+        ) : null}
         {order.map((colour) => {
-          const ratio = (distribution[colour] / total) * 100;
+          const ratio = (distribution[colour] / (total + untracked)) * 100;
           return (
             <span
               key={colour}
@@ -462,6 +479,16 @@ function Distribution({
         })}
       </div>
       <ul className="dist__legend">
+        {untracked > 0 ? (
+          <li>
+            <span
+              className="dist__dot"
+              style={{ background: "rgba(31,41,55,0.18)" }}
+            />
+            <span className="dist__label">Not started</span>
+            <span className="dist__count">{untracked}</span>
+          </li>
+        ) : null}
         {order.map((colour) => (
           <li key={colour}>
             <span

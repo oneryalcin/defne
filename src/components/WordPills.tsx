@@ -3,7 +3,6 @@ import type { MasteryColour } from "@/lib/types";
 type Pill = {
   word: string;
   level: MasteryColour | null;
-  isCurrent?: boolean;
 };
 
 export function WordPills({
@@ -25,10 +24,7 @@ export function WordPills({
       </header>
       <div className="focus-pills__row">
         {pills.map((pill) => (
-          <span
-            key={pill.word}
-            className={`word-pill${pill.isCurrent ? " is-current" : ""}`}
-          >
+          <span key={pill.word} className="word-pill">
             <span
               className={`word-pill__dot l-${pill.level ?? "empty"}`}
               aria-hidden="true"

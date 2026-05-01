@@ -36,10 +36,9 @@ export default async function ChildPage({
   };
   const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
 
-  const pills = words.map((word, idx) => ({
+  const pills = words.map((word) => ({
     word: word.word,
     level: (word.masteryColour ?? null) as MasteryColour | null,
-    isCurrent: idx === 0,
   }));
 
   const stops = words.slice(0, 6).map((word, idx) => ({
@@ -87,15 +86,6 @@ export default async function ChildPage({
               <button className="ribbon" type="submit">
                 <Footprints size={18} />
                 Start walking
-              </button>
-              <button
-                className="ribbon ribbon--ghost"
-                type="button"
-                aria-disabled="true"
-                disabled
-                title="Picker not wired up yet — pilot uses a single round"
-              >
-                Pick a different round
               </button>
             </form>
           </div>

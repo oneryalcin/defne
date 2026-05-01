@@ -60,6 +60,7 @@ describe("round-based vocabulary mode", () => {
     expect(retryQuestion).toMatchObject({
       wordId: "cautious",
       passNumber: 2,
+      pendingWordIds: ["cautious"],
       attemptNumberForWordInStep: 2,
       isRetryPass: true
     });

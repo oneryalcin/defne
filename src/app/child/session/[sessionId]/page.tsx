@@ -11,10 +11,10 @@ export default async function SessionPage({
   searchParams
 }: {
   params: Promise<{ sessionId: string }>;
-  searchParams: Promise<{ attemptId?: string; card?: string }>;
+  searchParams: Promise<{ attemptId?: string; card?: string; repair?: string }>;
 }) {
   const { sessionId } = await params;
-  const { attemptId, card } = await searchParams;
+  const { attemptId, card, repair } = await searchParams;
 
   if (attemptId) {
     const review = getAttemptReview(sessionId, attemptId);
@@ -54,6 +54,14 @@ export default async function SessionPage({
           <LearnCardsPanel sessionId={sessionId} round={view.round} card={view.round.selectedCard} />
           <RoundAside sessionId={sessionId} round={view.round} />
         </section>
+      </main>
+    );
+  }
+
+  if (view.round?.isRetryPass && view.round.passNumber && repair !== repairPassMarker(view.round)) {
+    return (
+      <main className="page">
+        <RepairPassIntro sessionId={sessionId} round={view.round} percent={percent} />
       </main>
     );
   }
@@ -100,6 +108,55 @@ export default async function SessionPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function RepairPassIntro({ sessionId, round, percent }: { sessionId: string; round: RoundSessionView; percent: number }) {
+  const cardsById = new Map(round.cards.map((card) => [card.id, card]));
+  const repairCards = round.currentPassWordIds
+    .map((wordId) => cardsById.get(wordId))
+    .filter((card): card is RoundLearnCardView => Boolean(card));
+  const passLabel = `${roundStepLabel(round.currentStep)} · pass ${round.passNumber ?? 2}`;
+  const questionCopy = round.remainingInPass === 1 ? "1 question" : `${round.remainingInPass} questions`;
+
+  return (
+    <section className="question-shell question-focus-shell repair-intro-shell">
+      <div className="question-main">
+        <div className="progress-track progress-track-compact" aria-label={`${passLabel} repair preview`}>
+          <div className="progress-fill" style={{ width: `${percent}%` }} />
+        </div>
+        <div className="repair-intro-kicker">
+          <span className="pass-pill repair-pass-pill">Repair pass</span>
+          <span>{passLabel}</span>
+        </div>
+        <h1>Let&apos;s work on the words that need one more try.</h1>
+        <p>
+          The first pass found a smaller set to practice. This is not starting over; these are the words that need a
+          clean comeback before the round moves on.
+        </p>
+
+        <div className="repair-intro-card">
+          <div>
+            <span className="metric-label">Coming up</span>
+            <strong>{questionCopy}</strong>
+          </div>
+          <ul className="repair-word-list" aria-label="Words in this repair pass">
+            {repairCards.map((card) => (
+              <li key={card.id}>
+                <strong>{card.word}</strong>
+                {card.selectionReason ? <span>{card.selectionReason.label}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="action-row">
+          <Link className="button button-large" href={`/child/session/${sessionId}?repair=${encodeURIComponent(repairPassMarker(round))}`}>
+            Start the repair pass
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -251,7 +308,7 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
 }
 
 function ReviewPanel({ review }: { review: AttemptReview }) {
-  const nextHref = review.isSessionComplete ? `/child/session/${review.sessionId}/summary` : `/child/session/${review.sessionId}`;
+  const nextHref = reviewNextHref(review);
   const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
   const choicesShowCorrection = review.choices.length > 0;
 
@@ -394,7 +451,23 @@ function normalise(value: string): string {
   return value.trim().toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
 }
 
-function roundStepLabel(step: AttemptReview["roundStep"]): string {
+function reviewNextHref(review: AttemptReview): string {
+  if (review.isSessionComplete) return `/child/session/${review.sessionId}/summary`;
+  if (review.roundStep && review.passNumber && review.passNumber > 1) {
+    return `/child/session/${review.sessionId}?repair=${encodeURIComponent(repairPassMarkerFromParts(review.roundStep, review.passNumber))}`;
+  }
+  return `/child/session/${review.sessionId}`;
+}
+
+function repairPassMarker(round: RoundSessionView): string {
+  return repairPassMarkerFromParts(round.currentStep, round.passNumber ?? 1);
+}
+
+function repairPassMarkerFromParts(step: RoundSessionView["currentStep"] | NonNullable<AttemptReview["roundStep"]>, passNumber: number): string {
+  return `${step}-${passNumber}`;
+}
+
+function roundStepLabel(step: RoundSessionView["currentStep"] | AttemptReview["roundStep"]): string {
   if (step === "meaning_recognition") return "Meaning recognition";
   if (step === "context_usage") return "Context usage";
   if (step === "learn_cards") return "Learn cards";

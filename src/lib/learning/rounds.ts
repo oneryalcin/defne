@@ -34,6 +34,7 @@ export interface RoundStepQuestionCursor {
   wordId: string;
   step: RoundStep;
   passNumber: number;
+  pendingWordIds: string[];
   attemptNumberForWordInStep: number;
   isRetryPass: boolean;
   remainingInPass: number;
@@ -129,6 +130,7 @@ export function nextRoundStepQuestion(
       wordId,
       step,
       passNumber,
+      pendingWordIds,
       attemptNumberForWordInStep,
       isRetryPass: passNumber > 1,
       remainingInPass: pendingWordIds.length

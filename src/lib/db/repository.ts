@@ -124,6 +124,7 @@ export interface RoundSessionView {
   question: PracticeQuestion | null;
   word: PracticeWord | null;
   passNumber: number | null;
+  currentPassWordIds: string[];
   attemptNumberForWordInStep: number | null;
   isRetryPass: boolean;
   remainingInPass: number;
@@ -789,6 +790,7 @@ function getRoundSessionView(
   let question: PracticeQuestion | null = null;
   let word: PracticeWord | null = null;
   let passNumber: number | null = null;
+  let currentPassWordIds: string[] = [];
   let attemptNumberForWordInStep: number | null = null;
   let isRetryPass = false;
   let remainingInPass = 0;
@@ -802,6 +804,7 @@ function getRoundSessionView(
       const questionType: QuestionType = cursor.step === "meaning_recognition" ? "definition_choice" : "fill_sentence";
       question = generateQuestion(questionType, word, words, { preferredDistractorWordIds: wordIds });
       passNumber = cursor.passNumber;
+      currentPassWordIds = cursor.pendingWordIds;
       attemptNumberForWordInStep = cursor.attemptNumberForWordInStep;
       isRetryPass = cursor.isRetryPass;
       remainingInPass = cursor.remainingInPass;
@@ -829,6 +832,7 @@ function getRoundSessionView(
       question,
       word,
       passNumber,
+      currentPassWordIds,
       attemptNumberForWordInStep,
       isRetryPass,
       remainingInPass,

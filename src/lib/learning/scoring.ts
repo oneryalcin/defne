@@ -15,7 +15,7 @@ import type {
   MasteryColour,
   PracticeWord,
 } from "../types";
-import { mistakeRecencyWeight } from "./rounds";
+import { DEFAULT_NEAR_REVIEW_SPACING, mistakeRecencyWeight } from "./rounds";
 
 export interface ScoreBreakdown {
   /** Bucket the UI should render. null when the word has never been answered. */
@@ -166,8 +166,9 @@ function computeWeightedTotals(
  *   4. Bucket the lower bound + apply gates:
  *        Reliable requires 2 clean firsts; Mastered requires Reliable +
  *        ≥7d stability + ≥4 corrects.
- *   5. Knock-down rule: a wrong inside the last 36h forces colour
- *      down at most one bucket — recent failure dominates old success.
+ *   5. Knock-down rule: an unresolved recent wrong forces colour down at most
+ *      one bucket. A mistake stops dragging the colour down after enough clean
+ *      follow-up questions clear near-review.
  */
 export function scoreFromState(
   state: LearnerWordState,
@@ -231,9 +232,10 @@ export function scoreFromState(
       `Last seen ${totals.newestDays.toFixed(1)}d ago (recall ≈ ${(recall * 100).toFixed(0)}%) — score dampened to ${(lowerBound * 100).toFixed(0)}%.`
     );
   }
-  if (totals.hadRecentWrong) {
+  const unresolvedRecentWrong = totals.hadRecentWrong && needsMistakeRecovery(state);
+  if (unresolvedRecentWrong) {
     reasons.push(
-      `Recent wrong (within ${RECENT_WRONG_KNOCKDOWN_HOURS}h) — knocked down one bucket on top of the score.`
+      `Recent wrong still in recovery — knocked down one bucket until ${DEFAULT_NEAR_REVIEW_SPACING} clean follow-up questions clear it.`
     );
   }
 
@@ -281,11 +283,18 @@ export function scoreFromState(
 
   // Recent-wrong knockdown: a fresh failure should never sit at
   // light_green / green just because old corrects remain in the average.
-  if (totals.hadRecentWrong) {
+  if (unresolvedRecentWrong) {
     colour = stepDown(colour);
   }
 
   return { colour, pHat, lowerBound, effectiveN: totals.effectiveN, reasons };
+}
+
+function needsMistakeRecovery(state: LearnerWordState): boolean {
+  return (
+    state.nearReview ||
+    state.eligibleQuestionsSinceLastMistake < DEFAULT_NEAR_REVIEW_SPACING
+  );
 }
 
 function stepDown(colour: MasteryColour): MasteryColour {

@@ -27,6 +27,9 @@ export function QuestionForm({
     });
   const highestOpened = openHints.size > 0 ? Math.max(...openHints) + 1 : 0;
   const passage = sentenceFromQuestion(question);
+  // Fill-in-the-blank questions hide the answer in the prompt; everything else
+  // can show the target word as a heading.
+  const showWordHeading = question.questionType !== "fill_sentence";
 
   return (
     <form
@@ -45,13 +48,17 @@ export function QuestionForm({
         <div className="practice-main">
           <div>
             <p className="practice-instruction">{question.instruction}</p>
-            <h2 className="practice-word">{question.targetWord}</h2>
+            {showWordHeading ? (
+              <h2 className="practice-word">{question.targetWord}</h2>
+            ) : null}
           </div>
 
           {passage ? (
             <blockquote className="story-sentence">
               {passage.before}
-              <span className="target">{passage.target}</span>
+              <span className="target target--blank" aria-label="Missing word">
+                _____
+              </span>
               {passage.after}
             </blockquote>
           ) : (
@@ -170,14 +177,13 @@ function SubmitButton() {
 
 function sentenceFromQuestion(
   question: PracticeQuestion
-): { before: string; target: string; after: string } | null {
+): { before: string; after: string } | null {
   if (question.questionType !== "fill_sentence") return null;
   const blank = "_____";
   const idx = question.prompt.indexOf(blank);
   if (idx === -1) return null;
   return {
     before: question.prompt.slice(0, idx),
-    target: question.targetWord,
     after: question.prompt.slice(idx + blank.length),
   };
 }

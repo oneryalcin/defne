@@ -493,6 +493,18 @@
   font-style: italic;
   font-weight: 600;
 }
+.story-sentence .target--blank {
+  display: inline-block;
+  min-width: 4em;
+  padding: 0 8px;
+  background: transparent;
+  border-bottom: 2px solid var(--graphite-ink);
+  border-radius: 0;
+  color: transparent;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+}
 
 /* Lettered choice rows (no card chrome — dashed dividers) */
 .choice-rows {

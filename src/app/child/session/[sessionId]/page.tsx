@@ -173,10 +173,20 @@ function RepairPassIntro({ sessionId, round, percent }: { sessionId: string; rou
 }
 
 function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round: RoundSessionView; card: RoundLearnCardView }) {
-  const currentIndex = Math.max(0, round.cards.findIndex((item) => item.id === card.id));
-  const nextUnreadyCard = round.cards.find((item) => item.id !== card.id && item.viewCount < 2);
-  const nextCard = round.cards[(currentIndex + 1) % round.cards.length];
-  const returnToWordId = nextUnreadyCard?.id ?? nextCard?.id ?? card.id;
+  const unreadyOthers = round.cards.filter(
+    (item) => item.id !== card.id && item.viewCount < 2
+  );
+  // Pick a random unready card next so two cards do not ping-pong each other.
+  const nextUnreadyCard =
+    unreadyOthers.length > 0
+      ? unreadyOthers[Math.floor(Math.random() * unreadyOthers.length)]
+      : null;
+  const otherCards = round.cards.filter((item) => item.id !== card.id);
+  const fallbackCard =
+    otherCards.length > 0
+      ? otherCards[Math.floor(Math.random() * otherCards.length)]
+      : null;
+  const returnToWordId = nextUnreadyCard?.id ?? fallbackCard?.id ?? card.id;
   const readyCount = round.cards.filter((item) => item.viewCount >= 2).length;
   const cardIsReady = card.viewCount >= 2;
 

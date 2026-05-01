@@ -186,6 +186,10 @@ export interface ParentWordListItem {
   masteryColour: LearnerWordState["masteryColour"] | null;
   difficultyLevel: number;
   isComplete: boolean;
+  attemptCount: number;
+  correctCount: number;
+  wrongCount: number;
+  lastSeenAt: string | null;
 }
 
 export interface ParentDashboard {
@@ -748,7 +752,11 @@ export function getParentWords(): ParentWordListItem[] {
       example: row.example,
       masteryColour,
       difficultyLevel: row.difficulty_level,
-      isComplete: Boolean(row.definition && row.example)
+      isComplete: Boolean(row.definition && row.example),
+      attemptCount: row.attempt_count ?? 0,
+      correctCount: row.correct_count ?? 0,
+      wrongCount: row.wrong_count ?? 0,
+      lastSeenAt: row.last_seen_at
     };
   });
 }

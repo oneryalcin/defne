@@ -6,6 +6,9 @@ import {
   getParentWords,
 } from "@/lib/db/repository";
 import type { MasteryColour } from "@/lib/types";
+import { WordHeatmap } from "@/components/WordHeatmap";
+
+const HEATMAP_PAGE_SIZE = 200;
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +50,18 @@ const DEMO_DECAY = [
   { word: "frequent", days: 9, from: "Reliable", to: "Nearly steady" },
 ];
 
-export default function ParentDashboardPage() {
+type SearchParams = Promise<{ p?: string }> | { p?: string };
+
+export default async function ParentDashboardPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const dashboard = getParentDashboard();
+  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as {
+    p?: string;
+  };
+  const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
   const nextRound = (() => {
     try {
       return getMissionPreview(8);
@@ -400,6 +413,28 @@ export default function ParentDashboardPage() {
                 </Link>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="dash-section" aria-labelledby="word-heatmap">
+          <header className="section-head">
+            <span className="section-head__label">Word heatmap</span>
+            <h2 id="word-heatmap" className="section-head__title">
+              Every word, at a glance.
+            </h2>
+            <p className="section-head__sub">
+              {allWords.length} words in the deck. Each square is one word —
+              hover to see its history, paginate to walk the whole list.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <WordHeatmap
+              words={allWords}
+              page={heatmapPage}
+              pageSize={HEATMAP_PAGE_SIZE}
+              variant="parent"
+              basePath="/parent"
+            />
           </div>
         </section>
 

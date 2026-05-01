@@ -1339,6 +1339,172 @@
   transform: translateY(0);
 }
 
+.child-heatmap-page { margin-top: 24px; }
+
+/* Word heatmap — paginated grid of word cells */
+.heatmap { display: grid; gap: 14px; }
+.heatmap__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--steel-secondary);
+}
+.heatmap__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.heatmap__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.heatmap__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+}
+
+.heatmap-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--graphite-ink);
+  cursor: help;
+  outline: none;
+  border: 1px solid rgba(31, 41, 55, 0.06);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.heatmap-cell:hover,
+.heatmap-cell:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px -6px rgba(31, 41, 55, 0.18);
+}
+.heatmap-cell__word {
+  display: block;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  /* the colour wash is light enough that the ink stays readable */
+  mix-blend-mode: multiply;
+}
+.heatmap-cell__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, -4px);
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  width: max-content;
+  max-width: 240px;
+  padding: 10px 12px;
+  background: var(--notebook-surface);
+  border: 1px solid var(--whisper-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px -8px rgba(31, 41, 55, 0.18);
+  color: var(--graphite-ink);
+  font-family: var(--font-body);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.heatmap-cell__pop strong {
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1rem;
+}
+.heatmap-cell__state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--steel-secondary);
+}
+.heatmap-cell__stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted-slate);
+}
+.heatmap-cell:hover .heatmap-cell__pop,
+.heatmap-cell:focus-visible .heatmap-cell__pop,
+.heatmap-cell:focus-within .heatmap-cell__pop {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.heatmap__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(31, 41, 55, 0.10);
+}
+.heatmap__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  color: var(--muted-slate);
+}
+
+.pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pagination__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--whisper-border);
+  border-radius: 999px;
+  background: var(--notebook-surface);
+  color: var(--graphite-ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+.pagination__btn[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.pagination__btn:hover {
+  background: rgba(31, 41, 55, 0.04);
+}
+.pagination__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--steel-secondary);
+}
+
 /* Disabled / demo annotation — bright red so missing data is unmistakable */
 .demo-tag {
   display: inline-flex;

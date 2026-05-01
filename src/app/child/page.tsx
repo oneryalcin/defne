@@ -1,11 +1,14 @@
 import { Footprints } from "lucide-react";
 import { startMissionAction } from "@/app/actions";
-import { getMissionPreview } from "@/lib/db/repository";
+import { getMissionPreview, getParentWords } from "@/lib/db/repository";
 import { GuideRail } from "@/components/GuideRail";
 import { MasteryRail } from "@/components/MasteryRail";
 import { PencilMap } from "@/components/PencilMap";
+import { WordHeatmap } from "@/components/WordHeatmap";
 import { WordPills } from "@/components/WordPills";
 import type { MasteryColour } from "@/lib/types";
+
+const HEATMAP_PAGE_SIZE = 120;
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +21,20 @@ const MAP_LAYOUT = [
   { x: 700, y: 130 },
 ];
 
-export default function ChildPage() {
+type SearchParams = Promise<{ p?: string }> | { p?: string };
+
+export default async function ChildPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const preview = getMissionPreview(8);
   const words = preview.words;
+  const allWords = getParentWords();
+  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as {
+    p?: string;
+  };
+  const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
 
   const pills = words.map((word, idx) => ({
     word: word.word,
@@ -97,6 +111,28 @@ export default function ChildPage() {
             </div>
           </div>
         </section>
+      </article>
+
+      <article
+        className="book-page child-heatmap-page"
+        aria-labelledby="child-heatmap"
+      >
+        <span className="folio">Your words so far</span>
+        <header style={{ padding: "clamp(28px, 4vw, 48px) clamp(28px, 5vw, 56px) 0" }}>
+          <span className="cover-chapter">Your words so far</span>
+          <h2 id="child-heatmap" className="cover-title" style={{ fontSize: "clamp(2rem, 3.4vw, 2.5rem)" }}>
+            A field of <span className="accent">words</span> you have met.
+          </h2>
+        </header>
+        <div style={{ padding: "clamp(20px, 3vw, 36px) clamp(28px, 5vw, 56px) clamp(28px, 4vw, 48px)" }}>
+          <WordHeatmap
+            words={allWords}
+            page={heatmapPage}
+            pageSize={HEATMAP_PAGE_SIZE}
+            variant="child"
+            basePath="/child"
+          />
+        </div>
       </article>
     </main>
   );

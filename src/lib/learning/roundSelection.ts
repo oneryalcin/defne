@@ -59,12 +59,15 @@ export function selectRoundWords(
 ): RoundWordSelection {
   const count = Math.max(6, Math.min(12, Math.round(targetCount)));
   const wordMap = new Map(words.map((word) => [word.id, word]));
-  // Randomise ties so a fresh deck (every word at the same priority) does
-  // not always serve the words in alphabetical order.
+  // Tie-break with a per-day stable hash so a fresh deck shuffles, but
+  // two calls within the same day (cover preview + round start) agree.
+  // Math.random() would let preview and start disagree on which words
+  // are 'today's eight'.
+  const dayBucket = nowIso.slice(0, 10);
   const ranked = [...words].sort((a, b) => {
     const diff = priorityScore(b, nowIso) - priorityScore(a, nowIso);
     if (diff !== 0) return diff;
-    return Math.random() - 0.5;
+    return stableHash(a.id, dayBucket) - stableHash(b.id, dayBucket);
   });
   const picked = new Map<string, RoundSelectionReason>();
 
@@ -138,4 +141,16 @@ function isDueForReview(word: PracticeWord, nowIso: string): boolean {
 function isNearGreenProofWord(word: PracticeWord): boolean {
   const weakest = Math.min(word.state.meaningMastery, word.state.usageMastery, word.state.spellingMastery);
   return weakest >= 0.75 && weakest < 0.9;
+}
+
+// Tiny stable string hash (FNV-1a 32-bit). Used to shuffle equal-priority
+// words deterministically per day.
+function stableHash(wordId: string, salt: string): number {
+  const input = `${salt}:${wordId}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }

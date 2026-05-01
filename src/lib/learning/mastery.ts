@@ -1,4 +1,5 @@
 import type {
+  AttemptRecord,
   LearnerWordState,
   MasteryColour,
   MasteryDimension,
@@ -8,6 +9,7 @@ import type {
   SessionPlanItem
 } from "../types";
 import { mistakeRecencyWeight } from "./rounds";
+import { priorityBreakdownForState, scoreFromState } from "./scoring";
 
 // Vocabulary practice does not test spelling production; the spelling
 // dimension is intentionally ignored when scoring.
@@ -71,37 +73,17 @@ function firstAttemptsClean(state: LearnerWordState): boolean {
   );
 }
 
-export function masteryColourForState(state: LearnerWordState): MasteryColour {
-  // Words that have never been answered live in a "Not started" bucket
-  // — surfaced as red so they are still picked, but the parent UI labels
-  // them separately.
-  if (state.attemptCount === 0) return "red";
-
-  const dims = attemptedDimensionScores(state);
-  if (dims.length === 0) {
-    // Attempted but never scored above zero (e.g. wrong on first try).
-    return state.wrongCount > 0 ? "red" : "orange";
-  }
-  const weakest = Math.min(...dims);
-
-  if (weakest < 0.35) return "red";
-  if (weakest < 0.6) return "orange";
-  if (weakest < RELIABLE_THRESHOLD) return "yellow";
-
-  // Reliable = high score AND first two attempts both clean (no wrongs, low hints).
-  const clean = firstAttemptsClean(state);
-  if (!clean) return "yellow";
-
-  // Mastered = Reliable + survived decay (longer stability, more correct attempts).
-  if (
-    weakest >= MASTERED_THRESHOLD &&
-    state.stabilityDays >= MASTERED_STABILITY_DAYS &&
-    state.correctCount >= MASTERED_MIN_CORRECT
-  ) {
-    return "green";
-  }
-
-  return "light_green";
+export function masteryColourForState(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null = null
+): MasteryColour {
+  // Delegated to scoring.ts so colour, priority, and tooltip explanations
+  // all read from the same Wilson-lower-bound pipeline. See
+  // docs/mastery-scoring-and-selection-v2.md.
+  const breakdown = scoreFromState(state, attempts);
+  // Untouched words still bucket as red here (callers that want to render
+  // a separate 'Not started' state should check attemptCount themselves).
+  return breakdown.colour ?? "red";
 }
 
 export function dimensionForQuestion(questionType: QuestionType): MasteryDimension {
@@ -122,47 +104,12 @@ export function dimensionForQuestion(questionType: QuestionType): MasteryDimensi
   }
 }
 
-export function priorityScore(word: PracticeWord, nowIso: string): number {
-  const state = word.state;
-  const colour = masteryColourForState(state);
-
-  // Untouched words: low base priority — only picked when nothing needier
-  // is in the queue.
-  if (state.attemptCount === 0) {
-    return 0.4;
-  }
-
-  // Mastered words: rare refresh, only when forgetting curve has decayed.
-  if (colour === "green") {
-    const daysSinceSeen = daysBetween(state.lastSeenAt, nowIso);
-    const recall = recallProbability(daysSinceSeen, state.stabilityDays);
-    return 0.05 + (1 - recall) * 0.15; // tops out around 0.2
-  }
-
-  const daysSinceSeen = daysBetween(state.lastSeenAt, nowIso);
-  const recall = recallProbability(daysSinceSeen, state.stabilityDays);
-  const dueScore = 1 - recall;
-  const weakestScore = 1 - weakestMastery(state);
-
-  const hoursSinceWrong = daysBetween(state.lastWrongAt, nowIso) * 24;
-  const recentFailureBonus = Number.isFinite(hoursSinceWrong)
-    ? 0.45 * mistakeRecencyWeight(hoursSinceWrong)
-    : 0;
-  const almostMasteredBonus =
-    weakestMastery(state) >= 0.75 && weakestMastery(state) < 0.9 ? 0.18 : 0;
-  const delayedRecallBonus =
-    daysSinceSeen >= 1 && recall < REVIEW_THRESHOLD ? 0.2 : 0;
-  const tooRecentPenalty =
-    daysSinceSeen * 24 * 60 < MINUTES_TOO_RECENT && !state.lastWrongAt ? 0.55 : 0;
-
-  return (
-    dueScore * 1.2 +
-    weakestScore * 0.8 +
-    recentFailureBonus +
-    almostMasteredBonus +
-    delayedRecallBonus -
-    tooRecentPenalty
-  );
+export function priorityScore(
+  word: PracticeWord,
+  nowIso: string,
+  attempts: AttemptRecord[] | null = null
+): number {
+  return priorityBreakdownForState(word, attempts, nowIso).score;
 }
 
 export function updateStateAfterAttempt(

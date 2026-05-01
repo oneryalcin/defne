@@ -77,6 +77,13 @@ export interface PracticeAttemptOutcome {
   masteryCredit?: "normal" | "recovery";
 }
 
+/** Minimal per-attempt record used for time-weighted mastery scoring. */
+export interface AttemptRecord {
+  answeredAt: string;
+  isCorrect: boolean;
+  hintLevelUsed: number;
+}
+
 export interface SessionPlanItem {
   wordId: string;
   questionType: QuestionType;

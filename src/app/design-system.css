@@ -1499,6 +1499,24 @@
   letter-spacing: 0.08em;
   color: var(--muted-slate);
 }
+.heatmap-cell__why {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px dashed rgba(31, 41, 55, 0.10);
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--steel-secondary);
+  line-height: 1.4;
+}
+.heatmap-cell__why li::before {
+  content: "· ";
+  color: var(--muted-slate);
+}
 .heatmap-cell:hover .heatmap-cell__pop,
 .heatmap-cell:focus-visible .heatmap-cell__pop,
 .heatmap-cell:focus-within .heatmap-cell__pop {
@@ -1556,6 +1574,65 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--steel-secondary);
+}
+
+/* Reason list (per-word detail page) */
+.reason-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.reason-list li {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--graphite-ink);
+  padding: 10px 12px;
+  border: 1px solid var(--whisper-border);
+  border-radius: 10px;
+  background: rgba(31, 41, 55, 0.02);
+}
+.reason-list li::before {
+  content: "·";
+  color: var(--muted-slate);
+  font-weight: 700;
+}
+
+/* Priority breakdown table */
+.priority-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+.priority-table thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-slate);
+  font-weight: 500;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.18);
+}
+.priority-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px dashed rgba(31, 41, 55, 0.10);
+  vertical-align: top;
+}
+.priority-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.priority-table .dim {
+  color: var(--steel-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 /* Disabled / demo annotation — bright red so missing data is unmistakable */

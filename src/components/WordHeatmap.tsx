@@ -90,20 +90,39 @@ export function WordHeatmap({
               ? `Seen ${word.attemptCount} · ✓ ${word.correctCount} · ✗ ${word.wrongCount}`
               : "Not started yet";
           return (
-            <span
+            <Link
               key={word.id}
               role="listitem"
               className="heatmap-cell"
               style={{ background: fill }}
-              tabIndex={0}
+              href={`/parent/words/${word.id}`}
+              prefetch={false}
             >
               <span className="heatmap-cell__word">{word.word}</span>
               <span className="heatmap-cell__pop" role="tooltip">
                 <strong>{word.word}</strong>
                 <span className="heatmap-cell__state">{label}</span>
                 <span className="heatmap-cell__stats">{stats}</span>
+                {word.scoreReasons.length > 0 ? (
+                  <ul className="heatmap-cell__why">
+                    {word.scoreReasons.map((reason, idx) => (
+                      <li key={idx}>{reason}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    letterSpacing: "0.1em",
+                    color: "var(--forest-green)",
+                    marginTop: 4,
+                  }}
+                >
+                  Click for full history →
+                </span>
               </span>
-            </span>
+            </Link>
           );
         })}
       </div>

@@ -15,6 +15,8 @@ describe("mastery scoring", () => {
   });
 
   it("ignores spelling when judging colour", () => {
+    // 5 clean correct, no wrongs, ≥7d stability, ≥4 corrects → Mastered.
+    // Spelling dimension is intentionally ignored.
     const state = makeState({
       meaningMastery: 0.95,
       usageMastery: 0.95,
@@ -23,7 +25,8 @@ describe("mastery scoring", () => {
       correctCount: 5,
       attemptCount: 5,
       wrongCount: 0,
-      averageHintLevelUsed: 0
+      averageHintLevelUsed: 0,
+      lastSeenAt: "2026-04-30T12:00:00.000Z"
     });
     expect(masteryColourForState(state)).toBe("green");
   });
@@ -35,50 +38,48 @@ describe("mastery scoring", () => {
 
   it("first two clean attempts unlock reliable", () => {
     const state = makeState({
-      meaningMastery: 0.82,
-      usageMastery: 0.8,
       attemptCount: 2,
       correctCount: 2,
       wrongCount: 0,
       averageHintLevelUsed: 0,
-      stabilityDays: 2
+      stabilityDays: 2,
+      lastSeenAt: "2026-05-01T08:00:00.000Z"
     });
     expect(masteryColourForState(state)).toBe("light_green");
   });
 
   it("two correct but with hints does not unlock reliable", () => {
     const state = makeState({
-      meaningMastery: 0.82,
-      usageMastery: 0.8,
       attemptCount: 2,
       correctCount: 2,
       wrongCount: 0,
       averageHintLevelUsed: 2,
-      stabilityDays: 2
+      stabilityDays: 2,
+      lastSeenAt: "2026-05-01T08:00:00.000Z"
     });
+    // Heavy hint use disables the Reliable floor; lower bound from 2/2
+    // sits in the yellow band.
     expect(masteryColourForState(state)).toBe("yellow");
   });
 
-  it("mastered requires high score AND survived decay", () => {
+  it("mastered requires Reliable AND survived decay AND ≥4 corrects", () => {
     const onlyHigh = makeState({
-      meaningMastery: 0.92,
-      usageMastery: 0.9,
       attemptCount: 2,
       correctCount: 2,
       wrongCount: 0,
       averageHintLevelUsed: 0,
-      stabilityDays: 2
+      stabilityDays: 2,
+      lastSeenAt: "2026-05-01T08:00:00.000Z"
     });
     expect(masteryColourForState(onlyHigh)).toBe("light_green");
 
     const survived = makeState({
-      meaningMastery: 0.92,
-      usageMastery: 0.9,
       attemptCount: 5,
       correctCount: 5,
       wrongCount: 0,
       averageHintLevelUsed: 0,
-      stabilityDays: 8
+      stabilityDays: 8,
+      lastSeenAt: "2026-04-30T20:00:00.000Z"
     });
     expect(masteryColourForState(survived)).toBe("green");
   });

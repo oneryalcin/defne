@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getWordDetail } from "@/lib/db/repository";
 import type { MasteryColour } from "@/lib/types";
+import { AttemptStrip } from "@/components/word-debug/AttemptStrip";
+import { CompetitorList } from "@/components/word-debug/CompetitorList";
+import { ConfidenceGauge } from "@/components/word-debug/ConfidenceGauge";
+import { ProjectionChart } from "@/components/word-debug/ProjectionChart";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +16,14 @@ const COLOUR_FILL: Record<MasteryColour, string> = {
   yellow: "var(--mastery-yellow)",
   light_green: "var(--mastery-light)",
   green: "var(--mastery-green)",
+};
+
+const COLOUR_KEY: Record<MasteryColour, string> = {
+  red: "is-red",
+  orange: "is-orange",
+  yellow: "is-yellow",
+  light_green: "is-light_green",
+  green: "is-green",
 };
 
 const COLOUR_LABEL: Record<MasteryColour, string> = {
@@ -32,6 +44,14 @@ export default async function WordDetailPage({
   if (!detail) notFound();
 
   const colour = detail.masteryColour;
+  const pHat =
+    detail.attempts.length > 0
+      ? detail.attempts.filter((a) => a.isCorrect).length /
+        detail.attempts.length
+      : 0;
+  const recentWrong = detail.attempts.find(
+    (a) => !a.isCorrect && Date.now() - new Date(a.answeredAt).getTime() < 36 * 3600 * 1000
+  );
 
   return (
     <main className="spread">
@@ -67,21 +87,7 @@ export default async function WordDetailPage({
             >
               {detail.word}
               {colour ? (
-                <span
-                  className="mastery-mini"
-                  style={{
-                    background:
-                      colour === "red"
-                        ? "var(--mastery-red-bg)"
-                        : colour === "orange"
-                          ? "var(--mastery-orange-bg)"
-                          : colour === "yellow"
-                            ? "var(--mastery-yellow-bg)"
-                            : colour === "light_green"
-                              ? "var(--mastery-light-bg)"
-                              : "var(--mastery-green-bg)",
-                  }}
-                >
+                <span className={`mastery-mini ${COLOUR_KEY[colour]}`}>
                   <span
                     className="mastery-mini__dot"
                     aria-hidden="true"
@@ -117,38 +123,189 @@ export default async function WordDetailPage({
           </div>
         </header>
 
-        {/* Section: Why this colour */}
+        {/* ============================================================
+            BIG STATS — answers "where does this sit, will I see it soon?"
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="big-stats">
+          <header className="section-head">
+            <span className="section-head__label">Right now</span>
+            <h2 id="big-stats" className="section-head__title">
+              Where this word sits and where it&apos;s headed.
+            </h2>
+            <p className="section-head__sub">
+              Each round picks the top eight words from {detail.rank.total} by
+              priority. Higher rank = more likely to surface tomorrow.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <div className="word-big-stats">
+              <div className="word-big-stat">
+                <span className="word-big-stat__label">Mastery confidence</span>
+                <span className="word-big-stat__value">
+                  {(detail.scoreLowerBound * 100).toFixed(0)}
+                  <span className="word-big-stat__unit">% lower bound</span>
+                </span>
+              </div>
+              <div className="word-big-stat">
+                <span className="word-big-stat__label">Priority rank</span>
+                <span className="word-big-stat__value">
+                  {detail.rank.rank}
+                  <span className="word-big-stat__unit">of {detail.rank.total}</span>
+                </span>
+              </div>
+              <div className="word-big-stat">
+                <span className="word-big-stat__label">Pick chance · next round</span>
+                <span className="word-big-stat__value">
+                  {(detail.pickProbabilityNow * 100).toFixed(0)}
+                  <span className="word-big-stat__unit">%</span>
+                </span>
+              </div>
+              <div className="word-big-stat">
+                <span className="word-big-stat__label">Attempts</span>
+                <span className="word-big-stat__value">
+                  {detail.attempts.length}
+                  <span className="word-big-stat__unit">
+                    · ✓ {detail.attempts.filter((a) => a.isCorrect).length} · ✗{" "}
+                    {detail.attempts.filter((a) => !a.isCorrect).length}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ============================================================
+            CONFIDENCE GAUGE — visualise the Wilson lower bound on the bucket scale
+            ============================================================ */}
         <section className="dash-section" aria-labelledby="why-colour">
           <header className="section-head">
             <span className="section-head__label">Why this colour</span>
             <h2 id="why-colour" className="section-head__title">
-              How the algorithm read the evidence.
+              Confidence band against the bucket scale.
             </h2>
             <p className="section-head__sub">
-              Wilson 80% lower bound: <strong>{(detail.scoreLowerBound * 100).toFixed(0)}%</strong>.
-              See <code>docs/mastery-scoring-and-selection-v2.md</code> for the full pipeline.
+              The dark tick is the Wilson 80% lower bound — the value
+              we bucket on. The faint tick is the naive correct ratio.
+              They differ because 1/1 is not the same evidence as 5/5
+              even though both have a mean of 1.0.
             </p>
           </header>
           <div className="bento col-12">
-            <ul className="reason-list">
-              {detail.scoreReasons.map((reason, idx) => (
-                <li key={idx}>{reason}</li>
-              ))}
-            </ul>
+            <ConfidenceGauge
+              lowerBound={detail.scoreLowerBound}
+              pHat={pHat}
+              effectiveN={detail.attempts.length}
+            />
+            {detail.nextBucket ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-editorial)",
+                  fontStyle: "italic",
+                  fontWeight: 500,
+                  fontSize: 15,
+                  color: "var(--graphite-ink)",
+                }}
+              >
+                To clear into <strong>{detail.nextBucket.label}</strong>:
+                push the lower bound to{" "}
+                <strong>{(detail.nextBucket.threshold * 100).toFixed(0)}%</strong>{" "}
+                — typically{" "}
+                {Math.max(
+                  1,
+                  Math.ceil(
+                    (detail.nextBucket.threshold - detail.scoreLowerBound) * 6
+                  )
+                )}{" "}
+                more clean correct attempts.
+              </p>
+            ) : (
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-editorial)",
+                  fontStyle: "italic",
+                  color: "var(--steel-secondary)",
+                }}
+              >
+                Already at the top bucket. From here it only drops if the
+                learner forgets it.
+              </p>
+            )}
+            {recentWrong ? (
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--mastery-red)",
+                }}
+              >
+                ● Recent wrong (within 36h) — colour was knocked down one
+                bucket on top of the score.
+              </p>
+            ) : null}
           </div>
         </section>
 
-        {/* Section: Why this priority */}
-        <section className="dash-section" aria-labelledby="why-priority">
+        {/* ============================================================
+            FORECAST — when will this word appear?
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="forecast">
           <header className="section-head">
-            <span className="section-head__label">Why this priority</span>
-            <h2 id="why-priority" className="section-head__title">
-              How likely the scheduler is to pick it next.
+            <span className="section-head__label">Forecast (next 14 days)</span>
+            <h2 id="forecast" className="section-head__title">
+              When will this word come back?
             </h2>
             <p className="section-head__sub">
-              Total priority score:{" "}
-              <strong>{detail.priorityScore.toFixed(3)}</strong>. Higher = more
-              likely to surface.
+              If the word is not practised, recall decays along the
+              Ebbinghaus curve and its priority rises. The green line is
+              the chance of being picked in the *next* round on each day,
+              assuming the rest of the deck stays still. The orange dash
+              marks the day where the chance crosses 50%.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <ProjectionChart projection={detail.projection} />
+          </div>
+        </section>
+
+        {/* ============================================================
+            QUEUE — what's it competing against?
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="queue">
+          <header className="section-head">
+            <span className="section-head__label">Today&apos;s priority queue</span>
+            <h2 id="queue" className="section-head__title">
+              What it&apos;s fighting against for the eight slots.
+            </h2>
+            <p className="section-head__sub">
+              The selector picks the top eight by priority. If a word is
+              ranked 9–12 it has a real but not guaranteed chance; outside
+              that, it usually waits a few days for its dueScore to climb.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <CompetitorList competitors={detail.competitors} />
+          </div>
+        </section>
+
+        {/* ============================================================
+            FACTOR BREAKDOWN — value × weight contributions
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="why-priority">
+          <header className="section-head">
+            <span className="section-head__label">Priority breakdown</span>
+            <h2 id="why-priority" className="section-head__title">
+              How this priority score got to {detail.priorityScore.toFixed(2)}.
+            </h2>
+            <p className="section-head__sub">
+              Each factor is a (value × weight) pair. Recent failure and
+              decay-due raise the score; just-answered penalty subtracts.
+              See <code>docs/mastery-scoring-and-selection-v2.md</code> for the
+              full pipeline.
             </p>
           </header>
           <div className="bento col-12">
@@ -194,7 +351,28 @@ export default async function WordDetailPage({
           </div>
         </section>
 
-        {/* Section: Attempt timeline */}
+        {/* ============================================================
+            REASONS — plain language of the score derivation
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="reasons">
+          <header className="section-head">
+            <span className="section-head__label">In plain language</span>
+            <h2 id="reasons" className="section-head__title">
+              Why the colour landed where it did.
+            </h2>
+          </header>
+          <div className="bento col-12">
+            <ul className="reason-list">
+              {detail.scoreReasons.map((reason, idx) => (
+                <li key={idx}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ============================================================
+            TIMELINE — strip + table
+            ============================================================ */}
         <section className="dash-section" aria-labelledby="timeline">
           <header className="section-head">
             <span className="section-head__label">Attempt timeline</span>
@@ -202,20 +380,29 @@ export default async function WordDetailPage({
               Every time {detail.word} has been answered.
             </h2>
             <p className="section-head__sub">
-              {detail.attempts.length} total. Most recent first. Greener rows
-              answered correctly; coral were missed.
+              {detail.attempts.length} total — green dots correct, coral
+              wrong. Larger dots used hints. The strip below the chart is
+              ordered chronologically.
             </p>
           </header>
           <div className="bento col-12">
+            <AttemptStrip
+              attempts={detail.attempts.map((a) => ({
+                id: a.id,
+                answeredAt: a.answeredAt,
+                isCorrect: a.isCorrect,
+                hintLevelUsed: a.hintLevelUsed,
+              }))}
+            />
             {detail.attempts.length > 0 ? (
-              <table className="word-table" aria-label="Attempt timeline">
+              <table className="word-table" aria-label="Attempt detail">
                 <thead>
                   <tr>
                     <th>When</th>
                     <th>Step</th>
                     <th>Question type</th>
                     <th>Correct?</th>
-                    <th>Hint level</th>
+                    <th>Hint</th>
                     <th>Submitted</th>
                   </tr>
                 </thead>
@@ -257,15 +444,71 @@ export default async function WordDetailPage({
                   ))}
                 </tbody>
               </table>
-            ) : (
-              <p className="empty-state">
-                No attempts recorded yet for this word.
-              </p>
-            )}
+            ) : null}
           </div>
         </section>
 
-        {/* Section: State snapshot */}
+        {/* ============================================================
+            HOW IT WORKS — short explanation, plus link to full doc
+            ============================================================ */}
+        <section className="dash-section" aria-labelledby="how-it-works">
+          <header className="section-head">
+            <span className="section-head__label">How the scheduler works</span>
+            <h2 id="how-it-works" className="section-head__title">
+              Eight slots, every round.
+            </h2>
+            <p className="section-head__sub">
+              The deck competes for eight slots per round. Each word gets
+              a priority score; top eight are picked. The factors that
+              raise priority: decay (the longer you have not seen it, the
+              higher); confidence gap (lower bound below 1.0); recent
+              wrong; almost-mastered nudge. The factors that lower it:
+              just-answered penalty, mastered floor.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <ul className="reason-list">
+              <li>
+                <strong>Needs-work / Building</strong> words tend to dominate
+                the queue — they have low confidence and (often) recent
+                wrongs, so two of the strongest factors are pegged high.
+              </li>
+              <li>
+                <strong>Reliable</strong> words usually wait until decay
+                (Ebbinghaus) lifts dueScore enough — typically a week,
+                because <code>stabilityDays</code> grows on each clean
+                correct.
+              </li>
+              <li>
+                <strong>Mastered</strong> words get a small floor priority
+                + a small bump from decay only. They stay out of the queue
+                unless the deck is otherwise empty or recall has dropped
+                below ~40%.
+              </li>
+              <li>
+                <strong>Untouched</strong> words sit at a flat 0.4 — picked
+                only when nothing needier is queued. So a deck with many
+                Building words will pull from those before introducing new
+                ones.
+              </li>
+            </ul>
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "var(--font-body)",
+                fontSize: 13,
+                color: "var(--steel-secondary)",
+              }}
+            >
+              Full pipeline + thresholds + caveats:{" "}
+              <code>docs/mastery-scoring-and-selection-v2.md</code>.
+            </p>
+          </div>
+        </section>
+
+        {/* ============================================================
+            RAW STATE — last, for debugging
+            ============================================================ */}
         {detail.state ? (
           <section className="dash-section" aria-labelledby="state">
             <header className="section-head">
@@ -274,8 +517,8 @@ export default async function WordDetailPage({
                 What the database stores.
               </h2>
               <p className="section-head__sub">
-                Useful when something looks off — these are the inputs to the
-                algorithm.
+                Useful when something looks off — these are the inputs to
+                the algorithm.
               </p>
             </header>
             <div className="bento col-12">

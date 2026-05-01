@@ -158,10 +158,60 @@ Not good enough yet — backlog ideas:
 - `src/lib/db/repository.ts` — `getParentWords`, `getMissionPreview`,
   `getWordDetail` fetch attempts and pass them in.
 
+## Selection — eight slots, fifty-three contenders
+
+The round selector picks the **top 8 priorityScore** from the deck.
+That single fact does most of the work in answering "when will I see
+this word again?":
+
+- A word ranked 1–8 will surface in the next round (≈95–99% chance).
+- A word at rank 9–12 has ~30–50% chance — it will surface if a top-8
+  word is "too recent" or filtered out by the reason buckets.
+- A word at rank 13–25 typically waits a few days for its dueScore
+  (Ebbinghaus) to climb high enough to break into the top 12.
+- A word past rank 25 is effectively dormant unless decay is severe.
+
+Why does this matter? Because **all words compete with each other**.
+If the deck is dense with Building/Nearly-steady words, untouched
+ones may not surface at all until the older ones move up. That is
+intentional — the spec says "deprioritise untouched below struggling."
+
 ## How to debug
 
 - **Heatmap cell tooltip** lists the reasons for the colour.
-- **`/parent/words/[wordId]`** shows the full attempt timeline, the
-  Wilson lower bound, and the per-factor priority breakdown.
+- **`/parent/words/[wordId]`** is the explainability surface. It
+  shows:
+  - the Wilson lower bound on the bucket scale (with naive ratio for
+    contrast),
+  - rank against the deck and pick probability for the next round,
+  - a **forecast** chart over the next 14 days — the recall curve and
+    the projected pick probability, with the day where it crosses
+    50% marked,
+  - the priority queue with this word highlighted (so you can see
+    what it is competing with),
+  - the full priority breakdown (factor × value × weight ×
+    contribution),
+  - the attempt timeline (chronological dot strip + table),
+  - and the raw `learner_word_state` for sanity checks.
 - **`scripts/reset-practice.ts`** wipes attempts/rounds/sessions/state
   if the algorithm needs to be tested on a clean slate.
+
+### How the projection chart is computed
+
+`projectWord` (in `src/lib/learning/projection.ts`) holds the rest of
+the deck still and walks the target word forward day-by-day. Each
+day:
+
+- `daysSinceSeen` increases by 1 → recall = `exp(−d/stability)` drops.
+- `priorityScore` is recomputed (the dueScore factor rises while
+  others stay roughly constant).
+- The word is inserted into the sorted deck to find its projected
+  rank.
+- Rank → probability via a sigmoid centred at rank 8 (`1 / (1 +
+  exp(0.4·(rank − 8)))`). So rank 1 ≈ 99%, rank 8 ≈ 85%, rank 12 ≈
+  50%, rank 20 ≈ 10%.
+
+The simplification: other words are not aged. In reality, every word
+ages by the same calendar day, so relative orderings are mostly
+stable. The chart is a planning aid, not a forecast — it shows "if
+nothing else changes, when does this word re-enter the top 8?".

@@ -1,0 +1,147 @@
+// Projection helpers for the per-word debug surface. Given the live
+// deck (every word + its current state) we can answer questions like:
+//
+//   * Where does this word rank against the others *today*?
+//   * If the learner does nothing, when does its priority cross into
+//     'will be picked' territory?
+//   * What does its forgetting curve look like over the next 14 days?
+//
+// These are explainability primitives — they don't change the
+// selector. They just simulate the same math the selector uses, with
+// the rest of the deck held constant.
+
+import type { LearnerWordState, PracticeWord } from "../types";
+import { priorityBreakdownForState, type PriorityBreakdown } from "./scoring";
+
+const PICK_TOP_N = 8;
+
+/** Sigmoid converting rank → "will be picked next round" probability. */
+export function rankToProbability(rank: number): number {
+  // Anchor: rank 1 → ~0.99, rank 8 → ~0.85, rank 12 → ~0.50, rank 20 → ~0.10.
+  const centered = rank - PICK_TOP_N;
+  return 1 / (1 + Math.exp(0.4 * centered));
+}
+
+export interface DeckPriorityRow {
+  wordId: string;
+  word: string;
+  score: number;
+}
+
+/**
+ * Score the whole deck so a single word can be ranked against the others.
+ * Caller passes the canonical word list + per-word attempt history map
+ * (already loaded in the repository) — this function just runs the
+ * priority math.
+ */
+export function deckPriorities(
+  words: PracticeWord[],
+  attemptsByWordId: Map<string, Array<{ answeredAt: string; isCorrect: boolean; hintLevelUsed: number }>>,
+  nowIso: string
+): DeckPriorityRow[] {
+  return words
+    .map((word) => ({
+      wordId: word.id,
+      word: word.word,
+      score: priorityBreakdownForState(word, attemptsByWordId.get(word.id) ?? null, nowIso).score,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Rank a specific word against the rest of the deck. 1-indexed.
+ */
+export function rankFor(deck: DeckPriorityRow[], wordId: string): {
+  rank: number;
+  total: number;
+  score: number | null;
+} {
+  const idx = deck.findIndex((row) => row.wordId === wordId);
+  if (idx === -1) return { rank: deck.length, total: deck.length, score: null };
+  return { rank: idx + 1, total: deck.length, score: deck[idx].score };
+}
+
+export interface DayProjection {
+  daysFromNow: number;
+  recall: number;
+  /** Priority score the *target* word would have at this day (everyone else held still). */
+  projectedScore: number;
+  /** Where it would rank against the rest of the deck. */
+  projectedRank: number;
+  /** Probability of being picked in the next round at that day. */
+  probability: number;
+  /** This word's priority breakdown at this day, for tooltips. */
+  breakdown: PriorityBreakdown;
+}
+
+/**
+ * Project this word forward day-by-day, assuming it is NOT practised
+ * and the rest of the deck stays where it is. The dueScore (Ebbinghaus)
+ * rises with `daysSinceSeen`, so the rank improves over time.
+ */
+export function projectWord(
+  word: PracticeWord,
+  attempts: Array<{ answeredAt: string; isCorrect: boolean; hintLevelUsed: number }> | null,
+  otherWords: DeckPriorityRow[],
+  startIso: string,
+  days: number
+): DayProjection[] {
+  const start = new Date(startIso).getTime();
+  const out: DayProjection[] = [];
+  // Sort everyone else once; we'll insert the target into the sorted list per day.
+  const sortedOthers = [...otherWords].sort((a, b) => b.score - a.score);
+  for (let d = 0; d <= days; d += 1) {
+    const projectedIso = new Date(start + d * 86_400_000).toISOString();
+    const breakdown = priorityBreakdownForState(word, attempts, projectedIso);
+
+    // Linear scan of others to find rank insertion point.
+    let rank = 1;
+    for (const other of sortedOthers) {
+      if (other.wordId === word.id) continue;
+      if (other.score > breakdown.score) rank += 1;
+    }
+
+    const stability = Math.max(1, word.state.stabilityDays);
+    const daysSinceSeen = word.state.lastSeenAt
+      ? (new Date(projectedIso).getTime() -
+          new Date(word.state.lastSeenAt).getTime()) /
+        86_400_000
+      : Number.POSITIVE_INFINITY;
+    const recall = Number.isFinite(daysSinceSeen)
+      ? Math.exp(-Math.max(0, daysSinceSeen) / stability)
+      : 0;
+
+    out.push({
+      daysFromNow: d,
+      recall,
+      projectedScore: breakdown.score,
+      projectedRank: rank,
+      probability: rankToProbability(rank),
+      breakdown,
+    });
+  }
+  return out;
+}
+
+/**
+ * The bucket thresholds duplicated here (kept in sync with scoring.ts)
+ * so the explainability page can render "to reach the next bucket you
+ * need lowerBound ≥ X" without importing private constants.
+ */
+export const BUCKET_THRESHOLDS = {
+  red: { upperLowerBound: 0.3, label: "Needs work" },
+  orange: { upperLowerBound: 0.55, label: "Building" },
+  yellow: { upperLowerBound: 0.7, label: "Nearly steady" },
+  light_green: { upperLowerBound: 0.8, label: "Reliable" },
+  green: { upperLowerBound: 1.0, label: "Mastered" },
+} as const;
+
+export function nextBucketTarget(
+  currentLowerBound: number
+): { label: string; threshold: number } | null {
+  if (currentLowerBound < 0.3) return { label: "Building", threshold: 0.3 };
+  if (currentLowerBound < 0.55) return { label: "Nearly steady", threshold: 0.55 };
+  if (currentLowerBound < 0.7) return { label: "Reliable", threshold: 0.7 };
+  if (currentLowerBound < 0.8) return { label: "Mastered", threshold: 0.8 };
+  return null;
+}

@@ -3,6 +3,14 @@ import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
 import { masteryColourForState, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
 import { priorityBreakdownForState, scoreFromState } from "../learning/scoring";
+import {
+  deckPriorities,
+  nextBucketTarget,
+  projectWord,
+  rankFor,
+  rankToProbability,
+  type DayProjection,
+} from "../learning/projection";
 import { selectRoundWords, type RoundWordSelection } from "../learning/roundSelection";
 import {
   DEFAULT_ROUND_MAX_RETRY_PASSES,
@@ -933,6 +941,21 @@ export interface WordDetailView {
     roundStep: string | null;
     passNumber: number | null;
   }>;
+  /** Where this word ranks against the rest of the deck for the *next* round. */
+  rank: { rank: number; total: number };
+  /** Probability of being picked in the next round (sigmoid of rank). */
+  pickProbabilityNow: number;
+  /** Day-by-day projection assuming the word is not practised. */
+  projection: DayProjection[];
+  /** What it would take to clear the next mastery bucket. */
+  nextBucket: { label: string; threshold: number } | null;
+  /** Top 12 of the deck right now, in priority order, with this word marked. */
+  competitors: Array<{
+    wordId: string;
+    word: string;
+    score: number;
+    isThis: boolean;
+  }>;
 }
 
 export function getWordDetail(wordId: string): WordDetailView | null {
@@ -1054,6 +1077,47 @@ export function getWordDetail(wordId: string): WordDetailView | null {
     priorityFactors = priority.factors;
   }
 
+  // Live deck rank + projection for the explainability page.
+  const allWords = getPracticeWords();
+  const allAttempts = loadAttemptHistoryByWord(db);
+  const nowIso = new Date().toISOString();
+  const deck = deckPriorities(allWords, allAttempts, nowIso);
+  const rank = rankFor(deck, wordId);
+  const pickProbabilityNow = rankToProbability(rank.rank);
+
+  let projection: DayProjection[] = [];
+  if (state) {
+    const livePracticeWord = allWords.find((w) => w.id === wordId);
+    if (livePracticeWord) {
+      projection = projectWord(
+        livePracticeWord,
+        attemptsAsc,
+        deck.filter((row) => row.wordId !== wordId),
+        nowIso,
+        14
+      );
+    }
+  }
+
+  const competitors = deck.slice(0, 12).map((row) => ({
+    wordId: row.wordId,
+    word: row.word,
+    score: row.score,
+    isThis: row.wordId === wordId,
+  }));
+  // If this word is outside the top 12, append it so the user can see it.
+  if (!competitors.some((c) => c.isThis)) {
+    const me = deck.find((row) => row.wordId === wordId);
+    if (me) {
+      competitors.push({
+        wordId: me.wordId,
+        word: me.word,
+        score: me.score,
+        isThis: true,
+      });
+    }
+  }
+
   return {
     id: wordRow.id,
     word: wordRow.word,
@@ -1080,6 +1144,11 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       roundStep: row.round_step,
       passNumber: row.pass_number,
     })),
+    rank: { rank: rank.rank, total: rank.total },
+    pickProbabilityNow,
+    projection,
+    nextBucket: nextBucketTarget(scoreLowerBound),
+    competitors,
   };
 }
 

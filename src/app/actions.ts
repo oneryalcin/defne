@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   createOrUpdateParentWord,
@@ -22,13 +22,17 @@ import {
 
 async function setPilotCookie(accessCode: string, role: "child" | "parent"): Promise<void> {
   const jar = await cookies();
+  const h = await headers();
+  const forwardProto = h.get("x-forwarded-proto");
+  const isSecure = forwardProto ? forwardProto.split(",")[0]?.trim() === "https" : false;
+
   jar.set({
     name: PILOT_SESSION_COOKIE,
     value: serializePilotSession({ accessCode, role }),
     path: "/",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecure,
     maxAge: getSessionTtlSeconds()
   });
 }

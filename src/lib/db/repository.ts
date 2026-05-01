@@ -1,8 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
-import { selectRoundWords } from "../learning/roundSelection";
+import { masteryColourForState, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { priorityBreakdownForState, scoreFromState } from "../learning/scoring";
+import {
+  deckPriorities,
+  nextBucketTarget,
+  projectWord,
+  rankFor,
+  rankToProbability,
+  type DayProjection,
+} from "../learning/projection";
+import { selectRoundWords, type RoundWordSelection } from "../learning/roundSelection";
 import {
   DEFAULT_ROUND_MAX_RETRY_PASSES,
   canUnlockMeaningStep,
@@ -16,6 +25,7 @@ import {
   type RoundStepAttempt
 } from "../learning/rounds";
 import type {
+  AttemptRecord,
   FailureType,
   LearnerWordState,
   PracticeAttemptOutcome,
@@ -95,9 +105,18 @@ export interface MissionPreview {
     id: string;
     word: string;
     definition: string;
-    masteryColour: LearnerWordState["masteryColour"];
+    masteryColour: LearnerWordState["masteryColour"] | null;
     selectionReason: RoundSelectionReason;
     weakestDimension: string;
+    /** Debug breakdown of why the scheduler picked this word. */
+    priorityFactors: Array<{
+      name: string;
+      value: number;
+      weight: number;
+      contribution: number;
+      note: string;
+    }>;
+    priorityScore: number;
   }>;
 }
 
@@ -144,6 +163,12 @@ export interface RoundLearnCardView {
   supportMode: LearnCardSupportMode;
   activeRecallPrompt: string;
   selectionReason: RoundSelectionReason | null;
+  history: {
+    attemptCount: number;
+    correctCount: number;
+    wrongCount: number;
+    masteryColour: LearnerWordState["masteryColour"] | null;
+  };
 }
 
 export interface AttemptReview {
@@ -180,6 +205,14 @@ export interface ParentWordListItem {
   masteryColour: LearnerWordState["masteryColour"] | null;
   difficultyLevel: number;
   isComplete: boolean;
+  attemptCount: number;
+  correctCount: number;
+  wrongCount: number;
+  lastSeenAt: string | null;
+  /** Plain-English reasons the colour landed where it did (for tooltips). */
+  scoreReasons: string[];
+  /** Wilson lower bound (0–1) used to bucket the colour. 0 when untouched. */
+  scoreLowerBound: number;
 }
 
 export interface ParentDashboard {
@@ -231,9 +264,44 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
 export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   const db = getDb();
   const words = getPracticeWords();
-  const selection = selectRoundWords(words, new Date().toISOString(), targetQuestionCount, getRemediationWordIds(db));
   const byId = new Map(words.map((word) => [word.id, word]));
+
+  // Make sure a round is committed before we render anything: this way
+  // 'today's words' on the cover are exactly the words the learner will
+  // load on Start. Without this, the cover and the started round each
+  // run the selector independently and the random tie-break causes them
+  // to disagree.
+  if (!hasInProgressRound(db)) {
+    startRoundMission(targetQuestionCount);
+  }
+  const liveRound = db
+    .prepare(
+      `SELECT word_ids_json, summary_json
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as
+    | { word_ids_json: string; summary_json: string }
+    | undefined;
+
+  const nowIso = new Date().toISOString();
+  const selection: RoundWordSelection = liveRound
+    ? roundSelectionFromLiveRound(liveRound, byId)
+    : selectRoundWords(words, nowIso, targetQuestionCount, getRemediationWordIds(db));
   const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
+  const attemptsByWordId = loadAttemptHistoryByWord(db);
+  const realAttemptsByWordId = new Map(
+    (db
+      .prepare(
+        `SELECT word_id, COUNT(*) AS n FROM practice_attempts
+         WHERE learner_id = ? GROUP BY word_id`
+      )
+      .all(defaultLearnerId()) as Array<{ word_id: string; n: number }>).map(
+      (row) => [row.word_id, row.n]
+    )
+  );
 
   return {
     targetQuestionCount: selection.wordIds.length,
@@ -242,20 +310,82 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
       const selectionReason = reasonByWordId.get(wordId);
       if (!word) throw new Error(`Missing planned word ${wordId}`);
       if (!selectionReason) throw new Error(`Missing round selection reason for ${wordId}`);
+      const realAttempts = realAttemptsByWordId.get(word.id) ?? 0;
+      const wordAttempts = attemptsByWordId.get(word.id) ?? null;
+      const priority = priorityBreakdownForState(word, wordAttempts, nowIso);
       return {
         id: word.id,
         word: word.word,
         definition: word.definition,
-        masteryColour: word.state.masteryColour,
+        // Recompute live so child surfaces match the parent dashboard.
+        // Only treat the word as "started" when a real attempt exists in
+        // practice_attempts — legacy state stubs are ignored.
+        masteryColour:
+          realAttempts === 0
+            ? null
+            : masteryColourForState(word.state, wordAttempts),
         selectionReason,
-        weakestDimension: weakestDimensionLabel(word.state)
+        weakestDimension: weakestDimensionLabel(word.state),
+        priorityFactors: priority.factors,
+        priorityScore: priority.score,
       };
     })
   };
 }
 
+function hasInProgressRound(db: DatabaseSync): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS x FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { x: number } | undefined;
+  return Boolean(row);
+}
+
+function roundSelectionFromLiveRound(
+  row: { word_ids_json: string; summary_json: string },
+  byId: Map<string, PracticeWord>
+): RoundWordSelection {
+  const wordIds = (JSON.parse(row.word_ids_json) as string[]).filter((id) =>
+    byId.has(id)
+  );
+  const stored = JSON.parse(row.summary_json) as SessionSummary;
+  const reasonsByWordId = new Map(
+    (stored.round?.selectionReasons ?? []).map((reason) => [reason.wordId, reason])
+  );
+  const reasons: RoundSelectionReason[] = wordIds.map((wordId) => {
+    const word = byId.get(wordId);
+    const stored = reasonsByWordId.get(wordId);
+    if (stored) return stored;
+    return {
+      wordId,
+      word: word?.word ?? wordId,
+      reason: "priority",
+      label: "Already in this round",
+      detail: "Carried over from the round you started earlier."
+    };
+  });
+  return { wordIds, reasons };
+}
+
 export function startRoundMission(roundWordCount = 8): string {
   const db = getDb();
+
+  // Reuse the in-progress round if one already exists. The cover preview
+  // commits one when the user lands on /child, so the words shown there
+  // are exactly the words this action navigates to.
+  const existing = db
+    .prepare(
+      `SELECT session_id FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { session_id: string } | undefined;
+  if (existing) return existing.session_id;
+
   const words = getPracticeWords();
   const now = new Date().toISOString();
   const selection = selectRoundWords(words, now, roundWordCount, getRemediationWordIds(db));
@@ -658,7 +788,20 @@ export function getParentWords(): ParentWordListItem[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example, s.mastery_colour
+      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example,
+              s.meaning_mastery, s.usage_mastery, s.spelling_mastery,
+              s.stability_days, s.attempt_count, s.correct_count, s.wrong_count,
+              s.last_hint_level_used, s.average_hint_level_used,
+              s.average_response_time_ms, s.last_seen_at, s.last_correct_at,
+              s.last_wrong_at, s.next_review_at, s.failure_types_json,
+              s.confused_with_word_ids_json, s.near_review,
+              s.eligible_questions_since_last_mistake, s.mastery_colour,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ?) AS real_attempts,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 1) AS real_correct,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 0) AS real_wrong
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
@@ -666,24 +809,375 @@ export function getParentWords(): ParentWordListItem[] {
        WHERE w.status = 'active'
        ORDER BY w.word ASC`
     )
-    .all(defaultLearnerId()) as unknown as Array<{
+    .all(defaultLearnerId(), defaultLearnerId(), defaultLearnerId(), defaultLearnerId()) as unknown as Array<{
     id: string;
     word: string;
     difficulty_level: number;
     definition: string | null;
     example: string | null;
+    meaning_mastery: number | null;
+    usage_mastery: number | null;
+    spelling_mastery: number | null;
+    stability_days: number | null;
+    attempt_count: number | null;
+    correct_count: number | null;
+    wrong_count: number | null;
+    last_hint_level_used: number | null;
+    average_hint_level_used: number | null;
+    average_response_time_ms: number | null;
+    last_seen_at: string | null;
+    last_correct_at: string | null;
+    last_wrong_at: string | null;
+    next_review_at: string | null;
+    failure_types_json: string | null;
+    confused_with_word_ids_json: string | null;
+    near_review: number | null;
+    eligible_questions_since_last_mistake: number | null;
     mastery_colour: LearnerWordState["masteryColour"] | null;
+    real_attempts: number;
+    real_correct: number;
+    real_wrong: number;
   }>;
 
-  return rows.map((row) => ({
-    id: row.id,
+  // Pull every attempt for this learner once, group by word, so we can
+  // run the time-weighted scorer for each word without N+1 queries.
+  const attemptsByWordId = loadAttemptHistoryByWord(db);
+
+  return rows.map((row) => {
+    // "Started" means a real practice_attempts row exists, not just a
+    // learner_word_state stub from card-view bookkeeping. This avoids
+    // showing legacy or seeded stub state as if the learner had answered.
+    const realAttempts = row.real_attempts;
+    let masteryColour: LearnerWordState["masteryColour"] | null = null;
+    let scoreReasons: string[] = ["Not started yet — first practice will set the colour."];
+    let scoreLowerBound = 0;
+    if (realAttempts > 0 && row.attempt_count !== null) {
+      const state: LearnerWordState = {
+        id: `state_${defaultLearnerId()}_${row.id}`,
+        learnerId: defaultLearnerId(),
+        wordId: row.id,
+        meaningMastery: row.meaning_mastery ?? 0,
+        usageMastery: row.usage_mastery ?? 0,
+        spellingMastery: row.spelling_mastery ?? 0,
+        stabilityDays: row.stability_days ?? 1,
+        masteryColour: row.mastery_colour ?? "red",
+        lastSeenAt: row.last_seen_at,
+        lastCorrectAt: row.last_correct_at,
+        lastWrongAt: row.last_wrong_at,
+        nextReviewAt: row.next_review_at,
+        attemptCount: realAttempts,
+        correctCount: row.real_correct,
+        wrongCount: row.real_wrong,
+        lastHintLevelUsed: row.last_hint_level_used,
+        averageHintLevelUsed: row.average_hint_level_used ?? 0,
+        averageResponseTimeMs: row.average_response_time_ms ?? 0,
+        failureTypes: row.failure_types_json
+          ? (JSON.parse(row.failure_types_json) as LearnerWordState["failureTypes"])
+          : [],
+        confusedWithWordIds: row.confused_with_word_ids_json
+          ? (JSON.parse(row.confused_with_word_ids_json) as string[])
+          : [],
+        nearReview: row.near_review === 1,
+        eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0
+      };
+      const breakdown = scoreFromState(state, attemptsByWordId.get(row.id) ?? null);
+      masteryColour = breakdown.colour ?? "red";
+      scoreReasons = breakdown.reasons;
+      scoreLowerBound = breakdown.lowerBound;
+    }
+    return {
+      id: row.id,
+      word: row.word,
+      definition: row.definition,
+      example: row.example,
+      masteryColour,
+      difficultyLevel: row.difficulty_level,
+      isComplete: Boolean(row.definition && row.example),
+      attemptCount: realAttempts,
+      correctCount: row.real_correct,
+      wrongCount: row.real_wrong,
+      lastSeenAt: row.last_seen_at,
+      scoreReasons,
+      scoreLowerBound
+    };
+  });
+}
+
+export interface WordDetailView {
+  id: string;
+  word: string;
+  definition: string | null;
+  example: string | null;
+  spellingNote: string | null;
+  synonyms: string[];
+  antonyms: string[];
+  confusables: string[];
+  /** State snapshot at read time. */
+  state: LearnerWordState | null;
+  /** Live colour from the algorithm. */
+  masteryColour: LearnerWordState["masteryColour"] | null;
+  /** Score reasons (Wilson, recency, knockdown rules). */
+  scoreReasons: string[];
+  /** Wilson lower bound used for the colour. */
+  scoreLowerBound: number;
+  /** Selection-priority breakdown. */
+  priorityScore: number;
+  priorityFactors: Array<{
+    name: string;
+    value: number;
+    weight: number;
+    contribution: number;
+    note: string;
+  }>;
+  /** Every recorded attempt, ordered most-recent-first. */
+  attempts: Array<{
+    id: string;
+    answeredAt: string;
+    questionType: QuestionType | null;
+    isCorrect: boolean;
+    hintLevelUsed: number;
+    submittedAnswer: string | null;
+    failureType: FailureType | null;
+    roundStep: string | null;
+    passNumber: number | null;
+  }>;
+  /** Where this word ranks against the rest of the deck for the *next* round. */
+  rank: { rank: number; total: number };
+  /** Probability of being picked in the next round (sigmoid of rank). */
+  pickProbabilityNow: number;
+  /** Day-by-day projection assuming the word is not practised. */
+  projection: DayProjection[];
+  /** What it would take to clear the next mastery bucket. */
+  nextBucket: { label: string; threshold: number } | null;
+  /** Top 12 of the deck right now, in priority order, with this word marked. */
+  competitors: Array<{
+    wordId: string;
+    word: string;
+    score: number;
+    isThis: boolean;
+  }>;
+}
+
+export function getWordDetail(wordId: string): WordDetailView | null {
+  const db = getDb();
+  const wordRow = db
+    .prepare(
+      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example,
+              sn.note AS spelling_note
+       FROM words w
+       LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
+       LEFT JOIN spelling_notes sn ON sn.word_id = w.id
+       WHERE w.id = ? AND w.status = 'active'`
+    )
+    .get(wordId) as
+    | {
+        id: string;
+        word: string;
+        difficulty_level: number;
+        definition: string | null;
+        example: string | null;
+        spelling_note: string | null;
+      }
+    | undefined;
+  if (!wordRow) return null;
+
+  const synonyms = db
+    .prepare(`SELECT synonym AS lemma FROM word_synonyms WHERE word_id = ?`)
+    .all(wordId) as Array<{ lemma: string }>;
+  const antonyms = db
+    .prepare(`SELECT antonym AS lemma FROM word_antonyms WHERE word_id = ?`)
+    .all(wordId) as Array<{ lemma: string }>;
+  const confusables = db
+    .prepare(
+      `SELECT COALESCE(confusable_text, (SELECT word FROM words WHERE id = wc.confusable_word_id)) AS lemma
+       FROM word_confusables wc
+       WHERE word_id = ?`
+    )
+    .all(wordId) as Array<{ lemma: string | null }>;
+
+  const stateRow = db
+    .prepare(
+      `SELECT * FROM learner_word_state WHERE learner_id = ? AND word_id = ?`
+    )
+    .get(defaultLearnerId(), wordId) as StateRow | undefined;
+
+  const attemptRows = db
+    .prepare(
+      `SELECT id, created_at, question_type, is_correct, hint_level_used,
+              submitted_answer, failure_type, round_step, pass_number
+       FROM practice_attempts
+       WHERE learner_id = ? AND word_id = ?
+       ORDER BY created_at DESC`
+    )
+    .all(defaultLearnerId(), wordId) as Array<{
+    id: string;
+    created_at: string;
+    question_type: string | null;
+    is_correct: number;
+    hint_level_used: number;
+    submitted_answer: string | null;
+    failure_type: string | null;
+    round_step: string | null;
+    pass_number: number | null;
+  }>;
+
+  const attemptsAsc: AttemptRecord[] = [...attemptRows]
+    .reverse()
+    .map((row) => ({
+      answeredAt: row.created_at,
+      isCorrect: row.is_correct === 1,
+      hintLevelUsed: row.hint_level_used,
+    }));
+
+  const state = stateRow ? mapState(stateRow) : null;
+  const realAttempts = attemptRows.length;
+
+  let masteryColour: LearnerWordState["masteryColour"] | null = null;
+  let scoreReasons: string[] = [
+    "Not started yet — first practice will set the colour.",
+  ];
+  let scoreLowerBound = 0;
+  let priorityScore = 0;
+  let priorityFactors: WordDetailView["priorityFactors"] = [];
+
+  if (state && realAttempts > 0) {
+    // Override aggregate counts with the real attempt totals so legacy
+    // stub state cannot inflate the picture.
+    const liveState: LearnerWordState = {
+      ...state,
+      attemptCount: realAttempts,
+      correctCount: attemptRows.filter((r) => r.is_correct === 1).length,
+      wrongCount: attemptRows.filter((r) => r.is_correct === 0).length,
+    };
+    const breakdown = scoreFromState(liveState, attemptsAsc);
+    masteryColour = breakdown.colour ?? "red";
+    scoreReasons = breakdown.reasons;
+    scoreLowerBound = breakdown.lowerBound;
+
+    const word: PracticeWord = {
+      id: wordRow.id,
+      word: wordRow.word,
+      normalizedWord: normalizeWord(wordRow.word),
+      difficultyLevel: wordRow.difficulty_level,
+      definition: wordRow.definition ?? "",
+      example: wordRow.example ?? "",
+      synonyms: synonyms.map((s) => s.lemma),
+      antonyms: antonyms.map((s) => s.lemma),
+      confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
+      spellingNote: wordRow.spelling_note,
+      state: liveState,
+    };
+    const priority = priorityBreakdownForState(
+      word,
+      attemptsAsc,
+      new Date().toISOString()
+    );
+    priorityScore = priority.score;
+    priorityFactors = priority.factors;
+  }
+
+  // Live deck rank + projection for the explainability page.
+  const allWords = getPracticeWords();
+  const allAttempts = loadAttemptHistoryByWord(db);
+  const nowIso = new Date().toISOString();
+  const deck = deckPriorities(allWords, allAttempts, nowIso);
+  const rank = rankFor(deck, wordId);
+  const pickProbabilityNow = rankToProbability(rank.rank);
+
+  let projection: DayProjection[] = [];
+  if (state) {
+    const livePracticeWord = allWords.find((w) => w.id === wordId);
+    if (livePracticeWord) {
+      projection = projectWord(
+        livePracticeWord,
+        attemptsAsc,
+        allWords,
+        allAttempts,
+        nowIso,
+        14
+      );
+    }
+  }
+
+  const competitors = deck.slice(0, 12).map((row) => ({
+    wordId: row.wordId,
     word: row.word,
-    definition: row.definition,
-    example: row.example,
-    masteryColour: row.mastery_colour,
-    difficultyLevel: row.difficulty_level,
-    isComplete: Boolean(row.definition && row.example)
+    score: row.score,
+    isThis: row.wordId === wordId,
   }));
+  // If this word is outside the top 12, append it so the user can see it.
+  if (!competitors.some((c) => c.isThis)) {
+    const me = deck.find((row) => row.wordId === wordId);
+    if (me) {
+      competitors.push({
+        wordId: me.wordId,
+        word: me.word,
+        score: me.score,
+        isThis: true,
+      });
+    }
+  }
+
+  return {
+    id: wordRow.id,
+    word: wordRow.word,
+    definition: wordRow.definition,
+    example: wordRow.example,
+    spellingNote: wordRow.spelling_note,
+    synonyms: synonyms.map((s) => s.lemma),
+    antonyms: antonyms.map((s) => s.lemma),
+    confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
+    state,
+    masteryColour,
+    scoreReasons,
+    scoreLowerBound,
+    priorityScore,
+    priorityFactors,
+    attempts: attemptRows.map((row) => ({
+      id: row.id,
+      answeredAt: row.created_at,
+      questionType: (row.question_type as QuestionType | null) ?? null,
+      isCorrect: row.is_correct === 1,
+      hintLevelUsed: row.hint_level_used,
+      submittedAnswer: row.submitted_answer,
+      failureType: (row.failure_type as FailureType | null) ?? null,
+      roundStep: row.round_step,
+      passNumber: row.pass_number,
+    })),
+    rank: { rank: rank.rank, total: rank.total },
+    pickProbabilityNow,
+    projection,
+    nextBucket: nextBucketTarget(scoreLowerBound),
+    competitors,
+  };
+}
+
+function loadAttemptHistoryByWord(db: DatabaseSync): Map<string, AttemptRecord[]> {
+  const rows = db
+    .prepare(
+      `SELECT word_id, created_at, is_correct, hint_level_used
+       FROM practice_attempts
+       WHERE learner_id = ?
+       ORDER BY created_at ASC`
+    )
+    .all(defaultLearnerId()) as Array<{
+    word_id: string;
+    created_at: string;
+    is_correct: number;
+    hint_level_used: number;
+  }>;
+  const byWordId = new Map<string, AttemptRecord[]>();
+  for (const row of rows) {
+    const list = byWordId.get(row.word_id) ?? [];
+    list.push({
+      answeredAt: row.created_at,
+      isCorrect: row.is_correct === 1,
+      hintLevelUsed: row.hint_level_used,
+    });
+    byWordId.set(row.word_id, list);
+  }
+  return byWordId;
 }
 
 export function createOrUpdateParentWord(input: WordFormInput): string {
@@ -1133,7 +1627,14 @@ function toRoundLearnCardView(
     viewCount,
     supportMode: learnCardSupportMode(viewCount),
     activeRecallPrompt: activeRecallPrompt(word),
-    selectionReason
+    selectionReason,
+    history: {
+      attemptCount: word.state.attemptCount,
+      correctCount: word.state.correctCount,
+      wrongCount: word.state.wrongCount,
+      masteryColour:
+        word.state.attemptCount === 0 ? null : masteryColourForState(word.state)
+    }
   };
 }
 

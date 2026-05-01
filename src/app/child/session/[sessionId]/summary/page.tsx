@@ -1,109 +1,117 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { CheckCircle2, RotateCcw, SpellCheck } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { getSessionSummary } from "@/lib/db/repository";
+import { PencilMap } from "@/components/PencilMap";
 
 export const dynamic = "force-dynamic";
+
+const MAP_LAYOUT = [
+  { x: 110, y: 296 },
+  { x: 230, y: 274 },
+  { x: 350, y: 252 },
+  { x: 470, y: 230 },
+  { x: 590, y: 196 },
+  { x: 700, y: 130 },
+];
 
 export default async function SummaryPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   const summary = getSessionSummary(sessionId);
 
-  return (
-    <main className="page">
-      <section className="page-title">
-        <h1>Round summary</h1>
-        <p>{summary.round?.explanation ?? "What moved forward in this session, and what should come back tomorrow."}</p>
-      </section>
+  const today = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
 
-      {summary.round ? (
-        <section className="panel round-parent-panel">
-          <h2>What the round means</h2>
-          <div className="round-explainer">
-            <div>
-              <span className="metric-label">Secure</span>
-              <strong>{summary.round.firstAttemptSecureWords.length}</strong>
-              <p>Correct on the first try in meaning and sentence use.</p>
-            </div>
-            <div>
-              <span className="metric-label">Recovered</span>
-              <strong>{summary.round.eventuallyCorrectWords.length + summary.round.revealAndMoveOnWords.length}</strong>
-              <p>Finished after a miss or reveal, so it should come back soon.</p>
-            </div>
-            <div>
-              <span className="metric-label">Near review</span>
-              <strong>{summary.round.nearReviewWords.length}</strong>
-              <p>These words need another clean pass.</p>
-            </div>
+  const secure = summary.round?.firstAttemptSecureWords ?? [];
+  const recovered = [
+    ...(summary.round?.eventuallyCorrectWords ?? []),
+    ...(summary.round?.revealAndMoveOnWords ?? []),
+  ];
+  const near = summary.round?.nearReviewWords ?? summary.revisitTomorrow ?? [];
+
+  // Buckets can overlap (e.g. a word can be both 'recovered' and
+  // 'nearReview'). Dedupe with a strongest-state-wins precedence so the
+  // word only appears once on the legend and the SVG.
+  const stateBy = new Map<string, "done" | "current" | "locked">();
+  const noteBy = new Map<string, string>();
+  for (const w of secure.slice(0, 2)) {
+    stateBy.set(w, "done");
+    noteBy.set(w, "Secure today.");
+  }
+  for (const w of recovered.slice(0, 1)) {
+    if (stateBy.get(w) === "done") continue;
+    stateBy.set(w, "current");
+    noteBy.set(w, "Recovered after a miss — back tomorrow.");
+  }
+  for (const w of near.slice(0, 2)) {
+    if (stateBy.has(w)) continue;
+    stateBy.set(w, "locked");
+    noteBy.set(w, "Needs another pass.");
+  }
+  const journey = [...stateBy.entries()].map(([word, state]) => ({
+    word,
+    state,
+    note: noteBy.get(word) ?? "",
+  }));
+
+  const stops = journey.slice(0, 6).map((entry, idx) => ({
+    word: entry.word,
+    state: entry.state,
+    x: MAP_LAYOUT[idx]?.x ?? 100 + idx * 110,
+    y: MAP_LAYOUT[idx]?.y ?? 280,
+  }));
+
+  return (
+    <main className="spread">
+      <article className="book-page end-spread" aria-labelledby="end-title">
+        <span className="folio">End of round · {today}</span>
+        <span className="cover-chapter">The path so far</span>
+        <h1 id="end-title" className="end-headline">
+          {secure.length > 0
+            ? "A small step today, a clearer view tomorrow."
+            : "We’ll come back to these tomorrow."}
+        </h1>
+
+        <p className="cover-lede">
+          {summary.round?.explanation ??
+            "What moved forward in this session, and what should come back tomorrow."}
+        </p>
+
+        {stops.length > 0 ? (
+          <div className="end-landscape">
+            <PencilMap stops={stops} caption="Story map of the round" />
           </div>
-        </section>
-      ) : null}
-
-      <section className="dashboard-grid">
-        <SummaryPanel
-          icon={<CheckCircle2 size={24} />}
-          title="Words improved"
-          empty="No words improved yet. The attempt history is still useful."
-          items={summary.wordsImproved ?? []}
-        />
-        <SummaryPanel
-          icon={<SpellCheck size={24} />}
-          title="Spelling traps"
-          empty="No spelling traps in this mission."
-          items={summary.spellingTraps ?? []}
-        />
-        <SummaryPanel
-          icon={<RotateCcw size={24} />}
-          title={summary.round ? "Near review" : "Revisit tomorrow"}
-          empty="Nothing urgent to revisit."
-          items={summary.revisitTomorrow ?? []}
-        />
-        {summary.round ? (
-          <SummaryPanel
-            icon={<CheckCircle2 size={24} />}
-            title="First-attempt secure"
-            empty="No words were secure on both first attempts yet."
-            items={summary.round.firstAttemptSecureWords}
-          />
         ) : null}
-      </section>
 
-      <div className="action-row">
-        <Link className="button" href="/child">
-          Practise another round
-        </Link>
-        <Link className="button-secondary" href="/">
-          Back home
-        </Link>
-      </div>
+        {journey.length > 0 ? (
+          <ul className="story-legend">
+            {journey.map((entry) => (
+              <li
+                key={`${entry.state}-${entry.word}`}
+                className={`story-legend__item is-${entry.state}`}
+              >
+                <span className="story-legend__word">{entry.word}</span>
+                <span className="story-legend__note">{entry.note}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty-state">No round details to summarise.</p>
+        )}
+
+        <footer className="page-actions">
+          <span className="page-actions__leader">Close the book.</span>
+          <div style={{ display: "flex", gap: 14 }}>
+            <Link className="ribbon" href="/child">
+              <BookOpen size={18} aria-hidden="true" />
+              Open another round
+            </Link>
+            <Link className="ribbon ribbon--ghost" href="/">
+              Home
+            </Link>
+          </div>
+        </footer>
+      </article>
     </main>
-  );
-}
-
-function SummaryPanel({
-  icon,
-  title,
-  empty,
-  items
-}: {
-  icon: ReactNode;
-  title: string;
-  empty: string;
-  items: string[];
-}) {
-  return (
-    <div className="panel">
-      {icon}
-      <h2>{title}</h2>
-      {items.length > 0 ? (
-        <ul className="compact-list">
-          {items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className="empty-state">{empty}</p>
-      )}
-    </div>
   );
 }

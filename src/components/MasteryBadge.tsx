@@ -1,11 +1,11 @@
 import type { MasteryColour } from "@/lib/types";
 
 const labels: Record<MasteryColour, string> = {
-  red: "Red",
-  orange: "Orange",
-  yellow: "Yellow",
-  light_green: "Light green",
-  green: "Green"
+  red: "Needs work",
+  orange: "Building",
+  yellow: "Nearly steady",
+  light_green: "Reliable",
+  green: "Mastered"
 };
 
 export function MasteryBadge({ colour }: { colour: MasteryColour }) {

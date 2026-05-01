@@ -1,4 +1,5 @@
 import type {
+  AttemptRecord,
   LearnerWordState,
   MasteryColour,
   MasteryDimension,
@@ -8,9 +9,17 @@ import type {
   SessionPlanItem
 } from "../types";
 import { mistakeRecencyWeight } from "./rounds";
+import { priorityBreakdownForState, scoreFromState } from "./scoring";
+
+// Vocabulary practice does not test spelling production; the spelling
+// dimension is intentionally ignored when scoring.
 
 const MINUTES_TOO_RECENT = 12;
 const REVIEW_THRESHOLD = 0.72;
+const RELIABLE_THRESHOLD = 0.78;
+const MASTERED_THRESHOLD = 0.85;
+const MASTERED_STABILITY_DAYS = 7;
+const MASTERED_MIN_CORRECT = 4;
 
 export function clamp01(value: number): number {
   if (Number.isNaN(value)) return 0;
@@ -30,32 +39,51 @@ export function recallProbability(daysSinceSeen: number, stabilityDays: number):
   return Math.exp(-daysSinceSeen / Math.max(1, stabilityDays));
 }
 
-export function weakestMastery(state: Pick<LearnerWordState, "meaningMastery" | "usageMastery" | "spellingMastery">): number {
-  return Math.min(state.meaningMastery, state.usageMastery, state.spellingMastery);
+// Only meaning + usage are scored. Returns null when neither has been
+// attempted yet (the word has not been started in any scoring dimension).
+export function attemptedDimensionScores(
+  state: Pick<LearnerWordState, "meaningMastery" | "usageMastery">
+): number[] {
+  const dims: number[] = [];
+  if (state.meaningMastery > 0) dims.push(state.meaningMastery);
+  if (state.usageMastery > 0) dims.push(state.usageMastery);
+  return dims;
 }
 
-export function weakestDimension(state: Pick<LearnerWordState, "meaningMastery" | "usageMastery" | "spellingMastery">): MasteryDimension {
-  const entries: Array<[MasteryDimension, number]> = [
-    ["meaning", state.meaningMastery],
-    ["usage", state.usageMastery],
-    ["spelling", state.spellingMastery]
-  ];
-  return entries.reduce((weakest, candidate) => (candidate[1] < weakest[1] ? candidate : weakest))[0];
+export function weakestMastery(
+  state: Pick<LearnerWordState, "meaningMastery" | "usageMastery" | "spellingMastery">
+): number {
+  // Backwards-compatible export — used by callers that still expect a single
+  // weakness number. Spelling no longer factors in.
+  return Math.min(state.meaningMastery, state.usageMastery);
 }
 
-export function masteryColourForState(state: LearnerWordState): MasteryColour {
-  const weakest = weakestMastery(state);
+export function weakestDimension(
+  state: Pick<LearnerWordState, "meaningMastery" | "usageMastery" | "spellingMastery">
+): MasteryDimension {
+  return state.meaningMastery <= state.usageMastery ? "meaning" : "usage";
+}
 
-  if (weakest < 0.35) return "red";
-  if (weakest < 0.6) return "orange";
-  if (weakest < 0.78) return "yellow";
-  if (weakest < 0.9) return "light_green";
+function firstAttemptsClean(state: LearnerWordState): boolean {
+  return (
+    state.attemptCount >= 2 &&
+    state.correctCount >= 2 &&
+    state.wrongCount === 0 &&
+    state.averageHintLevelUsed <= 0.5
+  );
+}
 
-  if (state.spellingMastery >= 0.9 && state.stabilityDays >= 3 && state.correctCount >= 3) {
-    return "green";
-  }
-
-  return "light_green";
+export function masteryColourForState(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null = null
+): MasteryColour {
+  // Delegated to scoring.ts so colour, priority, and tooltip explanations
+  // all read from the same Wilson-lower-bound pipeline. See
+  // docs/mastery-scoring-and-selection-v2.md.
+  const breakdown = scoreFromState(state, attempts);
+  // Untouched words still bucket as red here (callers that want to render
+  // a separate 'Not started' state should check attemptCount themselves).
+  return breakdown.colour ?? "red";
 }
 
 export function dimensionForQuestion(questionType: QuestionType): MasteryDimension {
@@ -70,39 +98,41 @@ export function dimensionForQuestion(questionType: QuestionType): MasteryDimensi
       return "usage";
     case "spelling_choice":
     case "type_from_memory":
+      // Spelling questions still update the spelling dimension internally so
+      // existing data stays valid, but the colour ignores it.
       return "spelling";
   }
 }
 
-export function priorityScore(word: PracticeWord, nowIso: string): number {
-  const state = word.state;
-  const daysSinceSeen = daysBetween(state.lastSeenAt, nowIso);
-  const recall = recallProbability(daysSinceSeen, state.stabilityDays);
-  const dueScore = 1 - recall;
-  const weaknessScore = 1 - weakestMastery(state);
-
-  const hoursSinceWrong = daysBetween(state.lastWrongAt, nowIso) * 24;
-  const recentFailureBonus = Number.isFinite(hoursSinceWrong) ? 0.45 * mistakeRecencyWeight(hoursSinceWrong) : 0;
-  const spellingTrapBonus = word.spellingNote && state.spellingMastery < 0.75 ? 0.25 : 0;
-  const weakest = weakestMastery(state);
-  const almostMasteredBonus = weakest >= 0.75 && weakest < 0.9 ? 0.18 : 0;
-  const delayedRecallBonus = daysSinceSeen >= 1 && recall < REVIEW_THRESHOLD ? 0.2 : 0;
-  const tooRecentPenalty = daysSinceSeen * 24 * 60 < MINUTES_TOO_RECENT && !state.lastWrongAt ? 0.55 : 0;
-
-  return dueScore + weaknessScore + recentFailureBonus + spellingTrapBonus + almostMasteredBonus + delayedRecallBonus - tooRecentPenalty;
+export function priorityScore(
+  word: PracticeWord,
+  nowIso: string,
+  attempts: AttemptRecord[] | null = null
+): number {
+  return priorityBreakdownForState(word, attempts, nowIso).score;
 }
 
-export function updateStateAfterAttempt(state: LearnerWordState, outcome: PracticeAttemptOutcome): LearnerWordState {
+export function updateStateAfterAttempt(
+  state: LearnerWordState,
+  outcome: PracticeAttemptOutcome
+): LearnerWordState {
   const dimension = dimensionForQuestion(outcome.questionType);
   const previousAttempts = state.attemptCount;
   const daysSinceSeen = daysBetween(state.lastSeenAt, outcome.answeredAt);
   const hintPenalty = Math.min(0.7, outcome.hintLevelUsed * 0.22);
-  const productionBonus = outcome.questionType === "type_from_memory" || outcome.questionType === "fill_sentence" ? 0.035 : 0;
+  // Production bonus only for usage production (fill sentence). Spelling
+  // production is no longer rewarded since we don't grade it.
+  const productionBonus = outcome.questionType === "fill_sentence" ? 0.035 : 0;
+  // Delay matters: getting it right after a real gap is stronger evidence.
   const delayBonus = daysSinceSeen >= 1 ? 0.035 : 0;
-  const speedPenalty = outcome.responseTimeMs > 18_000 ? 0.015 : 0;
+  // Speed deliberately ignored — kids may take longer; we are not measuring
+  // response time as a learning signal.
 
-  const baseIncrease = 0.12 + productionBonus + delayBonus - hintPenalty - speedPenalty;
-  const increase = outcome.masteryCredit === "recovery" ? Math.max(0, Math.min(0.015, baseIncrease * 0.18)) : Math.max(0.018, baseIncrease);
+  const baseIncrease = 0.12 + productionBonus + delayBonus - hintPenalty;
+  const increase =
+    outcome.masteryCredit === "recovery"
+      ? Math.max(0, Math.min(0.015, baseIncrease * 0.18))
+      : Math.max(0.018, baseIncrease);
   const decrease = outcome.hintLevelUsed > 0 ? 0.08 : 0.12;
 
   const next: LearnerWordState = {
@@ -111,16 +141,20 @@ export function updateStateAfterAttempt(state: LearnerWordState, outcome: Practi
     lastHintLevelUsed: outcome.hintLevelUsed,
     attemptCount: previousAttempts + 1,
     averageHintLevelUsed:
-      (state.averageHintLevelUsed * previousAttempts + outcome.hintLevelUsed) / (previousAttempts + 1),
+      (state.averageHintLevelUsed * previousAttempts + outcome.hintLevelUsed) /
+      (previousAttempts + 1),
     averageResponseTimeMs:
-      (state.averageResponseTimeMs * previousAttempts + outcome.responseTimeMs) / (previousAttempts + 1)
+      (state.averageResponseTimeMs * previousAttempts + outcome.responseTimeMs) /
+      (previousAttempts + 1)
   };
 
   if (outcome.isCorrect) {
     next.correctCount += 1;
     next.lastCorrectAt = outcome.answeredAt;
     next.stabilityDays =
-      outcome.masteryCredit === "recovery" ? state.stabilityDays : state.stabilityDays * (daysSinceSeen >= 1 ? 1.4 : 1.1);
+      outcome.masteryCredit === "recovery"
+        ? state.stabilityDays
+        : state.stabilityDays * (daysSinceSeen >= 1 ? 1.4 : 1.1);
     setDimension(next, dimension, clamp01(getDimension(next, dimension) + increase));
   } else {
     next.wrongCount += 1;
@@ -139,26 +173,50 @@ export function updateStateAfterAttempt(state: LearnerWordState, outcome: Practi
   return next;
 }
 
-export function selectSessionPlan(words: PracticeWord[], nowIso: string, targetCount = 15): SessionPlanItem[] {
+export function selectSessionPlan(
+  words: PracticeWord[],
+  nowIso: string,
+  targetCount = 15
+): SessionPlanItem[] {
   const ranked = [...words]
-    .map((word) => ({ word, score: priorityScore(word, nowIso), colour: word.state.masteryColour }))
-    .sort((a, b) => b.score - a.score || a.word.word.localeCompare(b.word.word));
+    .map((word) => ({
+      word,
+      score: priorityScore(word, nowIso),
+      colour: masteryColourForState(word.state)
+    }))
+    .sort((a, b) => {
+      const diff = b.score - a.score;
+      if (diff !== 0) return diff;
+      return Math.random() - 0.5;
+    });
 
-  const newOrRed = ranked.filter(({ word }) => word.state.attemptCount === 0 || word.state.masteryColour === "red");
-  const review = ranked.filter(({ word }) => {
-    const recall = recallProbability(daysBetween(word.state.lastSeenAt, nowIso), word.state.stabilityDays);
-    return word.state.attemptCount > 0 && recall < REVIEW_THRESHOLD && word.state.masteryColour !== "green";
+  const struggling = ranked.filter(({ word, colour }) => {
+    if (word.state.attemptCount === 0) return false; // not yet started
+    return colour === "red" || colour === "orange";
+  });
+  const review = ranked.filter(({ word, colour }) => {
+    if (word.state.attemptCount === 0) return false;
+    if (colour === "green") return false;
+    const recall = recallProbability(
+      daysBetween(word.state.lastSeenAt, nowIso),
+      word.state.stabilityDays
+    );
+    return recall < REVIEW_THRESHOLD;
   });
   const almost = ranked.filter(({ word }) => {
     const weakest = weakestMastery(word.state);
     return weakest >= 0.75 && weakest < 0.9;
   });
-  const maintenance = ranked.filter(({ word }) => word.state.masteryColour === "green");
+  const fresh = ranked.filter(({ word }) => word.state.attemptCount === 0);
+  const maintenance = ranked.filter(
+    ({ colour }) => colour === "green"
+  );
 
   const picked = new Map<string, PracticeWord>();
-  pickInto(picked, newOrRed, Math.min(5, targetCount));
+  pickInto(picked, struggling, Math.min(6, targetCount));
   pickInto(picked, review, Math.min(8, targetCount - picked.size));
   pickInto(picked, almost, Math.min(4, targetCount - picked.size));
+  pickInto(picked, fresh, Math.min(3, targetCount - picked.size));
   pickInto(picked, ranked, targetCount - picked.size);
   pickInto(picked, maintenance, targetCount - picked.size);
 
@@ -170,9 +228,6 @@ export function selectSessionPlan(words: PracticeWord[], nowIso: string, targetC
 
 function questionTypeForWord(word: PracticeWord, index: number): QuestionType {
   const weak = weakestDimension(word.state);
-  if (weak === "spelling") {
-    return index % 2 === 0 ? "type_from_memory" : "spelling_choice";
-  }
   if (weak === "usage") {
     const usageTypes: QuestionType[] = ["sentence_usage_choice", "fill_sentence", "confusable_choice"];
     return usageTypes[index % usageTypes.length];

@@ -1,9 +1,26 @@
 # Design System: Defne — Vocabulary Mission
 
-> Source of truth for Stitch screen generation and the React build. Fuses the
-> "Stitch Design Taste" anti-slop standard with project-specific overrides for a
-> Year 5 child + parent vocabulary practice app. Read this before generating any
-> screen.
+> **Current visual direction, not a hard contract.** This document captures the
+> intended look-and-feel and the anti-slop guardrails for Stitch and the React
+> build. The actual product contract lives in the learning docs:
+> [`mvp-scope.md`](mvp-scope.md), [`mastery-scoring-and-session-selection.md`](mastery-scoring-and-session-selection.md),
+> [`round-based-vocabulary-mode.md`](round-based-vocabulary-mode.md), and
+> [`implementation-plan.md`](implementation-plan.md).
+>
+> The design may drift from these rules during prototype iteration (for example,
+> the current CSS still uses Inter and Georgia in places). That drift is
+> acceptable while the learning mechanics catch up. When pedagogy and design
+> diverge, pedagogy wins.
+>
+> ### Concept-board caveat
+>
+> The concept boards in `docs/assets/visual-concepts/*.png` and
+> `public/assets/visual-concepts/*.png` are **tone seeds, not asset references.**
+> They predate the Defne / Maya naming convention (one board uses "Maya" as the
+> child) and contain motifs this document explicitly bans — streak cues,
+> confetti-like decoration, and embedded text inside images. The production
+> avatar library and screen assets must omit those motifs. Treat the boards as
+> "vibe and atmosphere" only.
 
 ## Configuration Dials
 
@@ -180,7 +197,89 @@ These are project-only. Stitch must respect them on every screen.
 - **Mastery state must always be a Mastery Pill** (colour dot + label).
 - **The three dimensions** (Meaning · Usage · Spelling) are first-class. Every word card and parent row shows them as small horizontal meters.
 - **The avatar** appears in: Mission Start, Active Practice (small corner pose), Hint Ladder (pointing to the sentence, never the answer), Session Summary (calm celebration), Parent Empty States. She never appears on a parent data table.
+- **Defne is a Turkish name meaning "laurel tree"** (bay laurel — symbol of growth, learning, and quiet achievement). The visual system can lean into this gently: a small laurel-leaf motif as a page-corner flourish on the watercolour avatar frame, on the journey path's "mastered" milestones, or as a faint pencil sprig beside the mission title. Never as a logo, never as a reward badge, never as decoration on the prompt itself. One tasteful reference per screen, maximum.
 - **Mistake recovery copy** uses calm phrasing: "Let's look closer", "This spelling is a trap — we'll revisit tomorrow", "You understood the idea; spelling needs another pass." Never "Wrong", "Incorrect", "Try again".
 - **End-of-session summary** uses movement language: "2 words strengthened", "1 spelling trap found", "reluctant returns tomorrow". Never "Score: 78%".
 - **Parent dashboard** answers four questions in this order: (1) what's still red/orange? (2) what spelling mistakes repeat? (3) what was forgotten after delay? (4) what should we practise next? Every section answers one of these — no decorative widgets.
 - **Cached avatar/background** slots in MVP-1A use `public/assets/visual-concepts/*` as visual references; production poses will be replaced later. Stitch should depict the recurring graphite-and-watercolour girl rather than stock illustration.
+
+## 11. Anti-LLM-Default Guardrails
+
+Pre-flight checks that counter known biases in LLM-driven UI generation. Inspired
+by gpt-taste, trimmed to what fits a calm pedagogical product (the cinematic
+GSAP motion, AIDA marketing structure, and inline-image typography from that doc
+are *not* adopted — see §9).
+
+### 11.1 Two-line headline rule
+
+LLMs default to narrow containers and wrap display headlines into 4–6 line text
+walls. Forbidden.
+
+- Display headlines (Mission Start, Session Summary, Parent Dashboard summary
+  band) flow in 2–3 lines, never more.
+- Pair display text with an ultra-wide container: `max-w-5xl` (64rem) or wider.
+  If text still wraps to 4 lines, drop the size — `clamp(2rem, 4.5vw, 3.25rem)`
+  for Mission Start, `clamp(1.75rem, 3.5vw, 2.5rem)` for parent-dashboard.
+- Verify on the 1024px breakpoint, not just 1440px.
+
+### 11.2 Gapless bento grid
+
+LLMs leave dead empty cells in CSS Grid layouts. Forbidden.
+
+- Every bento layout uses `grid-auto-flow: dense` (Tailwind `grid-flow-dense`).
+- Verify col/row spans interlock: no missing corner, no empty void.
+- Parent Dashboard 12-column bento: top row 4+4+4 (Latest Session · Red/Orange ·
+  Spelling Traps), middle row 7+5 (Forgotten-After-Delay · Suggested Focus),
+  bottom row 12 (Recent Sessions table). Spans declared explicitly.
+- 3–5 intentional tiles beat 8 messy ones. If a tile would only exist to fill
+  space, delete it.
+
+### 11.3 Layout-variance picker
+
+LLMs default to the same Left/Right split on every screen. Before generating a
+new screen, deterministically pick from this set (use the screen name's
+character count modulo the option count):
+
+- `asym-60-40`: child Mission Start, Session Summary
+- `asym-70-30`: Active Practice, Hint Ladder
+- `bento-12col`: Parent Dashboard
+- `split-with-offset-card`: Word Form, Batch Paste Import
+- `single-column-960`: Spelling Correction, mobile fallbacks
+
+Pick → write the choice in the screen's `<design_plan>` block → respect it.
+Never silently default to 50/50.
+
+### 11.4 Pre-flight `<design_plan>` block
+
+Before writing screen markup or a Stitch prompt, output a small plan that proves
+the screen respects the rules. Lives in PR descriptions for the React build, not
+in shipped UI.
+
+```
+<design_plan>
+  layout: asym-60-40 (picked from §11.3 by char-count)
+  h1_max_w: max-w-5xl, clamp(2rem, 4.5vw, 3.25rem) → 2 lines @1024px
+  bento_dense: n/a (not a bento screen)
+  cta_count: 1 primary (Forest Green "Start mission")
+  mastery_labels: 6 mastery pills, all with text labels
+  banned_check: no Inter, no #000, no purple, no emojis, no centered hero
+</design_plan>
+```
+
+### 11.5 Meta-label discipline
+
+LLMs love cheap labels like "SECTION 01 / STEP 02 / ABOUT US" — banned. But this
+product DOES use mono progress counters because they are *pedagogical
+information*, not decoration:
+
+- Allowed: `Question 4 of 14`, `Hint 2 of 5`, `Mon 28 Apr · 14 of 14 attempts`.
+- Banned: `SECTION 01`, `STEP 02`, `CHAPTER ONE`, `AT A GLANCE`.
+
+Test: does the label tell the child something they actually need to know right
+now? If yes, keep it. If it's chrome, delete it.
+
+### 11.6 Layout safety belt
+
+- Wrap the app shell in `overflow-x-hidden w-full max-w-full` so an unintended
+  off-screen element never produces a horizontal scrollbar.
+- Verify at 375px before declaring any screen done.

@@ -137,6 +137,14 @@ describe("round repository orchestration", () => {
     const summary = getSessionSummary(sessionId);
     expect(summary.round?.revealAndMoveOnWords).toContain(revealedWord);
     expect(summary.round?.nearReviewWords).toContain(revealedWord);
+    expect(summary.round?.mistakeEvidence).toContainEqual(
+      expect.objectContaining({
+        word: revealedWord,
+        contextMistakes: 3,
+        totalMistakes: 3
+      })
+    );
+    expect(summary.round?.selectionReasons?.map((reason) => reason.word)).toContain(revealedWord);
 
     const row = getDb()
       .prepare(
@@ -158,6 +166,7 @@ describe("round repository orchestration", () => {
       const sessionId = startRoundMission(6);
       let view = getSessionView(sessionId);
       expect(view.round?.cards[0]?.word).toBe(revealedWord);
+      expect(view.round?.cards[0]?.selectionReason?.reason).toBe("near_review");
 
       completeLearnCards(sessionId);
       startRoundMeaningRecognition(sessionId);

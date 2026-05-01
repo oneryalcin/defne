@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { priorityScore, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { selectRoundWords } from "../learning/roundSelection";
 import {
   DEFAULT_ROUND_MAX_RETRY_PASSES,
   canUnlockMeaningStep,
@@ -20,6 +21,7 @@ import type {
   PracticeAttemptOutcome,
   PracticeWord,
   QuestionType,
+  RoundSelectionReason,
   SessionPlanItem,
   SessionSummary
 } from "../types";
@@ -139,6 +141,7 @@ export interface RoundLearnCardView {
   viewCount: number;
   supportMode: LearnCardSupportMode;
   activeRecallPrompt: string;
+  selectionReason: RoundSelectionReason | null;
 }
 
 export interface AttemptReview {
@@ -246,19 +249,33 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
 export function startRoundMission(roundWordCount = 8): string {
   const db = getDb();
   const words = getPracticeWords();
-  const wordIds = selectRoundWordIds(db, words, new Date().toISOString(), roundWordCount);
+  const now = new Date().toISOString();
+  const selection = selectRoundWords(words, now, roundWordCount, getRemediationWordIds(db));
+  const wordIds = selection.wordIds;
   if (wordIds.length === 0) {
     throw new Error("No complete vocabulary words are available for a round.");
   }
 
-  const now = new Date().toISOString();
   const sessionId = randomUUID();
   const roundId = randomUUID();
   const plan: SessionPlanItem[] = wordIds.flatMap((wordId) => [
     { wordId, questionType: "definition_choice" },
     { wordId, questionType: "fill_sentence" }
   ]);
-  const summary: SessionSummary = { plan };
+  const summary: SessionSummary = {
+    plan,
+    round: {
+      roundId,
+      firstAttemptSecureWords: [],
+      eventuallyCorrectWords: [],
+      revealAndMoveOnWords: [],
+      nearReviewWords: [],
+      spellingStillWeakWords: [],
+      selectionReasons: selection.reasons,
+      mistakeEvidence: [],
+      explanation: "Round started. The word list is selected from recent mistakes, due reviews, and building words."
+    }
+  };
 
   db.prepare(
     `INSERT INTO practice_sessions
@@ -270,7 +287,7 @@ export function startRoundMission(roundWordCount = 8): string {
     `INSERT INTO practice_rounds
       (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
        card_view_counts_json, started_at, summary_json, created_at, updated_at)
-     VALUES (?, ?, ?, 'in_progress', 'learn_cards', ?, ?, '{}', ?, '{}', ?, ?)`
+     VALUES (?, ?, ?, 'in_progress', 'learn_cards', ?, ?, '{}', ?, ?, ?, ?)`
   ).run(
     roundId,
     sessionId,
@@ -278,6 +295,7 @@ export function startRoundMission(roundWordCount = 8): string {
     DEFAULT_ROUND_MAX_RETRY_PASSES,
     JSON.stringify(wordIds),
     now,
+    JSON.stringify(summary),
     now,
     now
   );
@@ -694,25 +712,6 @@ export function importWordShells(text: string): number {
   return unique.length;
 }
 
-function selectRoundWordIds(db: DatabaseSync, words: PracticeWord[], nowIso: string, targetCount: number): string[] {
-  const count = Math.max(6, Math.min(12, Math.round(targetCount)));
-  const wordMap = new Map(words.map((word) => [word.id, word]));
-  const ranked = [...words].sort((a, b) => priorityScore(b, nowIso) - priorityScore(a, nowIso) || a.word.localeCompare(b.word));
-  const remediation = getRemediationWordIds(db);
-  const picked = new Map<string, PracticeWord>();
-
-  pickWords(picked, ranked.filter((word) => word.state.nearReview), count);
-  pickWordIds(picked, wordMap, remediation.revealAndMoveOnWordIds, count);
-  pickWordIds(picked, wordMap, remediation.eventuallyCorrectNotFirstAttemptWordIds, count);
-  pickWords(picked, ranked.filter((word) => word.state.attemptCount === 0 || word.state.masteryColour === "red"), count);
-  pickWords(picked, ranked.filter((word) => isDueForReview(word, nowIso)), count);
-  pickWords(picked, ranked.filter((word) => isNearGreenProofWord(word)), count);
-  pickWords(picked, selectSessionPlan(words, nowIso, count).map((item) => wordMap.get(item.wordId)).filter((word): word is PracticeWord => Boolean(word)), count);
-  pickWords(picked, ranked, count);
-
-  return [...picked.keys()];
-}
-
 function getRemediationWordIds(db: DatabaseSync): {
   revealAndMoveOnWordIds: string[];
   eventuallyCorrectNotFirstAttemptWordIds: string[];
@@ -746,35 +745,6 @@ function getRemediationWordIds(db: DatabaseSync): {
   };
 }
 
-function pickWordIds(
-  picked: Map<string, PracticeWord>,
-  wordMap: Map<string, PracticeWord>,
-  wordIds: string[],
-  count: number
-): void {
-  for (const wordId of wordIds) {
-    if (picked.size >= count) return;
-    const word = wordMap.get(wordId);
-    if (word && !picked.has(word.id)) picked.set(word.id, word);
-  }
-}
-
-function pickWords(picked: Map<string, PracticeWord>, words: PracticeWord[], count: number): void {
-  for (const word of words) {
-    if (picked.size >= count) return;
-    if (!picked.has(word.id)) picked.set(word.id, word);
-  }
-}
-
-function isDueForReview(word: PracticeWord, nowIso: string): boolean {
-  return word.state.nextReviewAt ? new Date(word.state.nextReviewAt).getTime() <= new Date(nowIso).getTime() : false;
-}
-
-function isNearGreenProofWord(word: PracticeWord): boolean {
-  const weakest = Math.min(word.state.meaningMastery, word.state.usageMastery, word.state.spellingMastery);
-  return weakest >= 0.75 && weakest < 0.9;
-}
-
 function getRoundRowForSession(db: DatabaseSync, sessionId: string): PracticeRoundRow | null {
   const row = db.prepare("SELECT * FROM practice_rounds WHERE session_id = ? ORDER BY started_at DESC LIMIT 1").get(sessionId) as
     | PracticeRoundRow
@@ -797,9 +767,11 @@ function getRoundSessionView(
     if (!word) throw new Error(`Round word ${wordId} is not available.`);
     return word;
   });
+  const roundSummary = readRoundSummary(round);
+  const selectionReasons = new Map((roundSummary.round?.selectionReasons ?? []).map((reason) => [reason.wordId, reason]));
   const attempts = getRoundStepAttempts(db, round.id);
   const attemptCount = getSessionAttemptCount(db, session.id);
-  const cards = roundWords.map((word) => toRoundLearnCardView(word, cardViewCounts[word.id] ?? 0));
+  const cards = roundWords.map((word) => toRoundLearnCardView(word, cardViewCounts[word.id] ?? 0, selectionReasons.get(word.id) ?? null));
   const selectedCard =
     (selectedCardId ? cards.find((card) => card.id === selectedCardId) : null) ??
     cards.find((card) => card.viewCount < 2) ??
@@ -986,6 +958,7 @@ function advanceRoundAfterStepIfReady(db: DatabaseSync, sessionId: string, round
 
 function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, completedAt: string): SessionSummary {
   const wordIds = readRoundWordIds(round);
+  const startedSummary = readRoundSummary(round);
   const attempts = getRoundStepAttempts(db, round.id);
   const meaningProgress = evaluateRoundStepProgress(wordIds, "meaning_recognition", attempts, round.max_retry_passes);
   const contextProgress = evaluateRoundStepProgress(wordIds, "context_usage", attempts, round.max_retry_passes);
@@ -1029,6 +1002,18 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const revealAndMoveOnWords = revealAndMoveOnWordIds.map(wordName);
   const firstAttemptSecureWords = firstAttemptSecureWordIds.map(wordName);
   const spellingStillWeakWords = spellingStillWeakWordIds.map(wordName);
+  const mistakeEvidence = wordIds
+    .map((wordId) => {
+      const meaningMistakes = meaningByWord.get(wordId)?.mistakeCount ?? 0;
+      const contextMistakes = contextByWord.get(wordId)?.mistakeCount ?? 0;
+      return {
+        word: wordName(wordId),
+        meaningMistakes,
+        contextMistakes,
+        totalMistakes: meaningMistakes + contextMistakes
+      };
+    })
+    .filter((item) => item.totalMistakes > 0);
 
   const explanation =
     eventuallyCorrectWords.length > 0 || revealAndMoveOnWords.length > 0
@@ -1050,6 +1035,8 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
       revealAndMoveOnWords,
       nearReviewWords,
       spellingStillWeakWords,
+      selectionReasons: startedSummary.round?.selectionReasons ?? [],
+      mistakeEvidence,
       explanation
     },
     completedAt
@@ -1118,7 +1105,11 @@ function getRoundStepAttempts(db: DatabaseSync, roundId: string): RoundStepAttem
   }));
 }
 
-function toRoundLearnCardView(word: PracticeWord, viewCount: number): RoundLearnCardView {
+function toRoundLearnCardView(
+  word: PracticeWord,
+  viewCount: number,
+  selectionReason: RoundSelectionReason | null
+): RoundLearnCardView {
   return {
     id: word.id,
     word: word.word,
@@ -1130,7 +1121,8 @@ function toRoundLearnCardView(word: PracticeWord, viewCount: number): RoundLearn
     spellingNote: word.spellingNote,
     viewCount,
     supportMode: learnCardSupportMode(viewCount),
-    activeRecallPrompt: activeRecallPrompt(word)
+    activeRecallPrompt: activeRecallPrompt(word),
+    selectionReason
   };
 }
 
@@ -1149,6 +1141,10 @@ function readRoundWordIds(round: PracticeRoundRow): string[] {
 
 function readCardViewCounts(round: PracticeRoundRow): Record<string, number> {
   return JSON.parse(round.card_view_counts_json) as Record<string, number>;
+}
+
+function readRoundSummary(round: PracticeRoundRow): SessionSummary {
+  return JSON.parse(round.summary_json) as SessionSummary;
 }
 
 function isScoredRoundStep(step: RoundLearningStep): step is RoundStep {

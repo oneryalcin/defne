@@ -53,6 +53,10 @@ export default function ParentDashboardPage() {
             <EvidenceList title="Near review" items={dashboard.latestRound.nearReviewWords} />
             <EvidenceList title="Spelling still weak" items={dashboard.latestRound.spellingStillWeakWords} />
           </div>
+          <div className="round-detail-grid">
+            <SelectionReasonList reasons={dashboard.latestRound.selectionReasons ?? []} />
+            <MistakeEvidenceList evidence={dashboard.latestRound.mistakeEvidence ?? []} />
+          </div>
         </section>
       ) : null}
 
@@ -104,6 +108,48 @@ function EvidenceList({ title, items }: { title: string; items: string[] }) {
         </ul>
       ) : (
         <p className="empty-state compact-empty">None yet.</p>
+      )}
+    </div>
+  );
+}
+
+function SelectionReasonList({ reasons }: { reasons: NonNullable<ReturnType<typeof getParentDashboard>["latestRound"]>["selectionReasons"] }) {
+  return (
+    <div>
+      <span className="metric-label">Why these words were picked</span>
+      {reasons && reasons.length > 0 ? (
+        <ul className="evidence-list">
+          {reasons.slice(0, 8).map((reason) => (
+            <li key={reason.wordId}>
+              <strong>{reason.word}</strong>
+              <span>{reason.label}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="empty-state compact-empty">Selection reasons were not stored for this round.</p>
+      )}
+    </div>
+  );
+}
+
+function MistakeEvidenceList({ evidence }: { evidence: NonNullable<ReturnType<typeof getParentDashboard>["latestRound"]>["mistakeEvidence"] }) {
+  return (
+    <div>
+      <span className="metric-label">Mistake count</span>
+      {evidence && evidence.length > 0 ? (
+        <ul className="evidence-list">
+          {evidence.slice(0, 8).map((item) => (
+            <li key={item.word}>
+              <strong>{item.word}</strong>
+              <span>
+                {item.totalMistakes} total · meaning {item.meaningMistakes} · context {item.contextMistakes}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="empty-state compact-empty">No mistakes in the latest round.</p>
       )}
     </div>
   );

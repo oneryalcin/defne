@@ -82,6 +82,30 @@ export interface SessionPlanItem {
   questionType: QuestionType;
 }
 
+export type RoundSelectionReasonCode =
+  | "near_review"
+  | "revealed_recently"
+  | "recovered_after_miss"
+  | "new_or_red"
+  | "due_review"
+  | "near_green"
+  | "priority";
+
+export interface RoundSelectionReason {
+  wordId: string;
+  word: string;
+  reason: RoundSelectionReasonCode;
+  label: string;
+  detail: string;
+}
+
+export interface RoundMistakeEvidence {
+  word: string;
+  meaningMistakes: number;
+  contextMistakes: number;
+  totalMistakes: number;
+}
+
 export interface SessionSummary {
   plan?: SessionPlanItem[];
   wordsImproved?: string[];
@@ -94,6 +118,8 @@ export interface SessionSummary {
     revealAndMoveOnWords: string[];
     nearReviewWords: string[];
     spellingStillWeakWords: string[];
+    selectionReasons?: RoundSelectionReason[];
+    mistakeEvidence?: RoundMistakeEvidence[];
     explanation: string;
   };
   completedAt?: string;

@@ -159,6 +159,13 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
           <span className="metric-label">{card.viewCount >= 2 ? `${card.viewCount} reviews · ready` : `${card.viewCount} of 2 reviews`}</span>
           <h1>{card.word}</h1>
           <p>Read the meaning and example. Say one sentence with this word in your head, then mark the card reviewed.</p>
+          {card.selectionReason ? (
+            <div className="selection-reason">
+              <span>Practice reason</span>
+              <strong>{card.selectionReason.label}</strong>
+              <p>{card.selectionReason.detail}</p>
+            </div>
+          ) : null}
         </div>
 
         <CardSupport card={card} />
@@ -260,7 +267,10 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
       <ul className="round-card-list">
         {round.cards.map((card) => (
           <li key={card.id}>
-            <Link href={`/child/session/${sessionId}?card=${card.id}`}>{card.word}</Link>
+            <span>
+              <Link href={`/child/session/${sessionId}?card=${card.id}`}>{card.word}</Link>
+              {card.selectionReason ? <small>{card.selectionReason.label}</small> : null}
+            </span>
             <strong>{card.viewCount >= 2 ? "ready" : `${card.viewCount}/2`}</strong>
           </li>
         ))}

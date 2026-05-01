@@ -52,34 +52,21 @@ export function QuestionForm({
         />
       )}
 
-      {question.hints.length > 0 ? (
-        <div className="hint-ladder" aria-live="polite">
-          <div className="hint-ladder-header">
-            <strong>Hint ladder</strong>
-            <span>
-              {hintLevel} of {question.hints.length} opened
-            </span>
-          </div>
-          {question.hints.map((hint, index) => {
-            const isOpen = index < hintLevel;
-            return (
-              <div className={`hint-step${isOpen ? " hint-step-open" : ""}`} key={`${hint}-${index}`}>
-                <span className="hint-index">Hint {index + 1}</span>
-                <span>{isOpen ? hint : "Locked until you ask for the next hint."}</span>
-              </div>
-            );
-          })}
+      {question.hints.length > 0 && hintLevel > 0 ? (
+        <div className="hint-inline" aria-live="polite">
+          <span className="hint-index">Hint {hintLevel}</span>
+          <p>{question.hints[hintLevel - 1]}</p>
         </div>
       ) : null}
 
-      <div className="action-row">
+      <div className="question-actions">
         <button
           className="button-secondary"
           type="button"
           onClick={() => setHintLevel((current) => Math.min(question.hints.length, current + 1))}
           disabled={hintLevel >= question.hints.length}
         >
-          Hint
+          {hintLevel === 0 ? "Use hint" : `Next hint ${hintLevel}/${question.hints.length}`}
         </button>
         <SubmitButton />
       </div>

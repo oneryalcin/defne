@@ -1,10 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { recordCardViewAction, startMeaningRecognitionAction } from "@/app/actions";
 import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView } from "@/lib/db/repository";
 import type { FailureType } from "@/lib/types";
 import { QuestionForm } from "@/components/QuestionForm";
-import { MasteryBadge } from "@/components/MasteryBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -90,49 +88,28 @@ export default async function SessionPage({
 
   return (
     <main className="page">
-      <section className="question-shell">
-        <div>
+      <section className="question-shell question-focus-shell">
+        <div className="question-main">
           <div
-            className="progress-track"
+            className="progress-track progress-track-compact"
             aria-label={view.round ? `${view.round.stepProgressLabel}, question ${view.questionNumber} so far` : `Question ${view.questionNumber} of ${view.totalQuestions}`}
           >
             <div className="progress-fill" style={{ width: `${percent}%` }} />
           </div>
-          <p className="metric-label">
-            {view.round ? view.round.stepProgressLabel : `Question ${view.questionNumber} of ${view.totalQuestions}`}
-          </p>
-          {view.round ? <p className="progress-subcopy">Question {view.questionNumber} so far. Missed words come back in a repair pass.</p> : null}
+          <div className="question-meta-row">
+            <span className="metric-label">
+              {view.round ? view.round.stepProgressLabel : `Question ${view.questionNumber} of ${view.totalQuestions}`}
+            </span>
+            {view.round ? (
+              <span className={`pass-pill ${view.round.isRetryPass ? "repair-pass-pill" : "first-pass-pill"}`}>
+                {view.round.isRetryPass
+                  ? `Repair pass · ${view.round.remainingInPass} left`
+                  : `First pass · ${view.round.remainingInPass} left`}
+              </span>
+            ) : null}
+          </div>
           <QuestionForm sessionId={sessionId} question={view.question} />
         </div>
-
-        <aside className="helper-panel" aria-label="Word learning state">
-          <Image
-            src="/assets/visual-concepts/04-visual-memory-story.png"
-            alt="Pencil drawing visual memory story concept"
-            width={1536}
-            height={1024}
-            priority
-          />
-          <div className="action-row">
-            <MasteryBadge colour={view.word.state.masteryColour} />
-          </div>
-          <div className="dimension-stack">
-            <DimensionBar label="Meaning" value={view.word.state.meaningMastery} />
-            <DimensionBar label="Usage" value={view.word.state.usageMastery} />
-            <DimensionBar label="Spelling" value={view.word.state.spellingMastery} />
-          </div>
-          {view.word.spellingNote ? <div className="hint-box">Spelling support appears after your answer.</div> : null}
-          {view.round ? (
-            <div className={`round-status-card ${view.round.isRetryPass ? "repair-pass-card" : "first-pass-card"}`}>
-              <strong>{view.round.isRetryPass ? "Repair pass" : "First pass"}</strong>
-              <span>
-                {view.round.isRetryPass
-                  ? `Only missed words are back now. ${view.round.remainingInPass} left in this repair pass.`
-                  : `Try each word once. Missed words come back after this pass. ${view.round.remainingInPass} left.`}
-              </span>
-            </div>
-          ) : null}
-        </aside>
       </section>
     </main>
   );
@@ -429,17 +406,6 @@ function SpellingDiff({ submitted, canonical }: { submitted: string; canonical: 
           ))}
         </strong>
       </div>
-    </div>
-  );
-}
-
-function DimensionBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="dimension-row">
-      <span>{label}</span>
-      <span className="dimension-bar">
-        <span style={{ width: `${Math.round(value * 100)}%` }} />
-      </span>
     </div>
   );
 }

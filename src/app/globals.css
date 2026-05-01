@@ -371,12 +371,25 @@ select {
   padding: clamp(18px, 3vw, 28px);
 }
 
+.question-focus-shell {
+  grid-template-columns: minmax(0, 880px);
+  justify-content: center;
+}
+
+.question-main {
+  min-width: 0;
+}
+
 .progress-track {
   overflow: hidden;
   height: 10px;
   margin: 0 0 22px;
   border-radius: 999px;
   background: #e7efeb;
+}
+
+.progress-track-compact {
+  margin-bottom: 16px;
 }
 
 .progress-fill {
@@ -392,9 +405,38 @@ select {
   line-height: 1.4;
 }
 
+.question-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pass-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 0 11px;
+  font-size: 0.82rem;
+  font-weight: 780;
+}
+
+.first-pass-pill {
+  background: #edf8f6;
+  color: var(--teal-dark);
+}
+
+.repair-pass-pill {
+  background: #fff2c8;
+  color: #74550c;
+}
+
 .question-prompt {
   margin: 0;
-  font-size: clamp(1.45rem, 3vw, 2.35rem);
+  font-size: clamp(1.9rem, 4vw, 3rem);
   line-height: 1.14;
 }
 
@@ -406,19 +448,22 @@ select {
 
 .choice-grid {
   display: grid;
-  gap: 10px;
-  margin-top: 24px;
+  gap: 12px;
+  margin-top: 28px;
 }
 
 .choice {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  padding: 13px 14px;
+  min-height: 62px;
+  padding: 15px 18px;
   background: #fbfdfc;
   cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1.35;
 }
 
 .choice:hover,
@@ -428,7 +473,10 @@ select {
 }
 
 .choice input {
-  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .choice-review {
@@ -504,6 +552,22 @@ select {
   padding: 14px;
 }
 
+.hint-inline {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  border: 1px solid #b8d5e6;
+  border-radius: var(--radius);
+  background: #f5fbff;
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+
+.hint-inline p {
+  margin: 0;
+  color: #153b55;
+}
+
 .compact-hint-ladder {
   margin-top: 18px;
 }
@@ -540,6 +604,18 @@ select {
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.question-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.question-actions .button,
+.question-actions .button-secondary {
+  min-width: 120px;
 }
 
 .helper-panel {

@@ -383,26 +383,37 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
   const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
   const choicesShowCorrection = review.choices.length > 0;
 
-  // Mirror the question screen: instruction line on top, italic word as
-  // the heading, then the choices with feedback. For fill-sentence the
-  // target word is the answer — render the prompt instead.
-  const showWordHeading = review.questionType !== "fill_sentence";
+  // Mirror the question screen exactly: instruction, then either the
+  // big italic word (most types) or the story-sentence with a blank
+  // (fill_sentence — never reveal the answer in the prompt).
+  const isFill = review.questionType === "fill_sentence";
+  const fillPassage = isFill ? splitFillPrompt(review.prompt) : null;
   return (
     <div className="result-panel">
       <p className="practice-instruction">{review.instruction}</p>
-      {showWordHeading ? (
-        <h2 className="practice-word">{review.targetWord}</h2>
+      {isFill ? (
+        fillPassage ? (
+          <blockquote className="story-sentence">
+            {fillPassage.before}
+            <span className="target target--blank" aria-label="Missing word">
+              _____
+            </span>
+            {fillPassage.after}
+          </blockquote>
+        ) : (
+          <p className="practice-instruction">{review.prompt}</p>
+        )
       ) : (
-        <p className="question-prompt">{review.prompt}</p>
+        <>
+          <h2 className="practice-word">{review.targetWord}</h2>
+          <p
+            className="practice-instruction"
+            style={{ marginTop: 8, color: "var(--steel-secondary)" }}
+          >
+            {review.prompt}
+          </p>
+        </>
       )}
-      {showWordHeading ? (
-        <p
-          className="practice-instruction"
-          style={{ marginTop: 8, color: "var(--steel-secondary)" }}
-        >
-          {review.prompt}
-        </p>
-      ) : null}
 
       {review.choices.length > 0 ? (
         <div className="choice-grid" aria-label="Answer choices">
@@ -516,6 +527,18 @@ function SpellingDiff({ submitted, canonical }: { submitted: string; canonical: 
       </div>
     </div>
   );
+}
+
+function splitFillPrompt(
+  prompt: string
+): { before: string; after: string } | null {
+  const blank = "_____";
+  const idx = prompt.indexOf(blank);
+  if (idx === -1) return null;
+  return {
+    before: prompt.slice(0, idx),
+    after: prompt.slice(idx + blank.length),
+  };
 }
 
 function recoveryTitle(failureType: FailureType): string {

@@ -164,6 +164,12 @@ select {
   color: white;
 }
 
+.button-large {
+  min-height: 54px;
+  padding: 0 22px;
+  font-size: 1rem;
+}
+
 .button:hover {
   background: #0d4c49;
 }
@@ -737,9 +743,24 @@ select {
   padding: 14px;
 }
 
+.round-status-card {
+  display: grid;
+  gap: 6px;
+}
+
+.first-pass-card {
+  border-color: #b7d2cd;
+  background: #f1faf8;
+}
+
+.repair-pass-card {
+  border-color: #e1c06c;
+  background: #fff9e8;
+}
+
 .card-support-grid p,
 .round-status-card span {
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--muted);
   line-height: 1.45;
 }
@@ -811,6 +832,33 @@ select {
 
 .round-parent-panel {
   margin-top: 24px;
+}
+
+.round-explainer {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.round-explainer > div {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfdfc;
+  padding: 14px;
+}
+
+.round-explainer strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.round-explainer p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .round-evidence-grid {
@@ -898,6 +946,7 @@ select {
     .card-support-grid,
     .round-evidence-grid,
     .round-detail-grid,
+    .round-explainer,
     .word-grid,
     .form-grid,
   .mission-strip {

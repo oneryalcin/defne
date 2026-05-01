@@ -123,10 +123,12 @@ export default async function SessionPage({
           </div>
           {view.word.spellingNote ? <div className="hint-box">Spelling support appears after your answer.</div> : null}
           {view.round ? (
-            <div className="round-status-card">
+            <div className={`round-status-card ${view.round.isRetryPass ? "repair-pass-card" : "first-pass-card"}`}>
               <strong>{view.round.isRetryPass ? "Repair pass" : "First pass"}</strong>
               <span>
-                {view.round.remainingInPass} word{view.round.remainingInPass === 1 ? "" : "s"} left in this pass.
+                {view.round.isRetryPass
+                  ? `Only missed words are back now. ${view.round.remainingInPass} left in this repair pass.`
+                  : `Try each word once. Missed words come back after this pass. ${view.round.remainingInPass} left.`}
               </span>
             </div>
           ) : null}
@@ -138,11 +140,11 @@ export default async function SessionPage({
 
 function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round: RoundSessionView; card: RoundLearnCardView }) {
   const currentIndex = Math.max(0, round.cards.findIndex((item) => item.id === card.id));
-  const previousCard = round.cards[(currentIndex - 1 + round.cards.length) % round.cards.length];
-  const nextCard = round.cards[(currentIndex + 1) % round.cards.length];
   const nextUnreadyCard = round.cards.find((item) => item.id !== card.id && item.viewCount < 2);
+  const nextCard = round.cards[(currentIndex + 1) % round.cards.length];
   const returnToWordId = nextUnreadyCard?.id ?? nextCard?.id ?? card.id;
   const readyCount = round.cards.filter((item) => item.viewCount >= 2).length;
+  const cardIsReady = card.viewCount >= 2;
 
   return (
     <div>
@@ -158,7 +160,13 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
         <div className="learn-card-header">
           <span className="metric-label">{card.viewCount >= 2 ? `${card.viewCount} reviews · ready` : `${card.viewCount} of 2 reviews`}</span>
           <h1>{card.word}</h1>
-          <p>Read the meaning and example. Say one sentence with this word in your head, then mark the card reviewed.</p>
+          <p>
+            {round.canUnlockMeaning
+              ? "All cards are ready. Start the matching step when this word feels clear."
+              : cardIsReady
+                ? "This card is ready. Move to the next card that still needs a review."
+                : "Read the meaning and example, say one sentence with this word, then continue."}
+          </p>
           {card.selectionReason ? (
             <div className="selection-reason">
               <span>Practice reason</span>
@@ -171,27 +179,21 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
         <CardSupport card={card} />
 
         <div className="learn-card-actions">
-          {previousCard ? (
-            <Link className="button-secondary" href={`/child/session/${sessionId}?card=${previousCard.id}`}>
-              Previous card
+          {round.canUnlockMeaning ? (
+            <form action={startMeaningRecognitionAction}>
+              <input type="hidden" name="sessionId" value={sessionId} />
+              <button className="button button-large" type="submit">
+                Start matching meanings
+              </button>
+            </form>
+          ) : cardIsReady && nextUnreadyCard ? (
+            <Link className="button button-large" href={`/child/session/${sessionId}?card=${nextUnreadyCard.id}`}>
+              Go to next card
             </Link>
-          ) : null}
-          <CardViewForm sessionId={sessionId} wordId={card.id} returnToWordId={returnToWordId} />
-          {nextCard ? (
-            <Link className="button-secondary" href={`/child/session/${sessionId}?card=${nextCard.id}`}>
-              Next card
-            </Link>
-          ) : null}
+          ) : (
+            <CardViewForm sessionId={sessionId} wordId={card.id} returnToWordId={returnToWordId} />
+          )}
         </div>
-
-        {round.canUnlockMeaning ? (
-          <form action={startMeaningRecognitionAction} className="unlock-step-form">
-            <input type="hidden" name="sessionId" value={sessionId} />
-            <button className="button" type="submit">
-              Start matching meanings
-            </button>
-          </form>
-        ) : null}
       </div>
     </div>
   );
@@ -211,8 +213,8 @@ function CardViewForm({
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="wordId" value={wordId} />
       <input type="hidden" name="returnToWordId" value={returnToWordId} />
-      <button className="button" type="submit">
-        Mark reviewed
+      <button className="button button-large" type="submit">
+        Mark reviewed and continue
       </button>
     </form>
   );
@@ -261,8 +263,12 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
   return (
     <aside className="helper-panel" aria-label="Round words">
       <div className="round-status-card">
-        <strong>Step 1</strong>
-        <span>Review every card at least twice. You can move back and forth as much as you want before starting the matching test.</span>
+        <strong>{round.canUnlockMeaning ? "Ready for Step 2" : "Step 1"}</strong>
+        <span>
+          {round.canUnlockMeaning
+            ? "Every card has two reviews. The next task is matching each word to its meaning."
+            : "Each card needs two reviews. The list stays here if you want to revisit a word."}
+        </span>
       </div>
       <ul className="round-card-list">
         {round.cards.map((card) => (
@@ -313,10 +319,10 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
 
       {review.isCorrect ? (
         <div className="result-callout result-correct">
-          <strong>{review.firstAttemptCorrect === false ? "Recovered on this pass." : "Good retrieval."}</strong>
+          <strong>{review.firstAttemptCorrect === false ? "Fixed now." : "Good retrieval."}</strong>
           <span>
             {review.firstAttemptCorrect === false
-              ? "This finishes the round item, and the first miss still keeps it near review."
+              ? "This item is done for this step. It will still come back soon because the first try was missed."
               : review.hintLevelUsed > 0
                 ? "You got there with support, so this still counts as practice."
                 : "You recalled it without a hint."}
@@ -325,7 +331,7 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
       ) : review.revealAndMoveOn ? (
         <div className="result-callout result-recovery">
           <strong>Answer revealed so the round can keep moving.</strong>
-          <span>This word stays high priority for near review instead of blocking the round.</span>
+          <span>This word will come back soon instead of blocking the round.</span>
           <div className="canonical-answer">
             <span>Expected answer</span>
             <strong>{review.canonicalAnswer}</strong>

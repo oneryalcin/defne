@@ -47,6 +47,7 @@ export default function ParentDashboardPage() {
           <ListChecks size={24} />
           <h2>Latest round evidence</h2>
           <p>{dashboard.latestRound.explanation}</p>
+          <RoundMasteryExplainer round={dashboard.latestRound} />
           <div className="round-evidence-grid">
             <EvidenceList title="First-attempt secure" items={dashboard.latestRound.firstAttemptSecureWords} />
             <EvidenceList title="Completed with recovery" items={dashboard.latestRound.eventuallyCorrectWords} />
@@ -109,6 +110,29 @@ function EvidenceList({ title, items }: { title: string; items: string[] }) {
       ) : (
         <p className="empty-state compact-empty">None yet.</p>
       )}
+    </div>
+  );
+}
+
+function RoundMasteryExplainer({ round }: { round: NonNullable<ReturnType<typeof getParentDashboard>["latestRound"]> }) {
+  const recoveryCount = round.eventuallyCorrectWords.length + round.revealAndMoveOnWords.length;
+  return (
+    <div className="round-explainer" aria-label="Secure versus recovery explanation">
+      <div>
+        <span className="metric-label">Secure</span>
+        <strong>{round.firstAttemptSecureWords.length}</strong>
+        <p>Correct first try in meaning and sentence use.</p>
+      </div>
+      <div>
+        <span className="metric-label">Recovery</span>
+        <strong>{recoveryCount}</strong>
+        <p>Finished after a miss or reveal. Useful effort, not secure mastery yet.</p>
+      </div>
+      <div>
+        <span className="metric-label">Near review</span>
+        <strong>{round.nearReviewWords.length}</strong>
+        <p>Comes back soon until the recent mistake evidence clears.</p>
+      </div>
     </div>
   );
 }

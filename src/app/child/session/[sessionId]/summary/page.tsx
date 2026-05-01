@@ -16,6 +16,29 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
         <p>{summary.round?.explanation ?? "What moved forward in this session, and what should come back tomorrow."}</p>
       </section>
 
+      {summary.round ? (
+        <section className="panel round-parent-panel">
+          <h2>What the round means</h2>
+          <div className="round-explainer">
+            <div>
+              <span className="metric-label">Secure</span>
+              <strong>{summary.round.firstAttemptSecureWords.length}</strong>
+              <p>Correct on the first try in meaning and sentence use.</p>
+            </div>
+            <div>
+              <span className="metric-label">Recovered</span>
+              <strong>{summary.round.eventuallyCorrectWords.length + summary.round.revealAndMoveOnWords.length}</strong>
+              <p>Finished after a miss or reveal, so it should come back soon.</p>
+            </div>
+            <div>
+              <span className="metric-label">Near review</span>
+              <strong>{summary.round.nearReviewWords.length}</strong>
+              <p>These words need another clean pass.</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="dashboard-grid">
         <SummaryPanel
           icon={<CheckCircle2 size={24} />}

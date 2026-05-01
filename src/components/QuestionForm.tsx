@@ -73,32 +73,24 @@ export function QuestionForm({
           )}
 
           {question.answerMode === "choice" ? (
-            <ol className="choice-rows" role="listbox" aria-label="Answer choices">
-              {question.choices.map((choice, idx) => {
-                const letter = String.fromCharCode(65 + idx);
+            <div className="choice-grid" role="listbox" aria-label="Answer choices">
+              {question.choices.map((choice) => {
                 const isSelected = selected === choice;
                 return (
-                  <li key={choice}>
-                    <label
-                      className={`choice-row${isSelected ? " is-selected" : ""}`}
-                    >
-                      <input
-                        required
-                        type="radio"
-                        name="answer"
-                        value={choice}
-                        checked={isSelected}
-                        onChange={() => setSelected(choice)}
-                        style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}
-                      />
-                      <span className="choice-row__letter">{letter}</span>
-                      <span className="choice-row__text">{choice}</span>
-                      <span className="choice-row__tag" />
-                    </label>
-                  </li>
+                  <label className="choice" key={choice}>
+                    <input
+                      required
+                      type="radio"
+                      name="answer"
+                      value={choice}
+                      checked={isSelected}
+                      onChange={() => setSelected(choice)}
+                    />
+                    <span>{choice}</span>
+                  </label>
                 );
               })}
-            </ol>
+            </div>
           ) : (
             <input
               className="text-answer"

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { recordCardViewAction, startMeaningRecognitionAction } from "@/app/actions";
 import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView } from "@/lib/db/repository";
 import type { FailureType } from "@/lib/types";
@@ -198,15 +199,20 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
           style={{ width: `${Math.round((readyCount / round.wordCount) * 100)}%` }}
         />
       </div>
-      <p className="metric-label">Learn cards · {readyCount} of {round.wordCount} ready</p>
+      <p className="metric-label">
+        Learn cards · {readyCount} / {round.wordCount} ready · card {card.viewCount} / 2 reviews
+      </p>
 
       <div className="learn-card">
         <div className="learn-card-header">
-          <span className="metric-label">{card.viewCount >= 2 ? `${card.viewCount} reviews · ready` : `${card.viewCount} of 2 reviews`}</span>
           <div className="learn-card-title-row">
             <h1>{card.word}</h1>
             {card.selectionReason ? (
-              <ReasonPill reason={card.selectionReason} history={card.history} />
+              <ReasonPill
+                reason={card.selectionReason}
+                history={card.history}
+                colour={card.history.masteryColour}
+              />
             ) : null}
           </div>
           <p className="learn-card__meaning">
@@ -225,13 +231,16 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
           {round.canUnlockMeaning ? (
             <form action={startMeaningRecognitionAction}>
               <input type="hidden" name="sessionId" value={sessionId} />
-              <button className="button button-large" type="submit">
-                Start matching meanings
+              <button className="ribbon" type="submit">
+                Start matching <ArrowRight size={18} aria-hidden="true" />
               </button>
             </form>
           ) : cardIsReady && nextUnreadyCard ? (
-            <Link className="button button-large" href={`/child/session/${sessionId}?card=${nextUnreadyCard.id}`}>
-              Go to next card
+            <Link
+              className="ribbon"
+              href={`/child/session/${sessionId}?card=${nextUnreadyCard.id}`}
+            >
+              Next card <ArrowRight size={18} aria-hidden="true" />
             </Link>
           ) : (
             <CardViewForm sessionId={sessionId} wordId={card.id} returnToWordId={returnToWordId} />
@@ -256,8 +265,8 @@ function CardViewForm({
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="wordId" value={wordId} />
       <input type="hidden" name="returnToWordId" value={returnToWordId} />
-      <button className="button button-large" type="submit">
-        Mark reviewed and continue
+      <button className="ribbon" type="submit">
+        Reviewed <ArrowRight size={18} aria-hidden="true" />
       </button>
     </form>
   );
@@ -295,17 +304,20 @@ function CardSupport({ card }: { card: RoundLearnCardView }) {
 function ReasonPill({
   reason,
   history,
+  colour,
 }: {
   reason: NonNullable<RoundLearnCardView["selectionReason"]>;
   history: RoundLearnCardView["history"];
+  colour: RoundLearnCardView["history"]["masteryColour"];
 }) {
   const stats =
     history.attemptCount > 0
       ? `Seen ${history.attemptCount} time${history.attemptCount === 1 ? "" : "s"} · ✓ ${history.correctCount} · ✗ ${history.wrongCount}`
       : "Not started yet — first time on the page.";
+  const tone = colour ?? "untracked";
   return (
     <span
-      className="reason-pill"
+      className={`reason-pill reason-pill--${tone}`}
       tabIndex={0}
       role="button"
       aria-label={`Practice reason: ${reason.label}`}

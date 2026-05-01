@@ -75,30 +75,38 @@ export interface DayProjection {
 }
 
 /**
- * Project this word forward day-by-day, assuming it is NOT practised
- * and the rest of the deck stays where it is. The dueScore (Ebbinghaus)
- * rises with `daysSinceSeen`, so the rank improves over time.
+ * Project this word forward day-by-day. Critically, we age the *entire*
+ * deck by the same number of days, not just the target — otherwise this
+ * word's dueScore rises while everyone else's stays still, and the
+ * projection over-estimates pick probability dramatically.
  */
 export function projectWord(
   word: PracticeWord,
   attempts: Array<{ answeredAt: string; isCorrect: boolean; hintLevelUsed: number }> | null,
-  otherWords: DeckPriorityRow[],
+  otherWordsFull: PracticeWord[],
+  attemptsByWordId: Map<string, Array<{ answeredAt: string; isCorrect: boolean; hintLevelUsed: number }>>,
   startIso: string,
   days: number
 ): DayProjection[] {
   const start = new Date(startIso).getTime();
   const out: DayProjection[] = [];
-  // Sort everyone else once; we'll insert the target into the sorted list per day.
-  const sortedOthers = [...otherWords].sort((a, b) => b.score - a.score);
+
   for (let d = 0; d <= days; d += 1) {
     const projectedIso = new Date(start + d * 86_400_000).toISOString();
     const breakdown = priorityBreakdownForState(word, attempts, projectedIso);
 
-    // Linear scan of others to find rank insertion point.
+    // Re-score every other word at this projected day too. Equal aging
+    // → relative ranks stay roughly stable, the chart no longer pretends
+    // only this word's dueScore moves.
     let rank = 1;
-    for (const other of sortedOthers) {
-      if (other.wordId === word.id) continue;
-      if (other.score > breakdown.score) rank += 1;
+    for (const other of otherWordsFull) {
+      if (other.id === word.id) continue;
+      const otherScore = priorityBreakdownForState(
+        other,
+        attemptsByWordId.get(other.id) ?? null,
+        projectedIso
+      ).score;
+      if (otherScore > breakdown.score) rank += 1;
     }
 
     const stability = Math.max(1, word.state.stabilityDays);

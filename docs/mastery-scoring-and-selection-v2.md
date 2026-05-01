@@ -198,20 +198,27 @@ intentional — the spec says "deprioritise untouched below struggling."
 
 ### How the projection chart is computed
 
-`projectWord` (in `src/lib/learning/projection.ts`) holds the rest of
-the deck still and walks the target word forward day-by-day. Each
-day:
+`projectWord` (in `src/lib/learning/projection.ts`) walks the *entire*
+deck forward day-by-day, then asks "where does this one rank?" at
+each step. Each day:
 
-- `daysSinceSeen` increases by 1 → recall = `exp(−d/stability)` drops.
-- `priorityScore` is recomputed (the dueScore factor rises while
-  others stay roughly constant).
-- The word is inserted into the sorted deck to find its projected
-  rank.
+- Every word's `daysSinceSeen` increases by `d` → recall =
+  `exp(−d/stability)` drops on each.
+- Every word's `priorityScore` is recomputed.
+- The target word is ranked against the rescored deck.
 - Rank → probability via a sigmoid centred at rank 8 (`1 / (1 +
   exp(0.4·(rank − 8)))`). So rank 1 ≈ 99%, rank 8 ≈ 85%, rank 12 ≈
   50%, rank 20 ≈ 10%.
 
-The simplification: other words are not aged. In reality, every word
-ages by the same calendar day, so relative orderings are mostly
-stable. The chart is a planning aid, not a forecast — it shows "if
-nothing else changes, when does this word re-enter the top 8?".
+Why age the whole deck? Without it, the chart is a lie: the target
+word's dueScore rises but everyone else's looks frozen, so a Reliable
+word that just got a clean correct appears to jump to ~95% pick
+chance overnight. In reality, every word's curve is rising at the
+same rate, so relative ranks are mostly stable until one word's
+recall drops below another's.
+
+The simplification still left in: we assume nobody gets practised
+during the projection window. In practice the learner *will* practise
+some words each day, which would suppress those words' rank and let
+others (including this one) rise sooner. Treat the chart as a
+"if nothing else moves" planning aid, not a calendar.

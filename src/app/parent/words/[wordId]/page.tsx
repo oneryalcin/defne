@@ -260,11 +260,13 @@ export default async function WordDetailPage({
               When will this word come back?
             </h2>
             <p className="section-head__sub">
-              If the word is not practised, recall decays along the
-              Ebbinghaus curve and its priority rises. The green line is
-              the chance of being picked in the *next* round on each day,
-              assuming the rest of the deck stays still. The orange dash
-              marks the day where the chance crosses 50%.
+              If no one is practised, every word ages together — the
+              Ebbinghaus curve drops on all of them. The green line is
+              this word&apos;s chance of being picked in the next round
+              each day after re-ranking the whole deck at that day. The
+              orange dash marks the day the chance crosses 50%. A
+              Reliable word that just got a clean correct will sit low
+              for several days because everyone else is also rising.
             </p>
           </header>
           <div className="bento col-12">

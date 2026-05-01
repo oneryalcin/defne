@@ -1092,7 +1092,8 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       projection = projectWord(
         livePracticeWord,
         attemptsAsc,
-        deck.filter((row) => row.wordId !== wordId),
+        allWords,
+        allAttempts,
         nowIso,
         14
       );

@@ -244,6 +244,16 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   const selection = selectRoundWords(words, new Date().toISOString(), targetQuestionCount, getRemediationWordIds(db));
   const byId = new Map(words.map((word) => [word.id, word]));
   const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
+  const realAttemptsByWordId = new Map(
+    (db
+      .prepare(
+        `SELECT word_id, COUNT(*) AS n FROM practice_attempts
+         WHERE learner_id = ? GROUP BY word_id`
+      )
+      .all(defaultLearnerId()) as Array<{ word_id: string; n: number }>).map(
+      (row) => [row.word_id, row.n]
+    )
+  );
 
   return {
     targetQuestionCount: selection.wordIds.length,
@@ -252,16 +262,16 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
       const selectionReason = reasonByWordId.get(wordId);
       if (!word) throw new Error(`Missing planned word ${wordId}`);
       if (!selectionReason) throw new Error(`Missing round selection reason for ${wordId}`);
+      const realAttempts = realAttemptsByWordId.get(word.id) ?? 0;
       return {
         id: word.id,
         word: word.word,
         definition: word.definition,
-        // Recompute live so child surfaces match the parent dashboard
-        // (the persisted column is stale until the next attempt writes it).
+        // Recompute live so child surfaces match the parent dashboard.
+        // Only treat the word as "started" when a real attempt exists in
+        // practice_attempts — legacy state stubs are ignored.
         masteryColour:
-          word.state.attemptCount === 0
-            ? null
-            : masteryColourForState(word.state),
+          realAttempts === 0 ? null : masteryColourForState(word.state),
         selectionReason,
         weakestDimension: weakestDimensionLabel(word.state)
       };
@@ -680,7 +690,13 @@ export function getParentWords(): ParentWordListItem[] {
               s.average_response_time_ms, s.last_seen_at, s.last_correct_at,
               s.last_wrong_at, s.next_review_at, s.failure_types_json,
               s.confused_with_word_ids_json, s.near_review,
-              s.eligible_questions_since_last_mistake, s.mastery_colour
+              s.eligible_questions_since_last_mistake, s.mastery_colour,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ?) AS real_attempts,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 1) AS real_correct,
+              (SELECT COUNT(*) FROM practice_attempts pa
+                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 0) AS real_wrong
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
@@ -688,7 +704,7 @@ export function getParentWords(): ParentWordListItem[] {
        WHERE w.status = 'active'
        ORDER BY w.word ASC`
     )
-    .all(defaultLearnerId()) as unknown as Array<{
+    .all(defaultLearnerId(), defaultLearnerId(), defaultLearnerId(), defaultLearnerId()) as unknown as Array<{
     id: string;
     word: string;
     difficulty_level: number;
@@ -713,13 +729,18 @@ export function getParentWords(): ParentWordListItem[] {
     near_review: number | null;
     eligible_questions_since_last_mistake: number | null;
     mastery_colour: LearnerWordState["masteryColour"] | null;
+    real_attempts: number;
+    real_correct: number;
+    real_wrong: number;
   }>;
 
   return rows.map((row) => {
-    // Recompute the mastery colour from current state so the dashboard
-    // reflects the live algorithm (not whatever was persisted last write).
+    // "Started" means a real practice_attempts row exists, not just a
+    // learner_word_state stub from card-view bookkeeping. This avoids
+    // showing legacy or seeded stub state as if the learner had answered.
+    const realAttempts = row.real_attempts;
     let masteryColour: LearnerWordState["masteryColour"] | null = null;
-    if (row.attempt_count !== null) {
+    if (realAttempts > 0 && row.attempt_count !== null) {
       const state: LearnerWordState = {
         id: `state_${defaultLearnerId()}_${row.id}`,
         learnerId: defaultLearnerId(),
@@ -733,9 +754,9 @@ export function getParentWords(): ParentWordListItem[] {
         lastCorrectAt: row.last_correct_at,
         lastWrongAt: row.last_wrong_at,
         nextReviewAt: row.next_review_at,
-        attemptCount: row.attempt_count ?? 0,
-        correctCount: row.correct_count ?? 0,
-        wrongCount: row.wrong_count ?? 0,
+        attemptCount: realAttempts,
+        correctCount: row.real_correct,
+        wrongCount: row.real_wrong,
         lastHintLevelUsed: row.last_hint_level_used,
         averageHintLevelUsed: row.average_hint_level_used ?? 0,
         averageResponseTimeMs: row.average_response_time_ms ?? 0,
@@ -748,7 +769,7 @@ export function getParentWords(): ParentWordListItem[] {
         nearReview: row.near_review === 1,
         eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0
       };
-      masteryColour = state.attemptCount === 0 ? null : masteryColourForState(state);
+      masteryColour = masteryColourForState(state);
     }
     return {
       id: row.id,
@@ -758,9 +779,9 @@ export function getParentWords(): ParentWordListItem[] {
       masteryColour,
       difficultyLevel: row.difficulty_level,
       isComplete: Boolean(row.definition && row.example),
-      attemptCount: row.attempt_count ?? 0,
-      correctCount: row.correct_count ?? 0,
-      wrongCount: row.wrong_count ?? 0,
+      attemptCount: realAttempts,
+      correctCount: row.real_correct,
+      wrongCount: row.real_wrong,
       lastSeenAt: row.last_seen_at
     };
   });

@@ -72,10 +72,6 @@ export default async function HomePage({
 
         <section className="mission-strip" aria-label="Local app status">
           <div className="metric-strip">
-            <span className="metric-label">Learner</span>
-            <span className="metric-value">{status.learnerName}</span>
-          </div>
-          <div className="metric-strip">
             <span className="metric-label">Active words</span>
             <span className="metric-value">{status.wordCount}</span>
           </div>

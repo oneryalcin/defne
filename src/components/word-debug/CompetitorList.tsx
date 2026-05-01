@@ -6,7 +6,13 @@ import Link from "next/link";
 export function CompetitorList({
   competitors,
 }: {
-  competitors: Array<{ wordId: string; word: string; score: number; isThis: boolean }>;
+  competitors: Array<{
+    wordId: string;
+    word: string;
+    score: number;
+    isThis: boolean;
+    inNextRound: boolean;
+  }>;
 }) {
   const max = Math.max(...competitors.map((c) => c.score), 0.001);
   return (
@@ -26,7 +32,7 @@ export function CompetitorList({
               ) : (
                 <Link href={`/parent/words/${row.wordId}`}>{row.word}</Link>
               )}
-              {rank <= 8 ? (
+              {row.inNextRound ? (
                 <span className="competitor-row__pill">In next round</span>
               ) : null}
             </span>

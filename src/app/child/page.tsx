@@ -9,7 +9,7 @@ import type { MasteryColour } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export default function ChildPage() {
-  const preview = getMissionPreview(8);
+  const preview = getMissionPreview(12);
   const words = preview.words;
 
   const pills = words.map((word) => ({
@@ -21,7 +21,7 @@ export default function ChildPage() {
     <main className="spread">
       <article className="book-page" aria-labelledby="map-title">
         <section className="cover-map cover-map--simple">
-          <GuideRail message="Hello, hello. Eight little words today — let's see which ones want to stick." />
+          <GuideRail message="Hello, hello. Twelve little words today — let's see which ones want to stick." />
 
           <div className="cover-map__words">
             <WordPills

@@ -1,6 +1,6 @@
 export const DEFAULT_ROUND_MAX_RETRY_PASSES = 3;
 export const DEFAULT_MISTAKE_DECAY_HOURS = 24;
-export const DEFAULT_NEAR_REVIEW_SPACING = 6;
+export const DEFAULT_NEAR_REVIEW_SPACING = 3;
 
 export type RoundLearningStep = "learn_cards" | "meaning_recognition" | "context_usage" | "spelling_production";
 export type RoundStep = "meaning_recognition" | "context_usage";

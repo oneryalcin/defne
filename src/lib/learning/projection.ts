@@ -11,13 +11,14 @@
 // the rest of the deck held constant.
 
 import type { LearnerWordState, PracticeWord } from "../types";
+import { selectRoundWords } from "./roundSelection";
 import { priorityBreakdownForState, type PriorityBreakdown } from "./scoring";
 
-const PICK_TOP_N = 8;
+const PICK_TOP_N = 12;
 
 /** Sigmoid converting rank → "will be picked next round" probability. */
 export function rankToProbability(rank: number): number {
-  // Anchor: rank 1 → ~0.99, rank 8 → ~0.85, rank 12 → ~0.50, rank 20 → ~0.10.
+  // Anchor: rank 1 → ~0.99, rank 12 → ~0.50, rank 20 → ~0.10.
   const centered = rank - PICK_TOP_N;
   return 1 / (1 + Math.exp(0.4 * centered));
 }
@@ -68,7 +69,7 @@ export interface DayProjection {
   projectedScore: number;
   /** Where it would rank against the rest of the deck. */
   projectedRank: number;
-  /** Probability of being picked in the next round at that day. */
+  /** Rank-based probability, gated by actual selector eligibility at that day. */
   probability: number;
   /** This word's priority breakdown at this day, for tooltips. */
   breakdown: PriorityBreakdown;
@@ -108,6 +109,12 @@ export function projectWord(
       ).score;
       if (otherScore > breakdown.score) rank += 1;
     }
+    const selectedWordIds = new Set(
+      selectRoundWords(otherWordsFull, projectedIso, 12, {
+        revealAndMoveOnWordIds: [],
+        eventuallyCorrectNotFirstAttemptWordIds: [],
+      }).wordIds
+    );
 
     const stability = Math.max(1, word.state.stabilityDays);
     const daysSinceSeen = word.state.lastSeenAt
@@ -124,7 +131,7 @@ export function projectWord(
       recall,
       projectedScore: breakdown.score,
       projectedRank: rank,
-      probability: rankToProbability(rank),
+      probability: selectedWordIds.has(word.id) ? rankToProbability(rank) : 0,
       breakdown,
     });
   }

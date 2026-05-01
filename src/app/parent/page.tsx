@@ -64,7 +64,7 @@ export default async function ParentDashboardPage({
   const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
   const nextRound = (() => {
     try {
-      return getMissionPreview(8);
+      return getMissionPreview(12);
     } catch {
       return null;
     }
@@ -366,7 +366,7 @@ export default async function ParentDashboardPage({
               What&apos;s queued for tomorrow.
             </h2>
             <p className="section-head__sub">
-              Defne picks {nextRound?.targetQuestionCount ?? 8} words automatically based on the queue.
+              Defne picks {nextRound?.targetQuestionCount ?? 12} words automatically based on the queue.
               Manual swap controls are <DemoTag /> for now.
             </p>
           </header>
@@ -377,7 +377,7 @@ export default async function ParentDashboardPage({
               <h3>{nextRound?.targetQuestionCount ?? 0} words queued</h3>
               {nextRound && nextRound.words.length > 0 ? (
                 <ul className="queue-list">
-                  {nextRound.words.slice(0, 8).map((w) => (
+                  {nextRound.words.slice(0, 12).map((w) => (
                     <li key={w.id} className="queue-row">
                       <span className="queue-row__word">{w.word}</span>
                       {w.masteryColour ? (
@@ -406,8 +406,8 @@ export default async function ParentDashboardPage({
               <span className="bento__eyebrow">Adjust the queue</span>
               <h3>Swap or pause</h3>
               <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.55, color: "var(--steel-secondary)" }}>
-                Pause stressful words or pull from a school list. Defne keeps the round at 8 words
-                and rebalances returning ones automatically.
+                Pause stressful words or pull from a school list. Defne keeps the round at 12 words
+                with three comeback spaces for stable and mastered words.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Link className="ribbon" href="/parent/words/new">

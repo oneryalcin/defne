@@ -131,7 +131,7 @@ Build:
 
 - Daily mission route.
 - 12 to 20 question session.
-- Optional round-based mission structure for a 6 to 10 word batch:
+- Optional round-based mission structure for a 12 word batch:
   - Step 1: learn cards with word, definition, context, synonyms, antonyms, spelling note, and confusable support.
   - Step 2: definition recognition with retry of missed words only.
   - Step 3: sentence gap-fill with retry of missed sentences only.

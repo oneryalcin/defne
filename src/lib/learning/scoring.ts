@@ -232,7 +232,7 @@ export function scoreFromState(
       `Last seen ${totals.newestDays.toFixed(1)}d ago (recall ≈ ${(recall * 100).toFixed(0)}%) — score dampened to ${(lowerBound * 100).toFixed(0)}%.`
     );
   }
-  const unresolvedRecentWrong = totals.hadRecentWrong && needsMistakeRecovery(state);
+  const unresolvedRecentWrong = totals.hadRecentWrong && needsMistakeRecovery(state, attempts);
   if (unresolvedRecentWrong) {
     reasons.push(
       `Recent wrong still in recovery — knocked down one bucket until ${DEFAULT_NEAR_REVIEW_SPACING} clean follow-up questions clear it.`
@@ -290,11 +290,40 @@ export function scoreFromState(
   return { colour, pHat, lowerBound, effectiveN: totals.effectiveN, reasons };
 }
 
-function needsMistakeRecovery(state: LearnerWordState): boolean {
-  return (
-    state.nearReview ||
-    state.eligibleQuestionsSinceLastMistake < DEFAULT_NEAR_REVIEW_SPACING
-  );
+function needsMistakeRecovery(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null
+): boolean {
+  const cleanFollowUps = cleanCorrectSinceLatestWrong(state, attempts);
+  return state.nearReview && cleanFollowUps < DEFAULT_NEAR_REVIEW_SPACING;
+}
+
+function cleanCorrectSinceLatestWrong(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null
+): number {
+  if (!attempts || attempts.length === 0) {
+    return state.eligibleQuestionsSinceLastMistake;
+  }
+
+  const latestWrongAt = attempts.reduce<number | null>((latest, attempt) => {
+    if (attempt.isCorrect) return latest;
+    const timestamp = Date.parse(attempt.answeredAt);
+    if (!Number.isFinite(timestamp)) return latest;
+    return latest === null || timestamp > latest ? timestamp : latest;
+  }, null);
+
+  if (latestWrongAt === null) {
+    return state.eligibleQuestionsSinceLastMistake;
+  }
+
+  const cleanSinceWrong = attempts.filter((attempt) => {
+    if (!attempt.isCorrect) return false;
+    const timestamp = Date.parse(attempt.answeredAt);
+    return Number.isFinite(timestamp) && timestamp > latestWrongAt;
+  }).length;
+
+  return Math.max(state.eligibleQuestionsSinceLastMistake, cleanSinceWrong);
 }
 
 function stepDown(colour: MasteryColour): MasteryColour {

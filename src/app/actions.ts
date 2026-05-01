@@ -71,7 +71,7 @@ export async function logoutAction(): Promise<void> {
 
 export async function startMissionAction(): Promise<void> {
   await requireRole("child");
-  const sessionId = startRoundMission(8);
+  const sessionId = startRoundMission(12);
   redirect(`/child/session/${sessionId}`);
 }
 
@@ -105,10 +105,22 @@ export async function submitAnswerAction(formData: FormData): Promise<void> {
     responseTimeMs: Number.isFinite(responseTimeMs) ? responseTimeMs : 0
   });
 
+  if (result.completed && result.isCorrect !== false) {
+    redirect(`/child/session/${sessionId}/summary`);
+  }
+
+  if (result.isCorrect) {
+    const repairMarker =
+      result.roundStep && result.passNumber && result.passNumber > 1
+        ? `?repair=${encodeURIComponent(`${result.roundStep}-${result.passNumber}`)}`
+        : "";
+    redirect(`/child/session/${sessionId}${repairMarker}`);
+  }
+
   redirect(
     result.attemptId
       ? `/child/session/${sessionId}?attemptId=${result.attemptId}`
-      : `/child/session/${sessionId}/summary`
+      : `/child/session/${sessionId}`
   );
 }
 

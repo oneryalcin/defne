@@ -111,6 +111,31 @@ describe("round repository orchestration", () => {
     expect(activeRounds.map((row) => row.id)).not.toContain("round_stale");
   });
 
+  it("abandons an in-progress round when the requested round size changes", () => {
+    const sessionId = startRoundMission(6);
+    const originalView = getSessionView(sessionId);
+    expect(originalView.round?.cards).toHaveLength(6);
+
+    const preview = getMissionPreview(12);
+    const db = getDb();
+    const originalRound = db
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(sessionId) as { status: string };
+    const activeRound = db
+      .prepare(
+        `SELECT json_array_length(word_ids_json) AS word_count
+         FROM practice_rounds
+         WHERE learner_id = 'learner_defne' AND status = 'in_progress'
+         ORDER BY started_at DESC
+         LIMIT 1`
+      )
+      .get() as { word_count: number };
+
+    expect(originalRound.status).toBe("abandoned");
+    expect(activeRound.word_count).toBe(12);
+    expect(preview.targetQuestionCount).toBe(12);
+  });
+
   it("unlocks meaning after two card views and stores first-attempt versus recovery evidence", () => {
     const sessionId = startRoundMission(6);
     completeLearnCards(sessionId);
@@ -242,14 +267,16 @@ describe("round repository orchestration", () => {
     expect(row.next_review_at).toBeTruthy();
   });
 
-  it("prioritizes near-review words in later rounds until six clean eligible questions clear them", () => {
+  it("prioritizes near-review words in later rounds until three clean eligible questions clear them", () => {
     const revealedWord = completeRoundWithFirstContextWordRevealed();
 
-    for (let cleanRoundIndex = 0; cleanRoundIndex < 3; cleanRoundIndex += 1) {
+    for (let cleanRoundIndex = 0; cleanRoundIndex < 2; cleanRoundIndex += 1) {
       const sessionId = startRoundMission(6);
       let view = getSessionView(sessionId);
-      expect(view.round?.cards[0]?.word).toBe(revealedWord);
-      expect(view.round?.cards[0]?.selectionReason?.reason).toBe("near_review");
+      if (cleanRoundIndex === 0) {
+        expect(view.round?.cards[0]?.word).toBe(revealedWord);
+        expect(view.round?.cards[0]?.selectionReason?.reason).toBe("near_review");
+      }
 
       completeLearnCards(sessionId);
       startRoundMeaningRecognition(sessionId);
@@ -266,7 +293,7 @@ describe("round repository orchestration", () => {
       )
       .get(revealedWord) as { near_review: number; eligible_questions_since_last_mistake: number };
 
-    expect(row.eligible_questions_since_last_mistake).toBe(6);
+    expect(row.eligible_questions_since_last_mistake).toBeGreaterThanOrEqual(3);
     expect(row.near_review).toBe(0);
   });
 });

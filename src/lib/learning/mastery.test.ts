@@ -7,7 +7,7 @@ import {
   updateStateAfterAttempt
 } from "./mastery";
 import { scoreFromState } from "./scoring";
-import type { LearnerWordState, PracticeWord } from "../types";
+import type { AttemptRecord, LearnerWordState, PracticeWord } from "../types";
 
 describe("mastery scoring", () => {
   it("uses exponential recall decay", () => {
@@ -95,7 +95,7 @@ describe("mastery scoring", () => {
       lastCorrectAt: "2026-05-01T19:10:38.557Z",
       lastWrongAt: "2026-05-01T16:33:49.062Z",
       nearReview: false,
-      eligibleQuestionsSinceLastMistake: 6
+      eligibleQuestionsSinceLastMistake: 3
     });
     const attempts = [
       false,
@@ -139,6 +139,61 @@ describe("mastery scoring", () => {
     expect(recovered.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(false);
     expect(unresolved.colour).toBe("orange");
     expect(unresolved.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(true);
+  });
+
+  it("uses attempt history to clear stale near-review state after three clean follow-ups", () => {
+    const now = "2026-05-01T22:50:00.000Z";
+    const state = makeState({
+      attemptCount: 10,
+      correctCount: 6,
+      wrongCount: 4,
+      lastSeenAt: "2026-05-01T21:47:42.512Z",
+      lastCorrectAt: "2026-05-01T21:47:42.512Z",
+      lastWrongAt: "2026-05-01T21:45:07.758Z",
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 2
+    });
+    const attempts: AttemptRecord[] = [
+      { answeredAt: "2026-05-01T20:48:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T20:54:00.000Z", isCorrect: false, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:35:00.000Z", isCorrect: false, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:39:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:40:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:42:00.000Z", isCorrect: false, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:45:07.758Z", isCorrect: false, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:46:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:47:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T21:47:42.512Z", isCorrect: true, hintLevelUsed: 0 }
+    ];
+
+    const breakdown = scoreFromState(state, attempts, now);
+
+    expect(breakdown.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(false);
+  });
+
+  it("increments clean follow-up count and clears near review on the third correct answer", () => {
+    const base = makeState({
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 2,
+      lastWrongAt: "2026-05-01T10:00:00.000Z",
+      attemptCount: 5,
+      correctCount: 3,
+      wrongCount: 2,
+      usageMastery: 0.45
+    });
+
+    const result = updateStateAfterAttempt(base, {
+      questionType: "fill_sentence",
+      isCorrect: true,
+      hintLevelUsed: 0,
+      maxHintLevelAvailable: 4,
+      responseTimeMs: 4000,
+      failureType: "none",
+      answeredAt: "2026-05-01T12:00:00.000Z"
+    });
+
+    expect(result.eligibleQuestionsSinceLastMistake).toBe(3);
+    expect(result.nearReview).toBe(false);
   });
 
   it("ranks recently failed weak words above stable green words", () => {

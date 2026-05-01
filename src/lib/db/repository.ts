@@ -8,11 +8,11 @@ import {
   nextBucketTarget,
   projectWord,
   rankFor,
-  rankToProbability,
   type DayProjection,
 } from "../learning/projection";
 import { selectRoundWords, type RoundWordSelection } from "../learning/roundSelection";
 import {
+  DEFAULT_NEAR_REVIEW_SPACING,
   DEFAULT_ROUND_MAX_RETRY_PASSES,
   canUnlockMeaningStep,
   evaluateRoundStepProgress,
@@ -184,6 +184,11 @@ export interface AttemptReview {
   targetWord: string;
   submittedAnswer: string;
   canonicalAnswer: string;
+  targetDefinition: string | null;
+  submittedWordDefinition: {
+    word: string;
+    definition: string;
+  } | null;
   isCorrect: boolean;
   failureType: FailureType;
   hintLevelUsed: number;
@@ -196,6 +201,14 @@ export interface AttemptReview {
   eventuallyCorrect: boolean | null;
   revealAndMoveOn: boolean;
 }
+
+export type SubmitSessionAnswerResult = {
+  completed: boolean;
+  attemptId: string | null;
+  isCorrect: boolean | null;
+  roundStep: RoundLearningStep | null;
+  passNumber: number | null;
+};
 
 export interface ParentWordListItem {
   id: string;
@@ -261,9 +274,9 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
   return { wordCount, completeWordCount, learnerName: learner?.display_name ?? "Learner" };
 }
 
-export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
+export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
   const db = getDb();
-  const words = getPracticeWords();
+  const words = getPracticeWordsForSelection(db);
   const byId = new Map(words.map((word) => [word.id, word]));
 
   // Make sure a round is committed before we render anything: this way
@@ -271,7 +284,7 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   // load on Start. Without this, the cover and the started round each
   // run the selector independently and the random tie-break causes them
   // to disagree.
-  abandonStaleInProgressRounds(db);
+  abandonStaleInProgressRounds(db, targetQuestionCount);
   if (!hasInProgressRound(db)) {
     startRoundMission(targetQuestionCount);
   }
@@ -371,9 +384,9 @@ function roundSelectionFromLiveRound(
   return { wordIds, reasons };
 }
 
-export function startRoundMission(roundWordCount = 8): string {
+export function startRoundMission(roundWordCount = 12): string {
   const db = getDb();
-  abandonStaleInProgressRounds(db);
+  abandonStaleInProgressRounds(db, roundWordCount);
 
   // Reuse the in-progress round if one already exists. The cover preview
   // commits one when the user lands on /child, so the words shown there
@@ -388,7 +401,7 @@ export function startRoundMission(roundWordCount = 8): string {
     .get(defaultLearnerId()) as { session_id: string } | undefined;
   if (existing) return existing.session_id;
 
-  const words = getPracticeWords();
+  const words = getPracticeWordsForSelection(db);
   const now = new Date().toISOString();
   const selection = selectRoundWords(words, now, roundWordCount, getRemediationWordIds(db));
   const wordIds = selection.wordIds;
@@ -443,16 +456,24 @@ export function startRoundMission(roundWordCount = 8): string {
   return sessionId;
 }
 
-function abandonStaleInProgressRounds(db: DatabaseSync): void {
+function abandonStaleInProgressRounds(
+  db: DatabaseSync,
+  expectedWordCount = 12
+): void {
   const learnerId = defaultLearnerId();
   const rows = db
     .prepare(
-      `SELECT id, session_id, started_at
+      `SELECT id, session_id, started_at, json_array_length(word_ids_json) AS word_count
        FROM practice_rounds
        WHERE learner_id = ? AND status = 'in_progress'
        ORDER BY started_at DESC, created_at DESC`
     )
-    .all(learnerId) as Array<{ id: string; session_id: string; started_at: string }>;
+    .all(learnerId) as Array<{
+      id: string;
+      session_id: string;
+      started_at: string;
+      word_count: number;
+    }>;
   if (rows.length === 0) return;
 
   const latestCompleted = db
@@ -467,6 +488,7 @@ function abandonStaleInProgressRounds(db: DatabaseSync): void {
     : null;
 
   const stillCurrent = rows.filter((row) => {
+    if (row.word_count !== expectedWordCount) return false;
     if (!latestCompletedAt) return true;
     const startedAt = new Date(row.started_at).getTime();
     return Number.isFinite(startedAt) && startedAt > latestCompletedAt;
@@ -556,20 +578,20 @@ export function submitSessionAnswer(input: {
   submittedAnswer: string;
   hintLevelUsed: number;
   responseTimeMs: number;
-}): { completed: boolean; attemptId: string | null } {
+}): SubmitSessionAnswerResult {
   const db = getDb();
   const session = getSessionRow(db, input.sessionId);
   const round = getRoundRowForSession(db, input.sessionId);
   if (round) return submitRoundAnswer(db, session, round, input);
 
-  if (session.status !== "in_progress") return { completed: true, attemptId: null };
+  if (session.status !== "in_progress") return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
 
   const plan = readSessionPlan(session);
   const attemptIndex = getSessionAttemptCount(db, input.sessionId);
   const current = plan[attemptIndex];
   if (!current) {
     completeSession(db, session.id);
-    return { completed: true, attemptId: null };
+    return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
   }
 
   const words = getPracticeWords();
@@ -632,7 +654,7 @@ export function submitSessionAnswer(input: {
     );
   }
 
-  return { completed, attemptId };
+  return { completed, attemptId, isCorrect: assessment.isCorrect, roundStep: null, passNumber: null };
 }
 
 export function recordRoundCardView(sessionId: string, wordId: string): void {
@@ -680,9 +702,10 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
               a.submitted_answer, a.is_correct, a.hint_level_used, a.failure_type, a.created_at,
               a.round_step, a.pass_number, a.attempt_number_for_word_in_step,
               a.first_attempt_correct, a.eventually_correct, a.reveal_and_move_on,
-              w.word, sn.note AS spelling_note
+              w.word, d.definition, sn.note AS spelling_note
        FROM practice_attempts a
        JOIN words w ON w.id = a.word_id
+       LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        LEFT JOIN spelling_notes sn ON sn.word_id = w.id
        WHERE a.session_id = ? AND a.id = ?`
     )
@@ -706,6 +729,7 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
         eventually_correct: number | null;
         reveal_and_move_on: number;
         word: string;
+        definition: string | null;
         spelling_note: string | null;
       }
     | undefined;
@@ -727,6 +751,13 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     .all(sessionId) as unknown as Array<{ id: string }>;
   const questionNumber = Math.max(1, attemptIds.findIndex((attempt) => attempt.id === attemptId) + 1);
   const isRoundAttempt = row.round_step !== null;
+  const submittedWord = getPracticeWords().find(
+    (word) => normalizeWord(word.word) === normalizeWord(row.submitted_answer ?? "")
+  );
+  const submittedWordDefinition =
+    submittedWord && normalizeWord(submittedWord.word) !== normalizeWord(row.word)
+      ? { word: submittedWord.word, definition: submittedWord.definition }
+      : null;
 
   return {
     sessionId,
@@ -741,6 +772,8 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     targetWord: prompt.targetWord ?? row.word,
     submittedAnswer: row.submitted_answer ?? "",
     canonicalAnswer: expected.canonicalAnswer ?? row.word,
+    targetDefinition: row.definition,
+    submittedWordDefinition,
     isCorrect: row.is_correct === 1,
     failureType: row.failure_type,
     hintLevelUsed: row.hint_level_used,
@@ -1004,6 +1037,7 @@ export interface WordDetailView {
     word: string;
     score: number;
     isThis: boolean;
+    inNextRound: boolean;
   }>;
 }
 
@@ -1127,12 +1161,14 @@ export function getWordDetail(wordId: string): WordDetailView | null {
   }
 
   // Live deck rank + projection for the explainability page.
-  const allWords = getPracticeWords();
+  const allWords = getPracticeWordsForSelection(db);
   const allAttempts = loadAttemptHistoryByWord(db);
   const nowIso = new Date().toISOString();
   const deck = deckPriorities(allWords, allAttempts, nowIso);
   const rank = rankFor(deck, wordId);
-  const pickProbabilityNow = rankToProbability(rank.rank);
+  const selectedNextRoundWordIds = selectedWordIdsForDebug(db, allWords, nowIso);
+  const isSelectedNextRound = selectedNextRoundWordIds.has(wordId);
+  const pickProbabilityNow = isSelectedNextRound ? 1 : 0;
 
   let projection: DayProjection[] = [];
   if (state) {
@@ -1154,9 +1190,22 @@ export function getWordDetail(wordId: string): WordDetailView | null {
     word: row.word,
     score: row.score,
     isThis: row.wordId === wordId,
+    inNextRound: selectedNextRoundWordIds.has(row.wordId),
   }));
-  // If this word is outside the top 12, append it so the user can see it.
-  if (!competitors.some((c) => c.isThis)) {
+  for (const selectedWordId of selectedNextRoundWordIds) {
+    if (competitors.some((row) => row.wordId === selectedWordId)) continue;
+    const selected = deck.find((row) => row.wordId === selectedWordId);
+    if (!selected) continue;
+    competitors.push({
+      wordId: selected.wordId,
+      word: selected.word,
+      score: selected.score,
+      isThis: selected.wordId === wordId,
+      inNextRound: true,
+    });
+  }
+  // If this word is outside the displayed queue, append it so the user can see it.
+  if (!competitors.some((row) => row.isThis)) {
     const me = deck.find((row) => row.wordId === wordId);
     if (me) {
       competitors.push({
@@ -1164,6 +1213,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
         word: me.word,
         score: me.score,
         isThis: true,
+        inNextRound: isSelectedNextRound,
       });
     }
   }
@@ -1229,6 +1279,44 @@ function loadAttemptHistoryByWord(db: DatabaseSync): Map<string, AttemptRecord[]
   return byWordId;
 }
 
+function getPracticeWordsForSelection(db: DatabaseSync): PracticeWord[] {
+  const attemptsByWordId = loadAttemptHistoryByWord(db);
+  return getPracticeWords().map((word) => {
+    const attempts = attemptsByWordId.get(word.id) ?? null;
+    if (!attempts || attempts.length === 0) return word;
+    return {
+      ...word,
+      state: {
+        ...word.state,
+        masteryColour: masteryColourForState(word.state, attempts)
+      }
+    };
+  });
+}
+
+function selectedWordIdsForDebug(
+  db: DatabaseSync,
+  words: PracticeWord[],
+  nowIso: string
+): Set<string> {
+  const activeRound = db
+    .prepare(
+      `SELECT word_ids_json
+       FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC, created_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { word_ids_json: string } | undefined;
+  if (activeRound) {
+    return new Set(JSON.parse(activeRound.word_ids_json) as string[]);
+  }
+
+  return new Set(
+    selectRoundWords(words, nowIso, 12, getRemediationWordIds(db)).wordIds
+  );
+}
+
 export function createOrUpdateParentWord(input: WordFormInput): string {
   const db = getDb();
   const now = new Date().toISOString();
@@ -1279,16 +1367,21 @@ function getRemediationWordIds(db: DatabaseSync): {
 
   const recoveredRows = db
     .prepare(
-      `SELECT word_id
-       FROM practice_attempts
-       WHERE learner_id = ?
-         AND eventually_correct = 1
-         AND first_attempt_correct = 0
-         AND reveal_and_move_on = 0
-       GROUP BY word_id
-       ORDER BY MAX(created_at) DESC`
+      `SELECT a.word_id
+       FROM practice_attempts a
+       JOIN learner_word_state s
+         ON s.learner_id = a.learner_id
+        AND s.word_id = a.word_id
+       WHERE a.learner_id = ?
+         AND a.eventually_correct = 1
+         AND a.first_attempt_correct = 0
+         AND a.reveal_and_move_on = 0
+         AND s.near_review = 1
+         AND s.eligible_questions_since_last_mistake < ?
+       GROUP BY a.word_id
+       ORDER BY MAX(a.created_at) DESC`
     )
-    .all(defaultLearnerId()) as Array<{ word_id: string }>;
+    .all(defaultLearnerId(), DEFAULT_NEAR_REVIEW_SPACING) as Array<{ word_id: string }>;
 
   return {
     revealAndMoveOnWordIds: revealRows.map((row) => row.word_id),
@@ -1394,8 +1487,10 @@ function submitRoundAnswer(
     hintLevelUsed: number;
     responseTimeMs: number;
   }
-): { completed: boolean; attemptId: string | null } {
-  if (session.status !== "in_progress" || round.status !== "in_progress") return { completed: true, attemptId: null };
+): SubmitSessionAnswerResult {
+  if (session.status !== "in_progress" || round.status !== "in_progress") {
+    return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
+  }
   if (!isScoredRoundStep(round.current_step)) {
     throw new Error("This round is not ready for scored answers yet.");
   }
@@ -1405,7 +1500,7 @@ function submitRoundAnswer(
   const cursor = nextRoundStepQuestion(wordIds, round.current_step, attempts, round.max_retry_passes);
   if (!cursor) {
     advanceRoundAfterStepIfReady(db, session.id, round);
-    return { completed: false, attemptId: null };
+    return { completed: false, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
   }
 
   const words = getPracticeWords();
@@ -1477,7 +1572,7 @@ function submitRoundAnswer(
   if (!refreshedRound) throw new Error(`Round missing for session ${session.id}`);
   const completed = advanceRoundAfterStepIfReady(db, session.id, refreshedRound);
 
-  return { completed, attemptId };
+  return { completed, attemptId, isCorrect: assessment.isCorrect, roundStep: cursor.step, passNumber: cursor.passNumber };
 }
 
 function advanceRoundAfterStepIfReady(db: DatabaseSync, sessionId: string, round: PracticeRoundRow): boolean {

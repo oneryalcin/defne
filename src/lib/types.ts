@@ -96,6 +96,8 @@ export type RoundSelectionReasonCode =
   | "new_or_red"
   | "due_review"
   | "near_green"
+  | "mastered_comeback"
+  | "stable_comeback"
   | "priority";
 
 export interface RoundSelectionReason {

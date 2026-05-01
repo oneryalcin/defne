@@ -21,11 +21,18 @@ A round contains `N` selected words. The starting value should be small enough
 for attention and memory:
 
 ```text
-recommended N: 6 to 10 words
-maximum N: 12 words for the pilot
+recommended N: 12 words for the pilot
+minimum N: 6 words for tests or deliberately short sessions
 ```
 
 Each round has three steps.
+
+The default 12-word queue is split into 9 regular scheduler slots plus 3
+comeback slots. Comeback slots first reserve up to 1 mastered (`green`) word
+whose last test was at least 5 days ago, then fill the remaining comeback slots
+with stable (`light_green`) words whose last test was at least 24 hours ago. If
+no stable or mastered words satisfy those spacing filters, the slots fall back
+to the normal scheduler.
 
 ## Step 1: Learn Cards
 
@@ -247,7 +254,7 @@ If a word has zero mistakes across the last X eligible questions:
 `X` is intentionally tunable. Start with:
 
 ```text
-X = 6 eligible questions
+X = 3 eligible questions
 ```
 
 An eligible question is one where the word could plausibly have appeared again
@@ -311,7 +318,7 @@ still weak" so effort and mastery do not look contradictory.
 
 Round-based mode is implemented correctly when:
 
-- A round can be created with 6 to 10 words.
+- A round can be created with 12 words by default.
 - Step 1 blocks progression until every card has been viewed at least twice.
 - Step 2 repeats only first-pass misses until all are eventually correct.
 - Step 3 repeats only first-pass misses until all are eventually correct.

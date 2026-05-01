@@ -281,7 +281,7 @@ CREATE TABLE practice_sessions (
 ### `practice_rounds`
 
 Stores one focused round inside a session. A round is narrower than a whole
-daily mission: it tracks the 6 to 10 words currently moving through learn cards,
+daily mission: it tracks the 12 words currently moving through learn cards,
 meaning recognition, context usage, and later spelling production.
 
 ```sql

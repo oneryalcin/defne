@@ -133,8 +133,9 @@ export default async function WordDetailPage({
               Where this word sits and where it&apos;s headed.
             </h2>
             <p className="section-head__sub">
-              Each round picks the top eight words from {detail.rank.total} by
-              priority. Higher rank = more likely to surface tomorrow.
+              Priority rank shows raw urgency before spacing filters. The
+              final next-round decision uses nine regular slots plus three
+              comeback spaces.
             </p>
           </header>
           <div className="bento col-12">
@@ -154,7 +155,7 @@ export default async function WordDetailPage({
                 </span>
               </div>
               <div className="word-big-stat">
-                <span className="word-big-stat__label">Pick chance · next round</span>
+                <span className="word-big-stat__label">Selected · next round</span>
                 <span className="word-big-stat__value">
                   {(detail.pickProbabilityNow * 100).toFixed(0)}
                   <span className="word-big-stat__unit">%</span>
@@ -281,12 +282,12 @@ export default async function WordDetailPage({
           <header className="section-head">
             <span className="section-head__label">Today&apos;s priority queue</span>
             <h2 id="queue" className="section-head__title">
-              What it&apos;s fighting against for the eight slots.
+              What it&apos;s fighting against for the twelve slots.
             </h2>
             <p className="section-head__sub">
-              The selector picks the top eight by priority. If a word is
-              ranked 9–12 it has a real but not guaranteed chance; outside
-              that, it usually waits a few days for its dueScore to climb.
+              The selector fills nine regular priority slots plus three
+              comeback slots for due Reliable and Mastered words. Outside
+              the top twelve, a word usually waits for its due score to climb.
             </p>
           </header>
           <div className="bento col-12">
@@ -457,15 +458,15 @@ export default async function WordDetailPage({
           <header className="section-head">
             <span className="section-head__label">How the scheduler works</span>
             <h2 id="how-it-works" className="section-head__title">
-              Eight slots, every round.
+              Twelve slots, every round.
             </h2>
             <p className="section-head__sub">
-              The deck competes for eight slots per round. Each word gets
-              a priority score; top eight are picked. The factors that
-              raise priority: decay (the longer you have not seen it, the
-              higher); confidence gap (lower bound below 1.0); recent
-              wrong; almost-mastered nudge. The factors that lower it:
-              just-answered penalty, mastered floor.
+              The deck competes for twelve slots per round: nine regular
+              priority slots, plus three comeback spaces for due Reliable
+              and Mastered words. The factors that raise priority: decay
+              (the longer you have not seen it, the higher); confidence gap
+              (lower bound below 1.0); recent wrong; almost-mastered nudge.
+              The factors that lower it: just-answered penalty, mastered floor.
             </p>
           </header>
           <div className="bento col-12">

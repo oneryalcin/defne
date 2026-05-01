@@ -622,6 +622,14 @@
   color: var(--muted-slate);
 }
 
+.practice-spread .page-actions {
+  justify-content: flex-end;
+}
+
+.practice-spread .page-actions .ribbon {
+  margin-left: auto;
+}
+
 /* Margin scribble (recovery note) */
 .scribble {
   position: relative;
@@ -2203,4 +2211,69 @@
   .practice-word { font-size: clamp(2.25rem, 8vw, 3rem); }
   .scribble { grid-template-columns: 1fr; }
   .scribble__caret { display: none; }
+}
+
+@media (min-width: 700px) and (max-height: 900px) {
+  .spread {
+    min-height: auto;
+    padding: clamp(12px, 2.4vw, 28px);
+  }
+
+  .practice-spread {
+    width: min(900px, 100%);
+    min-height: 0;
+    gap: 14px;
+    padding: clamp(20px, 3vw, 32px) clamp(28px, 5vw, 56px);
+  }
+
+  .practice-main {
+    gap: 12px;
+  }
+
+  .practice-word {
+    margin: 4px 0 0;
+    font-size: clamp(3rem, 7vw, 4.75rem);
+  }
+
+  .choice-grid {
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .choice {
+    min-height: 56px;
+    padding: 12px 18px;
+    font-size: 1rem;
+  }
+
+  .practice-spread .page-actions {
+    margin-top: 10px;
+    padding-top: 12px;
+  }
+
+  .practice-spread .ribbon {
+    padding: 12px 22px;
+  }
+}
+
+@media (min-width: 700px) and (max-height: 760px) {
+  .spread {
+    padding: 10px;
+  }
+
+  .practice-spread {
+    padding: 18px clamp(28px, 5vw, 48px);
+  }
+
+  .practice-word {
+    font-size: clamp(2.75rem, 6vw, 4.25rem);
+  }
+
+  .choice-grid {
+    margin-top: 12px;
+  }
+
+  .choice {
+    min-height: 52px;
+  }
 }

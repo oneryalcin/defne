@@ -158,15 +158,15 @@ Not good enough yet — backlog ideas:
 - `src/lib/db/repository.ts` — `getParentWords`, `getMissionPreview`,
   `getWordDetail` fetch attempts and pass them in.
 
-## Selection — eight slots, fifty-three contenders
+## Selection — twelve slots, fifty-three contenders
 
-The round selector picks the **top 8 priorityScore** from the deck.
-That single fact does most of the work in answering "when will I see
-this word again?":
+The round selector fills **9 regular priority slots plus 3 comeback
+slots** from the deck. That does most of the work in answering "when
+will I see this word again?":
 
-- A word ranked 1–8 will surface in the next round (≈95–99% chance).
-- A word at rank 9–12 has ~30–50% chance — it will surface if a top-8
-  word is "too recent" or filtered out by the reason buckets.
+- A word ranked 1–9 by regular priority will surface in the next round.
+- Up to 3 extra comeback slots are reserved for due Reliable/Mastered
+  words before falling back to the regular priority queue.
 - A word at rank 13–25 typically waits a few days for its dueScore
   (Ebbinghaus) to climb high enough to break into the top 12.
 - A word past rank 25 is effectively dormant unless decay is severe.
@@ -206,9 +206,9 @@ each step. Each day:
   `exp(−d/stability)` drops on each.
 - Every word's `priorityScore` is recomputed.
 - The target word is ranked against the rescored deck.
-- Rank → probability via a sigmoid centred at rank 8 (`1 / (1 +
-  exp(0.4·(rank − 8)))`). So rank 1 ≈ 99%, rank 8 ≈ 85%, rank 12 ≈
-  50%, rank 20 ≈ 10%.
+- Rank → probability via a sigmoid centred at rank 12 (`1 / (1 +
+  exp(0.4·(rank − 12)))`). So rank 1 ≈ 99%, rank 12 ≈ 50%, rank 20 ≈
+  10%.
 
 Why age the whole deck? Without it, the chart is a lie: the target
 word's dueScore rises but everyone else's looks frozen, so a Reliable

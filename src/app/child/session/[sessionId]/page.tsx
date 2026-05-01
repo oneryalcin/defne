@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { recordCardViewAction, startMeaningRecognitionAction } from "@/app/actions";
 import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView } from "@/lib/db/repository";
@@ -18,6 +19,9 @@ export default async function SessionPage({
 
   if (attemptId) {
     const review = getAttemptReview(sessionId, attemptId);
+    if (review.isCorrect) {
+      redirect(reviewNextHref(review));
+    }
     const isRoundReview = Boolean(review.roundStep);
     const percent = review.totalQuestions > 0
       ? Math.min(isRoundReview && !review.isSessionComplete ? 92 : 100, Math.round((review.questionNumber / review.totalQuestions) * 100))
@@ -116,29 +120,24 @@ function RepairPassIntro({ sessionId, round, percent }: { sessionId: string; rou
   return (
     <section className="question-shell question-focus-shell repair-intro-shell">
       <div className="question-main">
-        <div className="progress-track progress-track-compact" aria-label={`${passLabel} repair preview`}>
+        <div className="progress-track progress-track-compact" aria-label={`${passLabel} quick practice preview`}>
           <div className="progress-fill" style={{ width: `${percent}%` }} />
         </div>
-        <div className="repair-intro-kicker">
-          <span className="pass-pill repair-pass-pill">Repair pass</span>
-          <span>{passLabel}</span>
-        </div>
-        <h1>Let&apos;s work on the words that need one more try.</h1>
+        <h1>A few words are ready for another go.</h1>
         <p>
-          The first pass found a smaller set to practice. This is not starting over; these are the words that need a
-          clean comeback before the round moves on.
+          You have already seen these words. Try them once more, then we will keep going.
         </p>
 
         <div className="repair-intro-card">
           <div>
-            <span className="metric-label">Coming up</span>
+            <span className="metric-label">Next up</span>
             <strong>{questionCopy}</strong>
           </div>
-          <ul className="repair-word-list" aria-label="Words in this repair pass">
+          <ul className="repair-word-list" aria-label="Words in this quick practice">
             {repairCards.map((card) => (
               <li key={card.id}>
                 <strong>{card.word}</strong>
-                {card.selectionReason ? <span>{card.selectionReason.label}</span> : null}
+                <span>Seen already</span>
               </li>
             ))}
           </ul>
@@ -146,7 +145,7 @@ function RepairPassIntro({ sessionId, round, percent }: { sessionId: string; rou
 
         <div className="action-row">
           <Link className="button button-large" href={`/child/session/${sessionId}?repair=${encodeURIComponent(repairPassMarker(round))}`}>
-            Start the repair pass
+            Start
           </Link>
         </div>
       </div>
@@ -391,6 +390,10 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         </div>
       ) : null}
 
+      {!review.isCorrect && shouldShowMeaningNote(review) ? (
+        <WordMeaningNote review={review} />
+      ) : null}
+
       {review.revealAndMoveOn ? (
         <div className="result-callout result-recovery">
           <strong>Answer revealed so the round can keep moving.</strong>
@@ -405,6 +408,31 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+function shouldShowMeaningNote(review: AttemptReview): boolean {
+  return Boolean(review.targetDefinition) && review.questionType !== "definition_choice";
+}
+
+function WordMeaningNote({ review }: { review: AttemptReview }) {
+  return (
+    <section className="meaning-note" aria-label="Word meaning">
+      <div className="meaning-note__item meaning-note__item--expected">
+        <span>Remember</span>
+        <p>
+          <strong>{review.targetWord}</strong> means {review.targetDefinition}.
+        </p>
+      </div>
+      {review.submittedWordDefinition ? (
+        <div className="meaning-note__item meaning-note__item--submitted">
+          <span>Your answer</span>
+          <p>
+            <strong>{review.submittedWordDefinition.word}</strong> means {review.submittedWordDefinition.definition}.
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

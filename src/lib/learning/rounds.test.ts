@@ -84,8 +84,8 @@ describe("round-based vocabulary mode", () => {
   });
 
   it("keeps recent mistakes in near review until enough eligible spacing has passed", () => {
-    expect(shouldKeepNearReview(1, 5)).toBe(true);
-    expect(shouldKeepNearReview(1, 6)).toBe(false);
+    expect(shouldKeepNearReview(1, 2)).toBe(true);
+    expect(shouldKeepNearReview(1, 3)).toBe(false);
     expect(shouldKeepNearReview(0, 0)).toBe(false);
   });
 

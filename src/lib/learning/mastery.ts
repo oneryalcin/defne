@@ -8,7 +8,7 @@ import type {
   QuestionType,
   SessionPlanItem
 } from "../types";
-import { mistakeRecencyWeight } from "./rounds";
+import { DEFAULT_NEAR_REVIEW_SPACING, mistakeRecencyWeight } from "./rounds";
 import { priorityBreakdownForState, scoreFromState } from "./scoring";
 
 // Vocabulary practice does not test spelling production; the spelling
@@ -151,6 +151,14 @@ export function updateStateAfterAttempt(
   if (outcome.isCorrect) {
     next.correctCount += 1;
     next.lastCorrectAt = outcome.answeredAt;
+    if (state.nearReview || state.lastWrongAt) {
+      const eligibleQuestionsSinceLastMistake =
+        state.eligibleQuestionsSinceLastMistake + 1;
+      next.eligibleQuestionsSinceLastMistake = eligibleQuestionsSinceLastMistake;
+      next.nearReview =
+        state.nearReview &&
+        eligibleQuestionsSinceLastMistake < DEFAULT_NEAR_REVIEW_SPACING;
+    }
     next.stabilityDays =
       outcome.masteryCredit === "recovery"
         ? state.stabilityDays

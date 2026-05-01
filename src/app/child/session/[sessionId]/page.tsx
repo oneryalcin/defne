@@ -27,20 +27,31 @@ export default async function SessionPage({
       ? `${roundStepLabel(review.roundStep)} · pass ${review.passNumber ?? 1} review`
       : `Question ${review.questionNumber} of ${review.totalQuestions}`;
 
+    const today = new Date().toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
     return (
-      <main className="page">
-        <section className="question-shell question-focus-shell">
-          <div className="question-main">
-            <div
-              className="progress-track progress-track-compact"
-              aria-label={isRoundReview ? `${progressLabel}, question ${review.questionNumber} so far` : progressLabel}
-            >
-              <div className="progress-fill" style={{ width: `${percent}%` }} />
-            </div>
-            <p className="metric-label">{progressLabel}</p>
-            <ReviewPanel review={review} />
+      <main className="spread">
+        <article className="book-page book-page--ruled practice-spread">
+          <span className="folio">
+            Question {review.questionNumber} / {review.totalQuestions}
+          </span>
+          <header className="practice-crumbs">
+            <span>Round · {today}</span>
+            <span className="dotline" aria-hidden="true" />
+            <span>{review.questionNumber} of {review.totalQuestions}</span>
+          </header>
+          <div
+            className="progress-track progress-track-compact"
+            aria-label={isRoundReview ? `${progressLabel}, question ${review.questionNumber} so far` : progressLabel}
+          >
+            <div className="progress-fill" style={{ width: `${percent}%` }} />
           </div>
-        </section>
+          <p className="metric-label">{progressLabel}</p>
+          <ReviewPanel review={review} />
+        </article>
       </main>
     );
   }

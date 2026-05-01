@@ -72,8 +72,8 @@ export default async function SummaryPage({ params }: { params: Promise<{ sessio
         <Link className="button" href="/child">
           Practise another round
         </Link>
-        <Link className="button-secondary" href="/parent">
-          Parent dashboard
+        <Link className="button-secondary" href="/">
+          Back home
         </Link>
       </div>
     </main>

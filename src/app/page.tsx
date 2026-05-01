@@ -1,33 +1,119 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, LineChart, Play } from "lucide-react";
+import { Play } from "lucide-react";
+import { cookies } from "next/headers";
 import { getHomeStatus } from "@/lib/db/repository";
+import { loginAction } from "./actions";
+import {
+  PILOT_SESSION_COOKIE,
+  parsePilotSession,
+  readableRoleName,
+  roleHomePath,
+  type PilotRole
+} from "@/lib/pilotAuth";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+type HomeSearchParams = {
+  error?: string;
+  required?: string;
+  current?: string;
+};
+
+export default async function HomePage({
+  searchParams
+}: {
+  searchParams: Promise<HomeSearchParams> | HomeSearchParams;
+}) {
   const status = getHomeStatus();
+  const { error, required, current } = await Promise.resolve(searchParams);
+  const cookieStore = await cookies();
+  const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
+  const requiredRole = isPilotRoleValue(required) ? required : undefined;
+
+  if (!session) {
+    return (
+      <main className="page">
+        <section className="hero-grid">
+          <div className="hero-copy">
+            <p className="metric-label">Pilot auth</p>
+            <h1>Use one of the local usernames to start.</h1>
+            <p>
+              This is local-only and intentional for the pilot: no passwords, no account creation, and no external identity
+              service.
+            </p>
+
+            <form action={loginAction} className="mission-panel login-form">
+              {error || required ? <p className="error-callout">{loginErrorMessage(error, requiredRole, current)}</p> : null}
+
+              <label>
+                Username
+                <input className="field" name="username" autoComplete="off" required placeholder="defne or daria" />
+              </label>
+
+              {requiredRole ? <input type="hidden" name="next" value={roleHomePath(requiredRole)} /> : null}
+
+              <div className="action-row">
+                <button className="button" type="submit">
+                  Continue
+                </button>
+              </div>
+            </form>
+
+            <p className="section-copy">
+              Tip: <strong>defne</strong> opens child mode, <strong>daria</strong> opens parent mode.
+            </p>
+          </div>
+          <div className="visual-frame">
+            <Image
+              src="/assets/visual-concepts/02-child-daily-mission-loop.png"
+              alt="Vocabulary mission concept with a pencil-drawn helper character"
+              width={1536}
+              height={1024}
+              priority
+            />
+          </div>
+        </section>
+
+        <section className="mission-strip" aria-label="Local app status">
+          <div className="metric-strip">
+            <span className="metric-label">Learner</span>
+            <span className="metric-value">{status.learnerName}</span>
+          </div>
+          <div className="metric-strip">
+            <span className="metric-label">Active words</span>
+            <span className="metric-value">{status.wordCount}</span>
+          </div>
+          <div className="metric-strip">
+            <span className="metric-label">Ready for practice</span>
+            <span className="metric-value">{status.completeWordCount}</span>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const roleHome = roleHomePath(session.role);
 
   return (
     <main className="page">
       <section className="hero-grid">
         <div className="hero-copy">
-          <h1>Vocabulary missions that make words stick.</h1>
+          <p className="metric-label">Current mode</p>
+          <h1>Welcome, {session.username}.</h1>
           <p>
-            A local-first practice app for short focused sessions: meaning, usage, spelling, hints, and visible
-            mastery movement from red towards green.
+            You are in {readableRoleName(session.role)} mode for this local session. Use the switch-user control to test
+            the other role quickly.
           </p>
+
           <div className="action-row">
-            <Link className="button" href="/child">
+            <Link className="button" href={roleHome}>
               <Play size={18} />
-              Start child practice
-            </Link>
-            <Link className="button-secondary" href="/parent">
-              <LineChart size={18} />
-              Parent dashboard
+              {session.role === "child" ? "Open child practice" : "Open parent dashboard"}
             </Link>
           </div>
         </div>
+
         <div className="visual-frame">
           <Image
             src="/assets/visual-concepts/02-child-daily-mission-loop.png"
@@ -53,25 +139,26 @@ export default function HomePage() {
           <span className="metric-value">{status.completeWordCount}</span>
         </div>
       </section>
-
-      <section className="mode-grid" aria-label="Choose mode">
-        <Link href="/child" className="mode-panel">
-          <div>
-            <BookOpen size={28} />
-            <h2>Child mission</h2>
-            <p>One bounded practice session with selected words, hints, and spelling checks.</p>
-          </div>
-          <span className="button-secondary">Open child mode</span>
-        </Link>
-        <Link href="/parent" className="mode-panel">
-          <div>
-            <LineChart size={28} />
-            <h2>Parent view</h2>
-            <p>Review weak words, spelling traps, recent sessions, and seed or parent-added vocabulary.</p>
-          </div>
-          <span className="button-secondary">Open parent mode</span>
-        </Link>
-      </section>
     </main>
   );
+}
+
+function isPilotRoleValue(value: string | undefined): value is PilotRole {
+  return value === "child" || value === "parent";
+}
+
+function loginErrorMessage(error?: string, required?: PilotRole, current?: string): string {
+  if (error === "unknown_user") {
+    return "We don't recognise that username yet. Try defne or daria.";
+  }
+
+  if (error === "wrong_role" && required && current) {
+    return `You are signed in as ${current}. Switch user to open ${required} mode.`;
+  }
+
+  if (error === "not_logged_in" && required) {
+    return `Please sign in to open ${required} mode.`;
+  }
+
+  return "Sign in to continue.";
 }

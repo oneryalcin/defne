@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
+import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
+import { logoutAction } from "./actions";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,7 +11,25 @@ export const metadata: Metadata = {
   description: "Local-first vocabulary practice for focused English learning."
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+type NavItem = {
+  href: string;
+  label: string;
+};
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const cookieStore = await cookies();
+  const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
+
+  const navItems: NavItem[] = session
+    ? session.role === "child"
+      ? [{ href: "/child", label: "Child" }]
+      : [{ href: "/parent", label: "Parent" }]
+    : [
+      { href: "/child", label: "Child" },
+      { href: "/parent", label: "Parent" },
+      { href: "/parent/words", label: "Words" }
+      ];
+
   return (
     <html lang="en-GB">
       <body>
@@ -18,9 +39,19 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <span>Defne Vocabulary</span>
           </Link>
           <nav className="top-nav" aria-label="Primary">
-            <Link href="/child">Child</Link>
-            <Link href="/parent">Parent</Link>
-            <Link href="/parent/words">Words</Link>
+            {navItems.map((item) => (
+              <Link href={item.href} key={item.href}>
+                {item.label}
+              </Link>
+            ))}
+            {session ? <span className="role-chip">{session.username}</span> : null}
+            {session ? (
+              <form action={logoutAction}>
+                <button className="button-secondary" type="submit">
+                  Switch user
+                </button>
+              </form>
+            ) : null}
           </nav>
         </header>
         {children}

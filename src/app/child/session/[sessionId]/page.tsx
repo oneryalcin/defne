@@ -82,31 +82,43 @@ export default async function SessionPage({
     );
   }
 
+  const today = new Date().toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const passLabel = view.round?.isRetryPass
+    ? `Repair pass · ${view.round.remainingInPass} left`
+    : view.round
+    ? `First pass · ${view.round.remainingInPass} left`
+    : null;
+
   return (
-    <main className="page">
-      <section className="question-shell question-focus-shell">
-        <div className="question-main">
-          <div
-            className="progress-track progress-track-compact"
-            aria-label={view.round ? `${view.round.stepProgressLabel}, question ${view.questionNumber} so far` : `Question ${view.questionNumber} of ${view.totalQuestions}`}
-          >
-            <div className="progress-fill" style={{ width: `${percent}%` }} />
-          </div>
+    <main className="spread">
+      <article className="book-page book-page--ruled practice-spread">
+        <span className="folio">
+          Question {view.questionNumber} / {view.totalQuestions}
+        </span>
+        <header className="practice-crumbs">
+          <span>Round · {today}</span>
+          <span className="dotline" aria-hidden="true" />
+          <span>{view.questionNumber} of {view.totalQuestions}</span>
+        </header>
+        <div className="progress-track progress-track-compact" aria-label={view.round?.stepProgressLabel ?? `Question ${view.questionNumber} of ${view.totalQuestions}`}>
+          <div className="progress-fill" style={{ width: `${percent}%` }} />
+        </div>
+        {passLabel ? (
           <div className="question-meta-row">
             <span className="metric-label">
-              {view.round ? view.round.stepProgressLabel : `Question ${view.questionNumber} of ${view.totalQuestions}`}
+              {view.round?.stepProgressLabel ?? `Question ${view.questionNumber} of ${view.totalQuestions}`}
             </span>
-            {view.round ? (
-              <span className={`pass-pill ${view.round.isRetryPass ? "repair-pass-pill" : "first-pass-pill"}`}>
-                {view.round.isRetryPass
-                  ? `Repair pass · ${view.round.remainingInPass} left`
-                  : `First pass · ${view.round.remainingInPass} left`}
-              </span>
-            ) : null}
+            <span className={`pass-pill ${view.round?.isRetryPass ? "repair-pass-pill" : "first-pass-pill"}`}>
+              {passLabel}
+            </span>
           </div>
-          <QuestionForm sessionId={sessionId} question={view.question} />
-        </div>
-      </section>
+        ) : null}
+        <QuestionForm sessionId={sessionId} question={view.question} />
+      </article>
     </main>
   );
 }

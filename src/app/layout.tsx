@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 import { logoutAction } from "./actions";
 import "./globals.css";
+import "./design-system.css";
 
 export const metadata: Metadata = {
   title: "Defne Vocabulary",

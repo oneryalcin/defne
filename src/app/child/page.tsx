@@ -1,131 +1,103 @@
-import { Target } from "lucide-react";
+import { Footprints } from "lucide-react";
 import { startMissionAction } from "@/app/actions";
 import { getMissionPreview } from "@/lib/db/repository";
+import { GuideRail } from "@/components/GuideRail";
+import { MasteryRail } from "@/components/MasteryRail";
+import { PencilMap } from "@/components/PencilMap";
+import { WordPills } from "@/components/WordPills";
+import type { MasteryColour } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default function ChildPage() {
-  const preview = getMissionPreview(8);
-  const groups = groupPreviewWords(preview.words);
-
-  return (
-    <main className="page">
-      <section className="two-column child-round-layout">
-        <div className="mission-panel round-preview-panel">
-          <div className="page-title">
-            <h1>Today&apos;s word round</h1>
-            <p>Learn a small set first, then prove meaning and usage. Mistakes get repaired without pretending they were first-try recall.</p>
-          </div>
-
-          <div className="mission-strip">
-            <div className="metric-strip">
-              <span className="metric-label">Words</span>
-              <span className="metric-value">{preview.targetQuestionCount}</span>
-            </div>
-            <div className="metric-strip">
-              <span className="metric-label">Time</span>
-              <span className="metric-value">10-15m</span>
-            </div>
-            <div className="metric-strip">
-              <span className="metric-label">Focus</span>
-              <span className="metric-value">Round</span>
-            </div>
-          </div>
-
-          <section className="round-brief" aria-label="Today&apos;s round words">
-            <div className="round-brief-header">
-              <span className="metric-label">Today&apos;s cards</span>
-              <strong>{preview.targetQuestionCount}</strong>
-            </div>
-            {groups.map((group) => (
-              <div className="word-cluster" key={group.title}>
-                <div className="word-cluster-header">
-                  <div>
-                    <strong>{group.title}</strong>
-                    <p>{group.detail}</p>
-                  </div>
-                  <span>{group.words.length} words</span>
-                </div>
-                <ul className="word-chip-grid">
-                  {group.words.map((word) => (
-                    <li className="word-chip" key={word.id}>
-                      <strong>{word.word}</strong>
-                      <span>{word.weakestDimension} focus</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </section>
-
-          <form action={startMissionAction} className="round-start-row">
-            <button className="button button-large" type="submit">
-              <Target size={18} />
-              Start round
-            </button>
-          </form>
-        </div>
-
-        <aside className="round-map-panel" aria-label="Round path">
-          <h2>How this round works</h2>
-          <ol className="round-path">
-            <li>
-              <span>1</span>
-              <div>
-                <strong>Study each card twice</strong>
-                <p>The word list stays visible so you can revisit anything before the questions start.</p>
-              </div>
-            </li>
-            <li>
-              <span>2</span>
-              <div>
-                <strong>Match meanings</strong>
-                <p>Missed words return in a repair pass instead of ending the round early.</p>
-              </div>
-            </li>
-            <li>
-              <span>3</span>
-              <div>
-                <strong>Complete sentences</strong>
-                <p>Clean answers are counted separately from recovered answers.</p>
-              </div>
-            </li>
-          </ol>
-        </aside>
-      </section>
-    </main>
-  );
-}
-
-type PreviewWord = ReturnType<typeof getMissionPreview>["words"][number];
-type PreviewReason = PreviewWord["selectionReason"]["reason"];
-
-const ROUND_PREVIEW_GROUPS: Array<{
-  title: string;
-  detail: string;
-  reasons: PreviewReason[];
-}> = [
-  {
-    title: "Comeback practice",
-    detail: "Words from recent misses or supported answers.",
-    reasons: ["near_review", "revealed_recently", "recovered_after_miss"]
-  },
-  {
-    title: "New builders",
-    detail: "Words that still need solid first evidence.",
-    reasons: ["new_or_red"]
-  },
-  {
-    title: "Review proof",
-    detail: "Words ready for another clean check.",
-    reasons: ["due_review", "near_green", "priority"]
-  }
+const MAP_LAYOUT = [
+  { x: 110, y: 296 },
+  { x: 230, y: 274 },
+  { x: 350, y: 252 },
+  { x: 470, y: 230 },
+  { x: 590, y: 196 },
+  { x: 700, y: 130 },
 ];
 
-function groupPreviewWords(words: PreviewWord[]): Array<{ title: string; detail: string; words: PreviewWord[] }> {
-  return ROUND_PREVIEW_GROUPS.map((group) => ({
-    title: group.title,
-    detail: group.detail,
-    words: words.filter((word) => group.reasons.includes(word.selectionReason.reason))
-  })).filter((group) => group.words.length > 0);
+export default function ChildPage() {
+  const preview = getMissionPreview(8);
+  const words = preview.words;
+
+  const pills = words.map((word, idx) => ({
+    word: word.word,
+    level: (word.masteryColour ?? null) as MasteryColour | null,
+    isCurrent: idx === 0,
+  }));
+
+  const stops = words.slice(0, 6).map((word, idx) => ({
+    word: word.word,
+    state:
+      word.masteryColour === "green" || word.masteryColour === "light_green"
+        ? ("done" as const)
+        : idx === 0
+        ? ("current" as const)
+        : ("locked" as const),
+    x: MAP_LAYOUT[idx]?.x ?? 100 + idx * 110,
+    y: MAP_LAYOUT[idx]?.y ?? 280,
+  }));
+
+  const today = new Date().toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <main className="spread">
+      <article className="book-page" aria-labelledby="map-title">
+        <span className="folio">Today&apos;s path</span>
+        <section className="cover-map">
+          <div className="cover-map__words">
+            <span className="cover-chapter">Today&apos;s path</span>
+            <h1 id="map-title" className="cover-title">
+              {words.length} stops along <span className="accent">the way</span>.
+            </h1>
+            <p className="cover-lede">
+              Some words are tucked into the hills, others are just past the
+              bend. Walk at your own pace — the path waits for you.
+            </p>
+
+            <MasteryRail />
+
+            <WordPills
+              pills={pills}
+              total={words.length}
+              heading="Today's words"
+            />
+
+            <form action={startMissionAction} className="cover-actions">
+              <button className="ribbon" type="submit">
+                <Footprints size={18} />
+                Start walking
+              </button>
+              <button
+                className="ribbon ribbon--ghost"
+                type="button"
+                aria-disabled="true"
+                disabled
+                title="Picker not wired up yet — pilot uses a single round"
+              >
+                Pick a different round
+              </button>
+            </form>
+          </div>
+
+          <div className="cover-map__landscape-wrap">
+            <GuideRail
+              message="Hello, hello. Eight little words today — let's see which ones want to stick."
+              date={today.toUpperCase()}
+              duration="10 MIN"
+            />
+            <div className="cover-landscape" aria-hidden="false">
+              <PencilMap stops={stops} caption="Your vocabulary journey" />
+            </div>
+          </div>
+        </section>
+      </article>
+    </main>
+  );
 }

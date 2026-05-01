@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown, Lock } from "lucide-react";
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitAnswerAction } from "@/app/actions";
@@ -14,18 +14,19 @@ export function QuestionForm({
   question: PracticeQuestion;
 }) {
   const [openHints, setOpenHints] = useState<Set<number>>(() => new Set());
+  const [selected, setSelected] = useState<string | null>(null);
   const responseTimeRef = useRef<HTMLInputElement>(null);
   const startedAtRef = useRef<number>(Date.now());
 
-  const toggleHint = (index: number) => {
+  const toggleHint = (index: number) =>
     setOpenHints((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
       else next.add(index);
       return next;
     });
-  };
   const highestOpened = openHints.size > 0 ? Math.max(...openHints) + 1 : 0;
+  const passage = sentenceFromQuestion(question);
 
   return (
     <form
@@ -40,40 +41,77 @@ export function QuestionForm({
       <input type="hidden" name="hintLevelUsed" value={highestOpened} />
       <input ref={responseTimeRef} type="hidden" name="responseTimeMs" value="0" />
 
-      <p className="question-prompt">{question.prompt}</p>
-      <p className="question-instruction">{question.instruction}</p>
+      <div className="practice-cols">
+        <div className="practice-main">
+          <div>
+            <p className="practice-instruction">{question.instruction}</p>
+            <h2 className="practice-word">{question.targetWord}</h2>
+          </div>
 
-      {question.answerMode === "choice" ? (
-        <div className="choice-grid">
-          {question.choices.map((choice) => (
-            <label className="choice" key={choice}>
-              <input required type="radio" name="answer" value={choice} />
-              <span>{choice}</span>
-            </label>
-          ))}
+          {passage ? (
+            <blockquote className="story-sentence">
+              {passage.before}
+              <span className="target">{passage.target}</span>
+              {passage.after}
+            </blockquote>
+          ) : (
+            <p className="practice-instruction">{question.prompt}</p>
+          )}
+
+          {question.answerMode === "choice" ? (
+            <ol className="choice-rows" role="listbox" aria-label="Answer choices">
+              {question.choices.map((choice, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                const isSelected = selected === choice;
+                return (
+                  <li key={choice}>
+                    <label
+                      className={`choice-row${isSelected ? " is-selected" : ""}`}
+                    >
+                      <input
+                        required
+                        type="radio"
+                        name="answer"
+                        value={choice}
+                        checked={isSelected}
+                        onChange={() => setSelected(choice)}
+                        style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}
+                      />
+                      <span className="choice-row__letter">{letter}</span>
+                      <span className="choice-row__text">{choice}</span>
+                      <span className="choice-row__tag" />
+                    </label>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <input
+              className="text-answer"
+              required
+              autoComplete="off"
+              spellCheck={false}
+              name="answer"
+              placeholder="Type the word"
+            />
+          )}
         </div>
-      ) : (
-        <input
-          className="text-answer"
-          required
-          autoComplete="off"
-          spellCheck={false}
-          name="answer"
-          placeholder="Type the word"
-        />
-      )}
 
-      {question.hints.length > 0 ? (
-        <HintLadder
-          hints={question.hints}
-          openSet={openHints}
-          onToggle={toggleHint}
-        />
-      ) : null}
-
-      <div className="question-actions">
-        <SubmitButton />
+        {question.hints.length > 0 ? (
+          <aside className="practice-rail">
+            <HintLadder
+              hints={question.hints}
+              openSet={openHints}
+              onToggle={toggleHint}
+            />
+          </aside>
+        ) : null}
       </div>
+
+      <footer className="page-actions">
+        <span className="page-actions__leader">Read the sentence carefully.</span>
+        <SubmitButton />
+      </footer>
     </form>
   );
 }
@@ -90,7 +128,7 @@ function HintLadder({
   return (
     <section className="ladder" aria-label="Hint ladder">
       <header className="ladder__head">
-        <span className="ladder__title">Hints — open one at a time, support not a shortcut</span>
+        <span className="ladder__title">Hint</span>
         <span className="ladder__sub">{openSet.size} of {hints.length}</span>
       </header>
       <ol className="ladder__list">
@@ -123,8 +161,23 @@ function HintLadder({
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button className="button button-large" type="submit" disabled={pending}>
+    <button className="ribbon" type="submit" disabled={pending}>
       {pending ? "Checking..." : "That's my answer"}
+      <ArrowRight size={18} aria-hidden="true" />
     </button>
   );
+}
+
+function sentenceFromQuestion(
+  question: PracticeQuestion
+): { before: string; target: string; after: string } | null {
+  if (question.questionType !== "fill_sentence") return null;
+  const blank = "_____";
+  const idx = question.prompt.indexOf(blank);
+  if (idx === -1) return null;
+  return {
+    before: question.prompt.slice(0, idx),
+    target: question.targetWord,
+    after: question.prompt.slice(idx + blank.length),
+  };
 }

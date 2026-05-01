@@ -258,10 +258,14 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   const words = getPracticeWords();
   const byId = new Map(words.map((word) => [word.id, word]));
 
-  // If a round is already in progress, surface its committed word list
-  // instead of running the selector again. This keeps the cover preview
-  // aligned with the round the learner will actually load on Start, even
-  // across multiple sessions on the same day.
+  // Make sure a round is committed before we render anything: this way
+  // 'today's words' on the cover are exactly the words the learner will
+  // load on Start. Without this, the cover and the started round each
+  // run the selector independently and the random tie-break causes them
+  // to disagree.
+  if (!hasInProgressRound(db)) {
+    startRoundMission(targetQuestionCount);
+  }
   const liveRound = db
     .prepare(
       `SELECT word_ids_json, summary_json
@@ -321,6 +325,17 @@ export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
   };
 }
 
+function hasInProgressRound(db: DatabaseSync): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS x FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { x: number } | undefined;
+  return Boolean(row);
+}
+
 function roundSelectionFromLiveRound(
   row: { word_ids_json: string; summary_json: string },
   byId: Map<string, PracticeWord>
@@ -349,6 +364,20 @@ function roundSelectionFromLiveRound(
 
 export function startRoundMission(roundWordCount = 8): string {
   const db = getDb();
+
+  // Reuse the in-progress round if one already exists. The cover preview
+  // commits one when the user lands on /child, so the words shown there
+  // are exactly the words this action navigates to.
+  const existing = db
+    .prepare(
+      `SELECT session_id FROM practice_rounds
+       WHERE learner_id = ? AND status = 'in_progress'
+       ORDER BY started_at DESC
+       LIMIT 1`
+    )
+    .get(defaultLearnerId()) as { session_id: string } | undefined;
+  if (existing) return existing.session_id;
+
   const words = getPracticeWords();
   const now = new Date().toISOString();
   const selection = selectRoundWords(words, now, roundWordCount, getRemediationWordIds(db));

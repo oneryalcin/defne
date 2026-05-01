@@ -1368,6 +1368,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 6px;
+  /* prevent neighbour cells/rows from ever painting on top of an
+     active tooltip */
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
 }
 
 .heatmap-cell {
@@ -1399,15 +1404,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
-  /* the colour wash is light enough that the ink stays readable */
-  mix-blend-mode: multiply;
+}
+.heatmap-cell:hover,
+.heatmap-cell:focus-visible,
+.heatmap-cell:focus-within {
+  /* lift the cell out of the grid stacking context so its tooltip is
+     not painted underneath the next row of cells */
+  z-index: 40;
 }
 .heatmap-cell__pop {
   position: absolute;
   top: calc(100% + 8px);
   left: 50%;
   transform: translate(-50%, -4px);
-  z-index: 30;
+  z-index: 50;
   display: grid;
   gap: 4px;
   width: max-content;
@@ -1416,7 +1426,7 @@
   background: var(--notebook-surface);
   border: 1px solid var(--whisper-border);
   border-radius: 10px;
-  box-shadow: 0 12px 32px -8px rgba(31, 41, 55, 0.18);
+  box-shadow: 0 12px 32px -8px rgba(31, 41, 55, 0.22);
   color: var(--graphite-ink);
   font-family: var(--font-body);
   font-style: normal;
@@ -1425,9 +1435,11 @@
   letter-spacing: 0;
   text-transform: none;
   line-height: 1.45;
+  /* opaque so cell colours behind don't bleed through */
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease, transform 120ms ease;
+  visibility: hidden;
+  transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 120ms;
 }
 .heatmap-cell__pop strong {
   font-family: var(--font-editorial);
@@ -1453,7 +1465,9 @@
 .heatmap-cell:focus-within .heatmap-cell__pop {
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
   transform: translate(-50%, 0);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 0s;
 }
 
 .heatmap__foot {

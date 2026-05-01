@@ -35,8 +35,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body>
         <header className="app-header">
           <Link href="/" className="brand">
-            <span className="brand-mark">D</span>
-            <span>Defne Vocabulary</span>
+            <span className="brand-mark" aria-hidden="true">D</span>
+            <span>Defne <em className="brand__editorial">vocabulary</em></span>
           </Link>
           <nav className="top-nav" aria-label="Primary">
             {navItems.map((item) => (

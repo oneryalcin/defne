@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock, ChevronDown } from "lucide-react";
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { submitAnswerAction } from "@/app/actions";
@@ -12,9 +13,19 @@ export function QuestionForm({
   sessionId: string;
   question: PracticeQuestion;
 }) {
-  const [hintLevel, setHintLevel] = useState(0);
+  const [openHints, setOpenHints] = useState<Set<number>>(() => new Set());
   const responseTimeRef = useRef<HTMLInputElement>(null);
   const startedAtRef = useRef<number>(Date.now());
+
+  const toggleHint = (index: number) => {
+    setOpenHints((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+  const highestOpened = openHints.size > 0 ? Math.max(...openHints) + 1 : 0;
 
   return (
     <form
@@ -26,7 +37,7 @@ export function QuestionForm({
       }}
     >
       <input type="hidden" name="sessionId" value={sessionId} />
-      <input type="hidden" name="hintLevelUsed" value={hintLevel} />
+      <input type="hidden" name="hintLevelUsed" value={highestOpened} />
       <input ref={responseTimeRef} type="hidden" name="responseTimeMs" value="0" />
 
       <p className="question-prompt">{question.prompt}</p>
@@ -52,33 +63,68 @@ export function QuestionForm({
         />
       )}
 
-      {question.hints.length > 0 && hintLevel > 0 ? (
-        <div className="hint-inline" aria-live="polite">
-          <span className="hint-index">Hint {hintLevel}</span>
-          <p>{question.hints[hintLevel - 1]}</p>
-        </div>
+      {question.hints.length > 0 ? (
+        <HintLadder
+          hints={question.hints}
+          openSet={openHints}
+          onToggle={toggleHint}
+        />
       ) : null}
 
       <div className="question-actions">
-        <button
-          className="button-secondary"
-          type="button"
-          onClick={() => setHintLevel((current) => Math.min(question.hints.length, current + 1))}
-          disabled={hintLevel >= question.hints.length}
-        >
-          {hintLevel === 0 ? "Use hint" : `Next hint ${hintLevel}/${question.hints.length}`}
-        </button>
         <SubmitButton />
       </div>
     </form>
   );
 }
 
+function HintLadder({
+  hints,
+  openSet,
+  onToggle
+}: {
+  hints: string[];
+  openSet: Set<number>;
+  onToggle: (index: number) => void;
+}) {
+  return (
+    <section className="ladder" aria-label="Hint ladder">
+      <header className="ladder__head">
+        <span className="ladder__title">Hints — open one at a time, support not a shortcut</span>
+        <span className="ladder__sub">{openSet.size} of {hints.length}</span>
+      </header>
+      <ol className="ladder__list">
+        {hints.map((hint, index) => {
+          const isOpen = openSet.has(index);
+          return (
+            <li key={index}>
+              <button
+                type="button"
+                className={`rung--card${isOpen ? " is-open" : ""}`}
+                onClick={() => onToggle(index)}
+                aria-expanded={isOpen}
+              >
+                <span className="rung__body">
+                  <span className="rung__kind">Hint {index + 1}</span>
+                  <p className="rung__text">{isOpen ? hint : "tap to open"}</p>
+                </span>
+                <span className="rung__icon" aria-hidden="true">
+                  {isOpen ? <ChevronDown size={16} /> : <Lock size={16} />}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 function SubmitButton() {
   const { pending } = useFormStatus();
   return (
-    <button className="button" type="submit" disabled={pending}>
-      {pending ? "Checking..." : "Submit"}
+    <button className="button button-large" type="submit" disabled={pending}>
+      {pending ? "Checking..." : "That's my answer"}
     </button>
   );
 }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
 import {
+  getMissionPreview,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
@@ -28,6 +29,17 @@ afterEach(() => {
 });
 
 describe("round repository orchestration", () => {
+  it("previews the same round words that starting the round creates", () => {
+    const preview = getMissionPreview(6);
+    const sessionId = startRoundMission(6);
+    const view = getSessionView(sessionId);
+
+    expect(view.round?.cards.map((card) => card.id)).toEqual(preview.words.map((word) => word.id));
+    expect(preview.words.map((word) => word.selectionReason.reason)).toEqual(
+      view.round?.cards.map((card) => card.selectionReason?.reason)
+    );
+  });
+
   it("unlocks meaning after two card views and stores first-attempt versus recovery evidence", () => {
     const sessionId = startRoundMission(6);
     completeLearnCards(sessionId);

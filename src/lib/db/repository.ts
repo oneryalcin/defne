@@ -96,6 +96,7 @@ export interface MissionPreview {
     word: string;
     definition: string;
     masteryColour: LearnerWordState["masteryColour"];
+    selectionReason: RoundSelectionReason;
     weakestDimension: string;
   }>;
 }
@@ -227,19 +228,25 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
 }
 
 export function getMissionPreview(targetQuestionCount = 8): MissionPreview {
+  const db = getDb();
   const words = getPracticeWords();
-  const plan = selectSessionPlan(words, new Date().toISOString(), targetQuestionCount);
+  const selection = selectRoundWords(words, new Date().toISOString(), targetQuestionCount, getRemediationWordIds(db));
   const byId = new Map(words.map((word) => [word.id, word]));
+  const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
+
   return {
-    targetQuestionCount: plan.length,
-    words: plan.map((item) => {
-      const word = byId.get(item.wordId);
-      if (!word) throw new Error(`Missing planned word ${item.wordId}`);
+    targetQuestionCount: selection.wordIds.length,
+    words: selection.wordIds.map((wordId) => {
+      const word = byId.get(wordId);
+      const selectionReason = reasonByWordId.get(wordId);
+      if (!word) throw new Error(`Missing planned word ${wordId}`);
+      if (!selectionReason) throw new Error(`Missing round selection reason for ${wordId}`);
       return {
         id: word.id,
         word: word.word,
         definition: word.definition,
         masteryColour: word.state.masteryColour,
+        selectionReason,
         weakestDimension: weakestDimensionLabel(word.state)
       };
     })

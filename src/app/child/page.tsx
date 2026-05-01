@@ -38,7 +38,7 @@ export default function ChildPage() {
               <li className="focus-item" key={word.id}>
                 <div className="word-main">
                   <strong>{word.word}</strong>
-                  <span>{word.weakestDimension} needs the most practice</span>
+                  <span>{word.selectionReason.label}</span>
                 </div>
                 <MasteryBadge colour={word.masteryColour} />
               </li>

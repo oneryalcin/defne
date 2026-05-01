@@ -57,7 +57,15 @@ export default async function SessionPage({
   }
 
   const view = getSessionView(sessionId, card);
-  const percent = view.totalQuestions > 0 ? Math.min(100, Math.round(((view.questionNumber - 1) / view.totalQuestions) * 100)) : 0;
+  // Show the bar including the in-flight question so the question screen
+  // matches the review screen (and Q1 isn't a flat empty bar).
+  const percent =
+    view.totalQuestions > 0
+      ? Math.min(
+          100,
+          Math.round((view.questionNumber / view.totalQuestions) * 100)
+        )
+      : 0;
 
   if (view.round?.currentStep === "learn_cards" && view.round.selectedCard) {
     return (
@@ -375,10 +383,26 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
   const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
   const choicesShowCorrection = review.choices.length > 0;
 
+  // Mirror the question screen: instruction line on top, italic word as
+  // the heading, then the choices with feedback. For fill-sentence the
+  // target word is the answer — render the prompt instead.
+  const showWordHeading = review.questionType !== "fill_sentence";
   return (
     <div className="result-panel">
-      <p className="question-prompt">{review.prompt}</p>
-      <p className="question-instruction">{review.instruction}</p>
+      <p className="practice-instruction">{review.instruction}</p>
+      {showWordHeading ? (
+        <h2 className="practice-word">{review.targetWord}</h2>
+      ) : (
+        <p className="question-prompt">{review.prompt}</p>
+      )}
+      {showWordHeading ? (
+        <p
+          className="practice-instruction"
+          style={{ marginTop: 8, color: "var(--steel-secondary)" }}
+        >
+          {review.prompt}
+        </p>
+      ) : null}
 
       {review.choices.length > 0 ? (
         <div className="choice-grid" aria-label="Answer choices">

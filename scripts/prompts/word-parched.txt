@@ -1,0 +1,15 @@
+subject: A small visual mnemonic for the vocabulary word "parched" — meaning "very dry, especially because of heat." This image is a memory aide that sits beside the word in the child's vocabulary card; it must communicate the meaning in two seconds and never compete with the UI text.
+
+scene: A patch of dry, cracked earth in late summer afternoon light. The cracks form an irregular polygon pattern — a few wide cracks running through, smaller hairline cracks branching off. The ground is the dominant element, filling the lower two-thirds of the frame. Above it, only warm cream paper showing through — no detailed sky, no horizon detail, no clouds, no buildings. A faint suggestion of dust drifting in the warm light. Anchored visually to the canonical example sentence: "The parched ground cracked in the drought."
+
+style: Editorial children's-book illustration. Graphite pencil line work with light, heavily desaturated watercolour wash on warm cream paper. Pencil dominates the cracks (each crack is a confident graphite line with light hatching for depth). Watercolour wash is whisper-faint, around 30-40% saturation, only enough to suggest warm afternoon light and dry earth tones. Visible pencil strokes throughout. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Arid stillness. The earth is thirsty. The image should feel parched — quiet, undecorated, the bare bones of a hot afternoon when the rain has not come.
+
+composition: Low horizon line at roughly the upper third. Ground fills the lower two-thirds with the crack pattern as the visual focus. Single subject, clear silhouette, fast two-second read. Generous warm cream paper space above the horizon. Centred, slightly asymmetric so the cracks feel natural rather than designed.
+
+palette: Warm cream paper canvas, graphite ink lines, faint warm umber and dust ochre wash on the cracked earth (around 30-40% saturation), the lightest hint of terracotta inside the deepest cracks. The cream paper itself reads as the warm dry sky. No purple. No violet. No neon. No green of any kind (parched land has no living green).
+
+aspect ratio: 1:1 (square — small UI thumbnail, ~200-256px render size in the app)
+
+Avoid: any green vegetation (parched implies no growth), any human figure, any animal figure, any water source or rain, any modern objects (no buildings, no roads, no signs), glow, sparkle, halo, particle effects, embedded text, logos, watermarks, photoreal rendering, cartoon mascot, decorative borders, streak chrome, badge chrome, coin chrome, oversaturation, harsh outlines, harsh red, anything that could read as the confusable word "perched" (no birds, no perches, no high vantage points), full saturation on any colour, modern picture-book brightness.

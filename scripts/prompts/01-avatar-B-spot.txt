@@ -1,0 +1,17 @@
+subject: A canonical avatar portrait of Defne, the recurring girl character of the Defne vocabulary practice app. She is around 9 to 10 years old (Year 5). VARIANT B: GRAPHITE PENCIL SKETCH WITH SPOT COLOUR ONLY — the figure is rendered in graphite line and hatching, except for two restrained spot-colour accents in forest green: the small hair clip and a faint forest-green wash along the long skirt only. Everything else stays pencil. Think of a vintage children's primer where one ink colour was added to a pencil sketch.
+
+scene: She is seated on a warm cream paper background, cross-legged, holding an open notebook on her lap. She is looking down at the notebook, never at the viewer. Calm, focused posture.
+
+character (canonical reference — repeat verbatim in every future scene): A girl around age 9 to 10. Dark wavy shoulder-length hair tied loosely with a small forest-green clip (this clip is one of the two spot-colour elements). Olive-warm skin tone (rendered in graphite hatching only — no skin colour wash). Almond eyes. Simple modern clothes: a soft cotton jumper rendered entirely in pencil hatching with no colour, a long skirt washed in faint forest-green watercolour (this is the other spot-colour element), plain canvas trainers in pencil only. Slight, thoughtful expression. Never looks at the camera. Never smiles broadly; small private smile at most.
+
+style: Graphite pencil sketch on warm cream paper, with two restrained forest-green spot-colour accents (hair clip + skirt). Visible loose pencil strokes, gestural line work, soft graphite hatching for shadows. The forest-green areas are watercolour washes, faint at the edges, never saturated. NO other colours. NO painted skin. NO painted jumper. NO painted shoes. NO painted hair. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Quiet attention. The girl is absorbed in something private. The two restrained forest-green spots draw the eye gently to the character without making her feel busy or decorative.
+
+composition: Centred figure, three-quarter view from her left, generous negative space all around. Warm cream paper background uniform across the entire canvas (hex roughly #FAF7F1). No frame, no border, no decorative elements behind the figure.
+
+palette: Warm cream paper canvas, graphite ink lines and shading, forest green (#3F7D5C) for the hair clip and the skirt only. Nothing else.
+
+aspect ratio: 1:1 (square)
+
+Avoid: any other colours besides graphite + forest green + cream paper, any cream-coloured jumper distinct from the paper (the jumper stays pencil-only against the paper), any tinting on hair or skin or shoes, glow, sparkle, halo, particle effects, embedded text, logos, watermarks, real child likeness, photoreal rendering, cartoon mascot, exaggerated facial features, eye contact with the viewer, decorative borders, streak chrome, badge chrome, coin chrome, harsh outlines, oversaturated forest green.

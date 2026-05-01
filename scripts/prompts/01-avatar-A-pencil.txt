@@ -1,0 +1,17 @@
+subject: A canonical avatar portrait of Defne, the recurring girl character of the Defne vocabulary practice app. She is around 9 to 10 years old (Year 5). VARIANT A: PURE GRAPHITE PENCIL SKETCH — no colour wash, no watercolour, no painted areas anywhere on the body, the hair, or the clothing. Treat this like a single-pose drawing from a study-journal sketchbook.
+
+scene: She is seated on a warm cream paper background, cross-legged, holding an open notebook on her lap. She is looking down at the notebook, never at the viewer. Calm, focused posture.
+
+character (canonical reference — repeat verbatim in every future scene): A girl around age 9 to 10. Dark wavy shoulder-length hair tied loosely with a small clip. Olive-warm skin tone (rendered in graphite hatching only). Almond eyes. Simple modern clothes drawn in pencil only — a soft cotton jumper over a long skirt, plain canvas trainers — no painted colour fills, only line and crosshatch shading. Slight, thoughtful expression. Never looks at the camera. Never smiles broadly; small private smile at most.
+
+style: Pure graphite pencil sketch on warm cream paper. Visible loose pencil strokes, gestural line work, soft graphite hatching for shadows. Reads like a single drawing torn from a study journal — quiet, primer-style, restrained. NO watercolour wash. NO painted colour fills. NO digital flat colours. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Quiet attention. The girl is absorbed in something private. The viewer is observing her, not addressed by her. The stripped-back medium reinforces the studious, primer-book feel.
+
+composition: Centred figure, three-quarter view from her left, generous negative space all around. Warm cream paper background uniform across the entire canvas (hex roughly #FAF7F1) — only the cream paper colour as background; everything else is graphite. No frame, no border, no decorative elements behind the figure.
+
+palette: Warm cream paper canvas, graphite ink lines and shading. That is all. No other colour anywhere on the figure or background.
+
+aspect ratio: 1:1 (square)
+
+Avoid: any colour wash, any watercolour bleed, any painted areas, any flat digital colours, any forest green skirt, any cream-coloured jumper distinguished from the paper, any tinting on hair or skin, glow, sparkle, halo, particle effects, embedded text, logos, watermarks, real child likeness, photoreal rendering, cartoon mascot, exaggerated facial features, eye contact with the viewer, decorative borders, streak chrome, badge chrome, coin chrome, harsh outlines.

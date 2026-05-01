@@ -1,0 +1,17 @@
+subject: A canonical avatar portrait of Defne, the recurring girl character of the Defne vocabulary practice app. She is around 9 to 10 years old (Year 5). VARIANT C: GRAPHITE PENCIL SKETCH WITH HEAVILY DESATURATED WATERCOLOUR WASH — the medium is graphite + watercolour but the colours are pulled to roughly 25-30% saturation, so from a distance the image reads as ~80% pencil with whisper-faint colour. The character has the same canonical clothing colours (cream jumper, forest-green skirt, green clip) but rendered as ghostly thin washes rather than fully painted.
+
+scene: She is seated on a warm cream paper background, cross-legged, holding an open notebook on her lap. She is looking down at the notebook, never at the viewer. Calm, focused posture.
+
+character (canonical reference — repeat verbatim in every future scene): A girl around age 9 to 10. Dark wavy shoulder-length hair tied loosely with a small green clip (the green is faint, not saturated). Olive-warm skin tone rendered with the lightest possible warm wash over graphite hatching — barely tinted. Almond eyes. Simple modern clothes: a soft cream jumper (the cream barely distinguished from the paper, only enough wash to suggest fabric), a long skirt in faint desaturated forest green (about 30% saturation, watery edges), plain canvas trainers with the lightest grey-cream wash. Slight, thoughtful expression. Never looks at the camera. Never smiles broadly; small private smile at most.
+
+style: Graphite pencil line work with very light, heavily desaturated watercolour wash on warm cream paper. Pencil dominates; colour is whisper-faint, around 25-30% of full saturation, only present to suggest material rather than to render full colour. Visible pencil strokes throughout. Watercolour bleeds at the edges where it appears. Imagine a sketch where a child gently brushed in barely-there colour with a watery brush. Never photoreal. Never cartoonish. Never glowing. Never the saturated cartoon-watercolour-app feel.
+
+mood: Quiet attention. The girl is absorbed in something private. The pulled-back colour reinforces the studious, restrained feel — colour is present but never demands attention.
+
+composition: Centred figure, three-quarter view from her left, generous negative space all around. Warm cream paper background uniform across the entire canvas (hex roughly #FAF7F1). No frame, no border, no decorative elements behind the figure.
+
+palette: Warm cream paper canvas, graphite ink lines and shading, very faint forest green for skirt and clip (about 30% saturation), barely-tinted cream for the jumper, the lightest possible warm tint for skin. All washes are whisper-faint and watery. No purple. No violet. No neon.
+
+aspect ratio: 1:1 (square)
+
+Avoid: full saturation on any colour, fully painted garment areas, modern picture-book brightness, glow, sparkle, halo, particle effects, embedded text, logos, watermarks, real child likeness, photoreal rendering, cartoon mascot, exaggerated facial features, eye contact with the viewer, decorative borders, streak chrome, badge chrome, coin chrome, harsh outlines, oversaturation, harsh red.

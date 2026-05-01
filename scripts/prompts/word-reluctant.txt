@@ -1,0 +1,17 @@
+subject: A small visual mnemonic for the vocabulary word "reluctant" — meaning "unwilling or hesitant." This image is a memory aide that sits beside the word in the child's vocabulary card; it must communicate the meaning in two seconds and never compete with the UI text. Class 2 mnemonic with character anchor: use the same girl as the reference image (canonical Defne avatar) so that across many person-centric mnemonics the kid recognises a single character.
+
+scene: Defne stands at the edge of a small group of school desks (the desks rendered as faint pencil silhouettes only), about to speak to the class but holding back — one foot half-stepped forward, shoulders slightly drawn in, hands loose at her sides, head tilted slightly down. The hesitation is in her posture: she has prepared, but she is reluctant to begin. Anchored to the canonical example sentence: "Defne was reluctant to speak in front of the class, even though she had prepared well." (The example originally used "Maya" in seed data — note that "Maya" is the parent's name in this project; the canonical child is Defne.)
+
+character: Use the girl exactly as shown in the reference image — rendered in graphite pencil with heavily desaturated watercolour wash (around 30-40% saturation, pencil-dominant, whisper-faint colour). Her canonical features are: dark wavy curly hair partially tied up with a small green clip (faint), olive-warm skin (barely tinted), soft jumper (whisper-faint cream wash), long skirt with faint forest-green wash, plain canvas trainers. She does not look at the viewer. Her expression here is hesitant, slightly inward — small mouth closed, eyes slightly down.
+
+style: Editorial children's-book illustration. Graphite pencil line work dominates. Heavily desaturated watercolour wash (around 30-40% saturation) on warm cream paper. The classroom desks behind her are rendered in light pencil only — soft suggestion, not detailed. Pencil first, colour whisper-faint. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Quiet hesitation. The girl has prepared but is holding back. The image should feel like the moment before action, not the action itself.
+
+composition: Single subject (Defne), three-quarter view from her right, centred or slightly left of centre. The classroom desks form a soft pencil silhouette behind her, giving the briefest sense of "in front of a class" without filling the frame with detail. Generous warm cream paper space. Two-second read.
+
+palette: Warm cream paper canvas, graphite ink lines, faint forest-green skirt wash as the colour anchor, the lightest possible wash on the desks (pencil only, no colour). No purple. No violet. No neon. No fully-saturated colour anywhere.
+
+aspect ratio: 1:1 (square — small UI thumbnail, ~200-256px render size in the app)
+
+Avoid: full-saturation colour anywhere, modern picture-book brightness, glow, sparkle, halo, particle effects, embedded text, logos, watermarks, real child likeness, photoreal rendering, cartoon mascot, exaggerated facial features, eye contact with the viewer, decorative borders, streak chrome, badge chrome, coin chrome, oversaturation, harsh outlines, harsh red, anything that pulls eye away from the single hesitant figure, multiple detailed background figures (the desks are pencil silhouettes only, no other detailed children), the girl shown in a confident or active posture (reluctant means holding back, not stepping forward), depicting the moment of speaking (she is hesitating, not mid-speech), tears or distress (reluctant is hesitant, not upset).

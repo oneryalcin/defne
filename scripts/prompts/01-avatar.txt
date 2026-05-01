@@ -1,0 +1,17 @@
+subject: A canonical avatar portrait of Defne, the recurring girl character of the Defne vocabulary practice app. She is around 9 to 10 years old (Year 5).
+
+scene: She is seated on a warm cream paper background, cross-legged, holding an open notebook on her lap. She is looking down at the notebook, never at the viewer. Calm, focused posture.
+
+character (canonical reference — repeat verbatim in every future scene): A girl around age 9 to 10. Dark wavy shoulder-length hair tied loosely with a small ribbon. Olive-warm skin tone. Almond eyes. Simple modern clothes: a soft cream cotton jumper over a long skirt in muted forest green, plain canvas shoes. Slight, thoughtful expression. Never looks at the camera. Never smiles broadly; small private smile at most.
+
+style: Editorial children's-book illustration. Graphite pencil line work with light watercolour wash on warm cream paper. Visible pencil strokes, soft watercolour bleed at the edges. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Quiet attention. The girl is absorbed in something private. The viewer is observing her, not addressed by her.
+
+composition: Centred figure, three-quarter view from her left, generous negative space all around. Warm cream paper background uniform across the entire canvas (hex roughly #FAF7F1) so this image can sit on the app's paper-canvas screens without a colour mismatch. No frame, no border, no decorative elements behind the figure.
+
+palette: Warm cream paper canvas, graphite ink lines, forest green for the skirt, soft amber for warm shadows, hint of sky blue for cool shadow. Never purple. Never violet. Never neon.
+
+aspect ratio: 1:1 (square)
+
+Avoid: glow, sparkle, halo, particle effects, embedded text, logos, watermarks, real child likeness, photoreal rendering, cartoon mascot, exaggerated facial features, eye contact with the viewer, decorative borders, streak chrome, badge chrome, coin chrome, oversaturation, harsh outlines, harsh red.

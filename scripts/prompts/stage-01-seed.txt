@@ -1,0 +1,15 @@
+subject: A small terracotta plant pot containing dark, freshly watered soil with a single laurel seed just barely visible, sitting on a wooden kitchen windowsill in late afternoon light. This is stage 1 of a 50-stage laurel-tree growth journey for a children's vocabulary app — the very first beat: a seed has been planted.
+
+scene: The windowsill is plain, slightly worn pine wood, with visible grain and one or two faint scuffs. The pot is small and hand-thrown, asymmetric, terracotta in colour, sitting roughly centred on the sill. The window behind is implied by warm slanted light coming from the upper right, casting a soft long shadow of the pot leftwards across the wood. Outside the window, only soft cream paper colour — the world beyond is undefined, like a watercolour wash.
+
+style: Editorial children's-book illustration. Graphite pencil line work with light watercolour wash on warm cream paper. Visible pencil strokes on the pot and the wood grain. Soft watercolour bleed where the light hits the sill. Never photoreal. Never cartoonish. Never glowing.
+
+mood: Patience and quiet beginning. Nothing has happened yet — but something will. The image should feel like the moment after a child has watered the seed and stepped back to look.
+
+composition: Pot slightly off-centre to the right, windowsill running across the lower third of the frame, generous warm cream space above. The shadow of the pot stretches into negative space on the left, anchoring the eye. No human figure in this scene.
+
+palette: Warm cream paper canvas, graphite ink lines, terracotta orange-brown for the pot, dark earth-brown for the soil, soft amber for the light wash, pale wood ochre for the sill. No purple. No violet. No neon.
+
+aspect ratio: 3:2 (landscape, 1536x1024)
+
+Avoid: glow, sparkle, halo, particle effects, embedded text, logos, watermarks, photoreal rendering, cartoon mascot, decorative borders, streak chrome, badge chrome, oversaturation, harsh outlines, harsh red, any human or animal figure, any visible signs of growth (this is stage 1 — only the seed and pot exist).

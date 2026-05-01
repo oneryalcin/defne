@@ -13,3 +13,4 @@ coverage/
 *.sqlite3
 *.db
 *.tsbuildinfo
+tmp/

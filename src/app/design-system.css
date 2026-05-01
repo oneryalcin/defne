@@ -829,14 +829,21 @@
   color: var(--graphite-ink);
   line-height: 1.55;
 }
-.col-12 { grid-column: span 12; }
-.col-8 { grid-column: span 8; }
-.col-6 { grid-column: span 6; }
-.col-5 { grid-column: span 5; }
-.col-4 { grid-column: span 4; }
-.col-7 { grid-column: span 7; }
+/* Span helpers only act inside a bento-grid; outside one they would
+   force the parent grid to spawn 12 implicit columns. */
+.bento-grid > .col-12 { grid-column: span 12; }
+.bento-grid > .col-8 { grid-column: span 8; }
+.bento-grid > .col-7 { grid-column: span 7; }
+.bento-grid > .col-6 { grid-column: span 6; }
+.bento-grid > .col-5 { grid-column: span 5; }
+.bento-grid > .col-4 { grid-column: span 4; }
 @media (max-width: 980px) {
-  .col-12, .col-8, .col-7, .col-6, .col-5, .col-4 { grid-column: span 12; }
+  .bento-grid > .col-12,
+  .bento-grid > .col-8,
+  .bento-grid > .col-7,
+  .bento-grid > .col-6,
+  .bento-grid > .col-5,
+  .bento-grid > .col-4 { grid-column: span 12; }
 }
 
 /* Word table */
@@ -1037,9 +1044,13 @@
   max-width: 64rem;
 }
 
-/* Stack within parent-spread */
+/* Stack within parent-spread. Pin to a single track so a child .bento
+   carrying .col-12 (which sets grid-column: span 12) cannot force the
+   section to grow 12 implicit columns and squeeze the .section-head
+   into a 1/12 sliver. */
 .parent-spread .dash-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 

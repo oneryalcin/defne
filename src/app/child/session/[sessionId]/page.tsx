@@ -19,6 +19,7 @@ export default async function SessionPage({
   if (attemptId) {
     const review = getAttemptReview(sessionId, attemptId);
     const isRoundReview = Boolean(review.roundStep);
+    const showCorrectionDetails = !review.isCorrect || review.revealAndMoveOn;
     const percent = review.totalQuestions > 0
       ? Math.min(isRoundReview && !review.isSessionComplete ? 92 : 100, Math.round((review.questionNumber / review.totalQuestions) * 100))
       : 0;
@@ -28,29 +29,33 @@ export default async function SessionPage({
 
     return (
       <main className="page">
-        <section className="question-shell">
-          <div>
+        <section className={`question-shell ${showCorrectionDetails ? "" : "question-focus-shell"}`}>
+          <div className={showCorrectionDetails ? undefined : "question-main"}>
             <div
-              className="progress-track"
+              className={`progress-track ${showCorrectionDetails ? "" : "progress-track-compact"}`}
               aria-label={isRoundReview ? `${progressLabel}, question ${review.questionNumber} so far` : progressLabel}
             >
               <div className="progress-fill" style={{ width: `${percent}%` }} />
             </div>
             <p className="metric-label">{progressLabel}</p>
-            {isRoundReview ? <p className="progress-subcopy">Question {review.questionNumber} so far. Retry questions are added only for missed words.</p> : null}
+            {isRoundReview && showCorrectionDetails ? (
+              <p className="progress-subcopy">Question {review.questionNumber} so far. Retry questions are added only for missed words.</p>
+            ) : null}
             <ReviewPanel review={review} />
           </div>
 
-          <aside className="helper-panel" aria-label="Attempt review">
-            <div className="review-sidecar">
-              <p className="metric-label">Your answer</p>
-              <strong>{review.submittedAnswer || "No answer entered"}</strong>
-              <p className="metric-label">Expected answer</p>
-              <strong>{review.canonicalAnswer}</strong>
-            </div>
-            <HintReview hints={review.hints} openedCount={review.hintLevelUsed} />
-            {review.spellingNote ? <div className="hint-box">Spelling note: {review.spellingNote}</div> : null}
-          </aside>
+          {showCorrectionDetails ? (
+            <aside className="helper-panel" aria-label="Attempt review">
+              <div className="review-sidecar">
+                <p className="metric-label">Your answer</p>
+                <strong>{review.submittedAnswer || "No answer entered"}</strong>
+                <p className="metric-label">Expected answer</p>
+                <strong>{review.canonicalAnswer}</strong>
+              </div>
+              {!review.isCorrect ? <HintReview hints={review.hints} openedCount={review.hintLevelUsed} /> : null}
+              {!review.isCorrect && review.spellingNote ? <div className="hint-box">Spelling note: {review.spellingNote}</div> : null}
+            </aside>
+          ) : null}
         </section>
       </main>
     );
@@ -264,6 +269,7 @@ function RoundAside({ sessionId, round }: { sessionId: string; round: RoundSessi
 
 function ReviewPanel({ review }: { review: AttemptReview }) {
   const nextHref = review.isSessionComplete ? `/child/session/${review.sessionId}/summary` : `/child/session/${review.sessionId}`;
+  const showRecoveryExplanation = review.isCorrect && review.firstAttemptCorrect === false;
 
   return (
     <div className="result-panel">
@@ -286,24 +292,18 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
             return (
               <div className={className} key={choice}>
                 <span>{choice}</span>
-                {isExpected ? <strong>Expected</strong> : null}
-                {isSubmitted && !isExpected ? <strong>Your answer</strong> : null}
+                {!review.isCorrect && isExpected ? <strong>Expected</strong> : null}
+                {!review.isCorrect && isSubmitted && !isExpected ? <strong>Your answer</strong> : null}
               </div>
             );
           })}
         </div>
       ) : null}
 
-      {review.isCorrect ? (
+      {showRecoveryExplanation ? (
         <div className="result-callout result-correct">
-          <strong>{review.firstAttemptCorrect === false ? "Fixed now." : "Good retrieval."}</strong>
-          <span>
-            {review.firstAttemptCorrect === false
-              ? "This item is done for this step. It will still come back soon because the first try was missed."
-              : review.hintLevelUsed > 0
-                ? "You got there with support, so this still counts as practice."
-                : "You recalled it without a hint."}
-          </span>
+          <strong>Fixed now.</strong>
+          <span>This item is done for this step. It will still come back soon because the first try was missed.</span>
         </div>
       ) : review.revealAndMoveOn ? (
         <div className="result-callout result-recovery">
@@ -314,9 +314,9 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
             <strong>{review.canonicalAnswer}</strong>
           </div>
         </div>
-      ) : (
+      ) : !review.isCorrect ? (
         <RecoveryCallout review={review} />
-      )}
+      ) : null}
 
       <div className="action-row">
         <Link className="button" href={nextHref}>

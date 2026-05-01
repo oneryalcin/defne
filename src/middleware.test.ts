@@ -6,8 +6,8 @@ import {
   serializePilotSession
 } from "./lib/pilotAuth";
 
-function requestCookieValue(username: string, role: "child" | "parent"): string {
-  return `${PILOT_SESSION_COOKIE}=${serializePilotSession({ username, role })}`;
+function requestCookieValue(accessCode: string, role: "child" | "parent"): string {
+  return `${PILOT_SESSION_COOKIE}=${serializePilotSession({ accessCode, role })}`;
 }
 
 describe("pilot middleware route guards", () => {
@@ -41,7 +41,7 @@ describe("pilot middleware route guards", () => {
     const response = middleware(
       new NextRequest("http://localhost/parent/words/new", {
         headers: {
-          cookie: requestCookieValue("defne", "child")
+          cookie: requestCookieValue("arina", "child")
         }
       })
     );

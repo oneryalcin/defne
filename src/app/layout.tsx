@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 {item.label}
               </Link>
             ))}
-            {session ? <span className="role-chip">{session.username}</span> : null}
+            {session ? <span className="role-chip">{session.role}</span> : null}
             {session ? (
               <form action={logoutAction}>
                 <button className="button-secondary" type="submit">

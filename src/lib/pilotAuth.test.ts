@@ -9,23 +9,23 @@ import {
 } from "./pilotAuth";
 
 describe("pilot role helpers", () => {
-  it("maps pilot users to fixed roles", () => {
-    expect(resolvePilotRole("defne")).toBe("child");
+  it("maps pilot access codes to fixed roles", () => {
+    expect(resolvePilotRole("arina")).toBe("child");
     expect(resolvePilotRole("Daria")).toBe("parent");
-    expect(resolvePilotRole("  dEfNe  ")).toBe("child");
+    expect(resolvePilotRole("  aRiNa  ")).toBe("child");
   });
 
-  it("rejects unknown usernames", () => {
+  it("rejects unknown access codes", () => {
     expect(resolvePilotRole("guest")).toBeNull();
   });
 
   it("encodes and decodes a session cookie deterministically", () => {
-    const value = serializePilotSession({ username: "defne", role: "child" });
-    expect(parsePilotSession(value)).toEqual({ username: "defne", role: "child" });
+    const value = serializePilotSession({ accessCode: "arina", role: "child" });
+    expect(parsePilotSession(value)).toEqual({ accessCode: "arina", role: "child" });
   });
 
   it("rejects tampered role in cookie payload", () => {
-    const value = `${encodeURIComponent("defne")}|parent`;
+    const value = `${encodeURIComponent("arina")}|parent`;
     expect(parsePilotSession(value)).toBeNull();
   });
 

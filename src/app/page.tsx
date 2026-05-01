@@ -37,18 +37,17 @@ export default async function HomePage({
         <section className="hero-grid">
           <div className="hero-copy">
             <p className="metric-label">Pilot auth</p>
-            <h1>Use one of the local usernames to start.</h1>
+            <h1>Enter your local access code.</h1>
             <p>
-              This is local-only and intentional for the pilot: no passwords, no account creation, and no external identity
-              service.
+              This is local-only and intentional for the pilot: no account creation and no external identity service.
             </p>
 
             <form action={loginAction} className="mission-panel login-form">
               {error || required ? <p className="error-callout">{loginErrorMessage(error, requiredRole, current)}</p> : null}
 
               <label>
-                Username
-                <input className="field" name="username" autoComplete="off" required placeholder="defne or daria" />
+                Access code
+                <input className="field" name="accessCode" autoComplete="off" required placeholder="Enter access code" />
               </label>
 
               {requiredRole ? <input type="hidden" name="next" value={roleHomePath(requiredRole)} /> : null}
@@ -59,10 +58,6 @@ export default async function HomePage({
                 </button>
               </div>
             </form>
-
-            <p className="section-copy">
-              Tip: <strong>defne</strong> opens child mode, <strong>daria</strong> opens parent mode.
-            </p>
           </div>
           <div className="visual-frame">
             <Image
@@ -100,7 +95,7 @@ export default async function HomePage({
       <section className="hero-grid">
         <div className="hero-copy">
           <p className="metric-label">Current mode</p>
-          <h1>Welcome, {session.username}.</h1>
+          <h1>Welcome back.</h1>
           <p>
             You are in {readableRoleName(session.role)} mode for this local session. Use the switch-user control to test
             the other role quickly.
@@ -149,7 +144,7 @@ function isPilotRoleValue(value: string | undefined): value is PilotRole {
 
 function loginErrorMessage(error?: string, required?: PilotRole, current?: string): string {
   if (error === "unknown_user") {
-    return "We don't recognise that username yet. Try defne or daria.";
+    return "That access code is not recognised.";
   }
 
   if (error === "wrong_role" && required && current) {

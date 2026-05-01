@@ -115,7 +115,6 @@ export function QuestionForm({
       </div>
 
       <footer className="page-actions">
-        <span className="page-actions__leader">Read the sentence carefully.</span>
         <SubmitButton />
       </footer>
     </form>
@@ -168,7 +167,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button className="ribbon" type="submit" disabled={pending}>
-      {pending ? "Checking..." : "That's my answer"}
+      {pending ? "Checking..." : "Check"}
       <ArrowRight size={18} aria-hidden="true" />
     </button>
   );

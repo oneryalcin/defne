@@ -45,6 +45,72 @@ describe("round repository orchestration", () => {
     );
   });
 
+  it("does not let stale unfinished rounds override the current priority queue", () => {
+    const db = getDb();
+    const wordIds = (
+      db.prepare("SELECT id FROM words WHERE status = 'active' ORDER BY word LIMIT 6").all() as Array<{
+        id: string;
+      }>
+    ).map((row) => row.id);
+    const staleStartedAt = "2026-05-01T09:00:00.000Z";
+    const completedStartedAt = "2026-05-01T10:00:00.000Z";
+    const completedEndedAt = "2026-05-01T10:30:00.000Z";
+    const staleSummary = {
+      plan: [],
+      round: {
+        roundId: "round_stale",
+        firstAttemptSecureWords: [],
+        eventuallyCorrectWords: [],
+        revealAndMoveOnWords: [],
+        nearReviewWords: [],
+        spellingStillWeakWords: [],
+        selectionReasons: [],
+        mistakeEvidence: [],
+        explanation: "stale"
+      }
+    };
+
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
+       VALUES ('session_stale', 'learner_defne', 'daily_mission', 'in_progress', 12, 0, ?, ?, ?, ?)`
+    ).run(staleStartedAt, JSON.stringify(staleSummary), staleStartedAt, staleStartedAt);
+    db.prepare(
+      `INSERT INTO practice_rounds
+        (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
+         card_view_counts_json, started_at, summary_json, created_at, updated_at)
+       VALUES ('round_stale', 'session_stale', 'learner_defne', 'in_progress', 'learn_cards', 3, ?, '{}', ?, ?, ?, ?)`
+    ).run(JSON.stringify(wordIds), staleStartedAt, JSON.stringify(staleSummary), staleStartedAt, staleStartedAt);
+
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, ended_at, summary_json, created_at, updated_at)
+       VALUES ('session_completed_later', 'learner_defne', 'daily_mission', 'completed', 12, 12, ?, ?, '{}', ?, ?)`
+    ).run(completedStartedAt, completedEndedAt, completedStartedAt, completedEndedAt);
+    db.prepare(
+      `INSERT INTO practice_rounds
+        (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
+         card_view_counts_json, started_at, ended_at, summary_json, created_at, updated_at)
+       VALUES ('round_completed_later', 'session_completed_later', 'learner_defne', 'completed', 'context_usage', 3, ?, '{}', ?, ?, '{}', ?, ?)`
+    ).run(JSON.stringify(wordIds), completedStartedAt, completedEndedAt, completedStartedAt, completedEndedAt);
+
+    getMissionPreview(6);
+
+    const staleRound = db
+      .prepare("SELECT status FROM practice_rounds WHERE id = 'round_stale'")
+      .get() as { status: string };
+    const staleSession = db
+      .prepare("SELECT status FROM practice_sessions WHERE id = 'session_stale'")
+      .get() as { status: string };
+    const activeRounds = db
+      .prepare("SELECT id FROM practice_rounds WHERE learner_id = 'learner_defne' AND status = 'in_progress'")
+      .all() as Array<{ id: string }>;
+
+    expect(staleRound.status).toBe("abandoned");
+    expect(staleSession.status).toBe("abandoned");
+    expect(activeRounds.map((row) => row.id)).not.toContain("round_stale");
+  });
+
   it("unlocks meaning after two card views and stores first-attempt versus recovery evidence", () => {
     const sessionId = startRoundMission(6);
     completeLearnCards(sessionId);

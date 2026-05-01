@@ -9,15 +9,27 @@ export function WordPills({
   pills,
   total,
   heading = "Today's words",
+  headingId,
 }: {
   pills: Pill[];
   total?: number;
   heading?: string;
+  headingId?: string;
 }) {
   return (
-    <section className="focus-pills" aria-label={heading}>
+    <section
+      className="focus-pills"
+      aria-label={headingId ? undefined : heading}
+      aria-labelledby={headingId}
+    >
       <header className="focus-pills__head">
-        <span className="cover-chapter">{heading}</span>
+        {headingId ? (
+          <h1 id={headingId} className="cover-chapter">
+            {heading}
+          </h1>
+        ) : (
+          <span className="cover-chapter">{heading}</span>
+        )}
         <span className="focus-pills__more">
           {(total ?? pills.length)} in total
         </span>

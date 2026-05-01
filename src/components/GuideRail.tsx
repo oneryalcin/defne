@@ -6,8 +6,8 @@ export function GuideRail({
   duration,
 }: {
   message: string;
-  date: string;
-  duration: string;
+  date?: string;
+  duration?: string;
 }) {
   return (
     <aside className="guiderail" aria-label="Guide character">
@@ -21,10 +21,12 @@ export function GuideRail({
         />
       </span>
       <p className="guiderail__bubble">{message}</p>
-      <span className="guiderail__date">
-        <span>{date}</span>
-        <span>{duration}</span>
-      </span>
+      {date || duration ? (
+        <span className="guiderail__date">
+          <span>{date}</span>
+          <span>{duration}</span>
+        </span>
+      ) : null}
     </aside>
   );
 }

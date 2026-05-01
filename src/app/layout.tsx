@@ -23,7 +23,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   const navItems: NavItem[] = session
     ? session.role === "child"
-      ? [{ href: "/child", label: "Child" }]
+      ? [
+        { href: "/child", label: "Child" },
+        { href: "/child/words", label: "Words" }
+        ]
       : [{ href: "/parent", label: "Parent" }]
     : [
       { href: "/child", label: "Child" },

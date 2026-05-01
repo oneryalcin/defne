@@ -1,128 +1,47 @@
 import { Footprints } from "lucide-react";
+import Link from "next/link";
 import { startMissionAction } from "@/app/actions";
-import { getMissionPreview, getParentWords } from "@/lib/db/repository";
+import { getMissionPreview } from "@/lib/db/repository";
 import { GuideRail } from "@/components/GuideRail";
-import { MasteryRail } from "@/components/MasteryRail";
-import { PencilMap } from "@/components/PencilMap";
-import { WordHeatmap } from "@/components/WordHeatmap";
 import { WordPills } from "@/components/WordPills";
 import type { MasteryColour } from "@/lib/types";
 
-const HEATMAP_PAGE_SIZE = 120;
-
 export const dynamic = "force-dynamic";
 
-const MAP_LAYOUT = [
-  { x: 110, y: 296 },
-  { x: 230, y: 274 },
-  { x: 350, y: 252 },
-  { x: 470, y: 230 },
-  { x: 590, y: 196 },
-  { x: 700, y: 130 },
-];
-
-type SearchParams = Promise<{ p?: string }> | { p?: string };
-
-export default async function ChildPage({
-  searchParams,
-}: {
-  searchParams?: SearchParams;
-}) {
+export default function ChildPage() {
   const preview = getMissionPreview(8);
   const words = preview.words;
-  const allWords = getParentWords();
-  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as {
-    p?: string;
-  };
-  const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
 
   const pills = words.map((word) => ({
     word: word.word,
     level: (word.masteryColour ?? null) as MasteryColour | null,
   }));
 
-  const stops = words.slice(0, 6).map((word, idx) => ({
-    word: word.word,
-    state:
-      word.masteryColour === "green" || word.masteryColour === "light_green"
-        ? ("done" as const)
-        : idx === 0
-        ? ("current" as const)
-        : ("locked" as const),
-    x: MAP_LAYOUT[idx]?.x ?? 100 + idx * 110,
-    y: MAP_LAYOUT[idx]?.y ?? 280,
-  }));
-
-  const today = new Date().toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-
   return (
     <main className="spread">
       <article className="book-page" aria-labelledby="map-title">
-        <span className="folio">Today&apos;s path</span>
-        <section className="cover-map">
+        <section className="cover-map cover-map--simple">
+          <GuideRail message="Hello, hello. Eight little words today — let's see which ones want to stick." />
+
           <div className="cover-map__words">
-            <span className="cover-chapter">Today&apos;s path</span>
-            <h1 id="map-title" className="cover-title">
-              {words.length} stops along <span className="accent">the way</span>.
-            </h1>
-            <p className="cover-lede">
-              Some words are tucked into the hills, others are just past the
-              bend. Walk at your own pace — the path waits for you.
-            </p>
-
-            <MasteryRail />
-
             <WordPills
               pills={pills}
               total={words.length}
-              heading="Today's words"
+              heading="This round's words"
+              headingId="map-title"
             />
 
             <form action={startMissionAction} className="cover-actions">
               <button className="ribbon" type="submit">
                 <Footprints size={18} />
-                Start walking
+                Start
               </button>
+              <Link className="ribbon ribbon--ghost" href="/child/words">
+                Words so far
+              </Link>
             </form>
           </div>
-
-          <div className="cover-map__landscape-wrap">
-            <GuideRail
-              message="Hello, hello. Eight little words today — let's see which ones want to stick."
-              date={today.toUpperCase()}
-              duration="10 MIN"
-            />
-            <div className="cover-landscape" aria-hidden="false">
-              <PencilMap stops={stops} caption="Your vocabulary journey" />
-            </div>
-          </div>
         </section>
-      </article>
-
-      <article
-        className="book-page child-heatmap-page"
-        aria-labelledby="child-heatmap"
-      >
-        <span className="folio">Your words so far</span>
-        <header style={{ padding: "clamp(28px, 4vw, 48px) clamp(28px, 5vw, 56px) 0" }}>
-          <span className="cover-chapter">Your words so far</span>
-          <h2 id="child-heatmap" className="cover-title" style={{ fontSize: "clamp(2rem, 3.4vw, 2.5rem)" }}>
-            A field of <span className="accent">words</span> you have met.
-          </h2>
-        </header>
-        <div style={{ padding: "clamp(20px, 3vw, 36px) clamp(28px, 5vw, 56px) clamp(28px, 4vw, 48px)" }}>
-          <WordHeatmap
-            words={allWords}
-            page={heatmapPage}
-            pageSize={HEATMAP_PAGE_SIZE}
-            variant="child"
-            basePath="/child"
-          />
-        </div>
       </article>
     </main>
   );

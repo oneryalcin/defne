@@ -1158,12 +1158,19 @@ select {
     flex-direction: column;
   }
 
+  .round-preview-panel .mission-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .round-preview-panel .mission-strip,
+  .word-chip-grid {
+    grid-template-columns: 1fr;
+  }
+
   .word-cluster-header {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .word-chip-grid {
-    grid-template-columns: 1fr;
   }
 }

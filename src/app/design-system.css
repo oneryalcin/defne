@@ -456,6 +456,9 @@
   gap: clamp(20px, 3vw, 36px);
   align-items: start;
 }
+.practice-cols--single {
+  grid-template-columns: minmax(0, 1fr);
+}
 .practice-main { display: grid; gap: 18px; min-width: 0; }
 .practice-rail {
   position: sticky;

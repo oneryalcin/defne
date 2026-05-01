@@ -6,6 +6,11 @@ import { useFormStatus } from "react-dom";
 import { submitAnswerAction } from "@/app/actions";
 import type { PracticeQuestion } from "@/lib/learning/questions";
 
+// Temporarily disabled — the hint copy is not reliable yet. Flip this
+// to true once hint generation is trustworthy and the rail will return
+// without any other code changes.
+const HINTS_ENABLED = false;
+
 export function QuestionForm({
   sessionId,
   question
@@ -25,11 +30,13 @@ export function QuestionForm({
       else next.add(index);
       return next;
     });
-  const highestOpened = openHints.size > 0 ? Math.max(...openHints) + 1 : 0;
+  const highestOpened =
+    HINTS_ENABLED && openHints.size > 0 ? Math.max(...openHints) + 1 : 0;
   const passage = sentenceFromQuestion(question);
   // Fill-in-the-blank questions hide the answer in the prompt; everything else
   // can show the target word as a heading.
   const showWordHeading = question.questionType !== "fill_sentence";
+  const showHintRail = HINTS_ENABLED && question.hints.length > 0;
 
   return (
     <form
@@ -44,7 +51,7 @@ export function QuestionForm({
       <input type="hidden" name="hintLevelUsed" value={highestOpened} />
       <input ref={responseTimeRef} type="hidden" name="responseTimeMs" value="0" />
 
-      <div className="practice-cols">
+      <div className={`practice-cols${showHintRail ? "" : " practice-cols--single"}`}>
         <div className="practice-main">
           <div>
             <p className="practice-instruction">{question.instruction}</p>
@@ -104,7 +111,7 @@ export function QuestionForm({
           )}
         </div>
 
-        {question.hints.length > 0 ? (
+        {showHintRail ? (
           <aside className="practice-rail">
             <HintLadder
               hints={question.hints}

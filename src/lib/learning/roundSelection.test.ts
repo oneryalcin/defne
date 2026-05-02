@@ -1,122 +1,113 @@
 import { describe, expect, it } from "vitest";
-import { selectRoundWords } from "./roundSelection";
+import { computeFeatures, selectRoundWords } from "./roundSelection";
 import type { LearnerWordState, PracticeWord } from "../types";
 
 const NOW = "2026-05-01T12:00:00.000Z";
+const EMPTY_REMEDIATION = { revealAndMoveOnWordIds: [], eventuallyCorrectNotFirstAttemptWordIds: [] };
 
-describe("round word selection", () => {
-  it("adds one due mastered comeback and fills the other comeback slots with due stable words", () => {
-    const selection = selectRoundWords(
-      [
-        ...coreWords(9),
-        word("mastered_due", { masteryColour: "green", attemptCount: 6, correctCount: 6, lastSeenAt: daysAgo(6) }),
-        word("stable_due_1", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: daysAgo(2) }),
-        word("stable_due_2", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: daysAgo(1.5) }),
-        word("stable_recent", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: hoursAgo(12) }),
-        word("mastered_recent", { masteryColour: "green", attemptCount: 6, correctCount: 6, lastSeenAt: daysAgo(2) })
-      ],
-      NOW,
-      12,
-      { revealAndMoveOnWordIds: [], eventuallyCorrectNotFirstAttemptWordIds: [] }
-    );
+describe("round word selection v2.1", () => {
+  it("uses fresh recovery debt as recovery score and lets old debt fall back to normal weakness", () => {
+    const fresh = word("fresh_recovery", {
+      attemptCount: 4,
+      wrongCount: 2,
+      recoveryDebt: 3,
+      lastWrongAt: hoursAgo(4),
+      lastPracticedAt: hoursAgo(4),
+      lastExposedAt: hoursAgo(4)
+    });
+    const old = word("old_recovery", {
+      attemptCount: 4,
+      wrongCount: 2,
+      recoveryDebt: 3,
+      lastWrongAt: daysAgo(30),
+      lastPracticedAt: daysAgo(30),
+      lastExposedAt: daysAgo(30)
+    });
 
-    expect(selection.wordIds).toHaveLength(12);
-    expect(selection.reasons.filter((reason) => reason.reason === "mastered_comeback").map((reason) => reason.word)).toEqual([
-      "mastered_due"
-    ]);
-    expect(selection.reasons.filter((reason) => reason.reason === "stable_comeback").map((reason) => reason.word).sort()).toEqual([
-      "stable_due_1",
-      "stable_due_2"
-    ]);
+    expect(computeFeatures(fresh, NOW).recovery).toBe(1);
+    expect(computeFeatures(old, NOW).recovery).toBe(0);
+
+    const selection = selectRoundWords([fresh, old, ...retrievalWords(10)], NOW, 12, EMPTY_REMEDIATION);
+    expect(selection.reasons.find((reason) => reason.word === "fresh_recovery")?.reason).toBe("mistake_recovery");
   });
 
-  it("lets due stable words use all three comeback slots when no mastered word is due", () => {
-    const selection = selectRoundWords(
-      [
-        ...coreWords(9),
-        word("stable_due_1", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: daysAgo(2) }),
-        word("stable_due_2", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: daysAgo(1.5) }),
-        word("stable_due_3", { masteryColour: "light_green", attemptCount: 3, correctCount: 3, lastSeenAt: daysAgo(1.1) }),
-        word("mastered_recent", { masteryColour: "green", attemptCount: 6, correctCount: 6, lastSeenAt: daysAgo(2) })
-      ],
-      NOW,
-      12,
-      { revealAndMoveOnWordIds: [], eventuallyCorrectNotFirstAttemptWordIds: [] }
-    );
+  it("caps untouched and introduced-only words together when enough retrieval candidates exist", () => {
+    const introductions = [
+      word("untouched_1"),
+      word("untouched_2"),
+      word("untouched_3"),
+      word("introduced_1", { lastExposedAt: daysAgo(2) }),
+      word("introduced_2", { lastExposedAt: daysAgo(3) }),
+      word("introduced_3", { lastExposedAt: daysAgo(4) })
+    ];
+    const selection = selectRoundWords([...introductions, ...retrievalWords(12)], NOW, 12, EMPTY_REMEDIATION);
+    const introCount = selection.wordIds.filter((id) => id.includes("untouched") || id.includes("introduced")).length;
 
-    expect(selection.wordIds).toHaveLength(12);
-    expect(selection.reasons.some((reason) => reason.reason === "mastered_comeback")).toBe(false);
-    expect(selection.reasons.filter((reason) => reason.reason === "stable_comeback")).toHaveLength(3);
+    expect(introCount).toBeLessThanOrEqual(3);
   });
 
-  it("does not keep a word in near-review after enough clean follow-up questions", () => {
+  it("relaxes the green cap when the available deck is all mastered words", () => {
     const selection = selectRoundWords(
-      [
-        word("recovered", {
-          masteryColour: "yellow",
-          nearReview: true,
-          eligibleQuestionsSinceLastMistake: 4,
-          attemptCount: 7,
-          correctCount: 6,
-          wrongCount: 1,
-          lastSeenAt: hoursAgo(1),
-          lastWrongAt: hoursAgo(2)
-        }),
-        word("active_repair", {
-          masteryColour: "orange",
-          nearReview: true,
-          eligibleQuestionsSinceLastMistake: 2,
-          attemptCount: 7,
-          correctCount: 5,
-          wrongCount: 2,
-          lastSeenAt: hoursAgo(1),
-          lastWrongAt: hoursAgo(2)
-        }),
-        ...coreWords(10)
-      ],
-      NOW,
-      12,
-      { revealAndMoveOnWordIds: [], eventuallyCorrectNotFirstAttemptWordIds: [] }
-    );
-
-    const recovered = selection.reasons.find((reason) => reason.word === "recovered");
-    const activeRepair = selection.reasons.find((reason) => reason.word === "active_repair");
-
-    expect(recovered?.reason).not.toBe("near_review");
-    expect(activeRepair?.reason).toBe("near_review");
-  });
-
-  it("keeps recently seen stable and mastered words out of regular fallback slots", () => {
-    const selection = selectRoundWords(
-      [
-        ...coreWords(12),
-        word("stable_recent", {
-          masteryColour: "light_green",
+      Array.from({ length: 8 }, (_, index) =>
+        word(`green_${index + 1}`, {
+          masteryColour: "green",
           attemptCount: 6,
           correctCount: 6,
-          lastSeenAt: hoursAgo(3)
-        }),
-        word("mastered_recent", {
-          masteryColour: "green",
-          attemptCount: 8,
-          correctCount: 8,
+          wrongCount: 0,
           stabilityDays: 10,
-          lastSeenAt: daysAgo(2)
+          lastCleanRetrievalAt: daysAgo(12),
+          lastPracticedAt: daysAgo(12),
+          lastExposedAt: daysAgo(12)
         })
-      ],
+      ),
       NOW,
-      12,
-      { revealAndMoveOnWordIds: [], eventuallyCorrectNotFirstAttemptWordIds: [] }
+      6,
+      EMPTY_REMEDIATION
     );
 
-    expect(selection.wordIds).not.toContain("word_stable_recent");
-    expect(selection.wordIds).not.toContain("word_mastered_recent");
+    expect(selection.wordIds).toHaveLength(6);
+    expect(selection.wordIds.every((id) => id.includes("green"))).toBe(true);
+  });
+
+  it("caps very-low-recall words before relaxing into relearning candidates", () => {
+    const veryHard = Array.from({ length: 6 }, (_, index) =>
+      word(`hard_${index + 1}`, {
+        attemptCount: 3,
+        wrongCount: 2,
+        lastWrongAt: daysAgo(8),
+        lastPracticedAt: daysAgo(8),
+        lastExposedAt: daysAgo(8),
+        recoveryDebt: 0
+      })
+    );
+    const selection = selectRoundWords([...veryHard, ...retrievalWords(12)], NOW, 12, EMPTY_REMEDIATION);
+    const relearningCount = selection.reasons.filter((reason) => reason.reason === "needs_relearning").length;
+
+    expect(relearningCount).toBeLessThanOrEqual(2);
+  });
+
+  it("does not repeat recently introduced-only words unless the deck needs emergency backfill", () => {
+    const recentIntroductions = Array.from({ length: 5 }, (_, index) =>
+      word(`recent_intro_${index + 1}`, { lastExposedAt: hoursAgo(0.5), lastPracticedAt: hoursAgo(0.5) })
+    );
+    const selection = selectRoundWords([...recentIntroductions, ...retrievalWords(12)], NOW, 12, EMPTY_REMEDIATION);
+
+    expect(selection.wordIds.some((id) => id.includes("recent_intro"))).toBe(false);
   });
 });
 
-function coreWords(count: number): PracticeWord[] {
+function retrievalWords(count: number): PracticeWord[] {
   return Array.from({ length: count }, (_, index) =>
-    word(`core_${index + 1}`, { masteryColour: "red", attemptCount: 0 })
+    word(`retrieval_${index + 1}`, {
+      masteryColour: "yellow",
+      attemptCount: 3,
+      correctCount: 2,
+      wrongCount: 1,
+      stabilityDays: 2,
+      lastCleanRetrievalAt: daysAgo(1),
+      lastPracticedAt: daysAgo(1),
+      lastExposedAt: daysAgo(1)
+    })
   );
 }
 
@@ -141,10 +132,10 @@ function state(wordId: string, overrides: Partial<LearnerWordState>): LearnerWor
     id: `state_${wordId}`,
     learnerId: "learner_1",
     wordId,
-    meaningMastery: 0.9,
-    usageMastery: 0.9,
-    spellingMastery: 0.9,
-    stabilityDays: 8,
+    meaningMastery: 0.6,
+    usageMastery: 0.6,
+    spellingMastery: 0.6,
+    stabilityDays: 2,
     masteryColour: "red",
     lastSeenAt: null,
     lastCorrectAt: null,
@@ -160,6 +151,15 @@ function state(wordId: string, overrides: Partial<LearnerWordState>): LearnerWor
     confusedWithWordIds: [],
     nearReview: false,
     eligibleQuestionsSinceLastMistake: 0,
+    recoveryDebt: 0,
+    lastPracticedAt: null,
+    lastCleanRetrievalAt: null,
+    lastSupportedSuccessAt: null,
+    lastRevealedAt: null,
+    lastExposedAt: null,
+    lastPracticedSessionId: null,
+    lastPracticedInteractionIndex: null,
+    learnerStateContentVersion: 1,
     ...overrides
   };
 }

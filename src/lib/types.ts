@@ -50,6 +50,15 @@ export interface LearnerWordState {
   confusedWithWordIds: string[];
   nearReview: boolean;
   eligibleQuestionsSinceLastMistake: number;
+  recoveryDebt: number;
+  lastPracticedAt: string | null;
+  lastCleanRetrievalAt: string | null;
+  lastSupportedSuccessAt: string | null;
+  lastRevealedAt: string | null;
+  lastExposedAt: string | null;
+  lastPracticedSessionId: string | null;
+  lastPracticedInteractionIndex: number | null;
+  learnerStateContentVersion: number;
 }
 
 export interface PracticeWord {
@@ -90,6 +99,13 @@ export interface SessionPlanItem {
 }
 
 export type RoundSelectionReasonCode =
+  | "mistake_recovery"
+  | "new_word"
+  | "needs_relearning"
+  | "scheduled_review"
+  | "stable_check"
+  | "almost_secure"
+  | "useful_practice"
   | "near_review"
   | "revealed_recently"
   | "recovered_after_miss"

@@ -286,7 +286,7 @@ function ReasonWord({
     history.attemptCount > 0
       ? `Seen ${history.attemptCount} time${history.attemptCount === 1 ? "" : "s"} · ✓ ${history.correctCount} · ✗ ${history.wrongCount}`
       : "Not started yet — first time on the page.";
-  const tone = reason.reason === "near_review" ? "red" : colour ?? "untracked";
+  const tone = reason.reason === "near_review" || reason.reason === "mistake_recovery" ? "red" : colour ?? "untracked";
   return (
     <span
       className={`reason-word reason-word--${tone}`}

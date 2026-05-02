@@ -22,7 +22,7 @@ describe("mastery scoring", () => {
       meaningMastery: 0.95,
       usageMastery: 0.95,
       spellingMastery: 0.0,
-      stabilityDays: 8,
+      stabilityDays: 20,
       correctCount: 5,
       attemptCount: 5,
       wrongCount: 0,
@@ -79,7 +79,7 @@ describe("mastery scoring", () => {
       correctCount: 5,
       wrongCount: 0,
       averageHintLevelUsed: 0,
-      stabilityDays: 8,
+      stabilityDays: 20,
       lastSeenAt: "2026-04-30T20:00:00.000Z"
     });
     expect(masteryColourForState(survived)).toBe("green");
@@ -383,6 +383,15 @@ function makeState(overrides: Partial<LearnerWordState> = {}): LearnerWordState 
     confusedWithWordIds: [],
     nearReview: false,
     eligibleQuestionsSinceLastMistake: 0,
+    recoveryDebt: 0,
+    lastPracticedAt: null,
+    lastCleanRetrievalAt: null,
+    lastSupportedSuccessAt: null,
+    lastRevealedAt: null,
+    lastExposedAt: null,
+    lastPracticedSessionId: null,
+    lastPracticedInteractionIndex: null,
+    learnerStateContentVersion: 1,
     ...overrides
   };
 }

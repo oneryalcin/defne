@@ -70,6 +70,15 @@ interface StateRow {
   confused_with_word_ids_json: string;
   near_review: number;
   eligible_questions_since_last_mistake: number;
+  recovery_debt: number;
+  last_practiced_at: string | null;
+  last_clean_retrieval_at: string | null;
+  last_supported_success_at: string | null;
+  last_revealed_at: string | null;
+  last_exposed_at: string | null;
+  last_practiced_session_id: string | null;
+  last_practiced_interaction_index: number | null;
+  learner_state_content_version: number;
 }
 
 interface SessionRow {
@@ -640,9 +649,20 @@ export function submitSessionAnswer(input: {
     now
   );
 
-  saveLearnerWordState(db, updateStateAfterAttempt(word.state, outcome));
-
   const actualCount = attemptIndex + 1;
+  saveLearnerWordState(
+    db,
+    applyPracticeEventToSelectionState(updateStateAfterAttempt(word.state, outcome), word.state, {
+      answeredAt: now,
+      isCorrect: assessment.isCorrect,
+      hintLevelUsed: input.hintLevelUsed,
+      revealAndMoveOn: false,
+      firstAttemptCorrect: assessment.isCorrect,
+      sessionId: session.id,
+      interactionIndex: actualCount
+    })
+  );
+
   const completed = actualCount >= plan.length;
   if (completed) {
     completeSession(db, session.id);
@@ -674,6 +694,15 @@ export function recordRoundCardView(sessionId: string, wordId: string): void {
      SET card_view_counts_json = ?, updated_at = ?
      WHERE id = ?`
   ).run(JSON.stringify(counts), now, round.id);
+
+  const state = getStateForWord(db, wordId);
+  saveLearnerWordState(db, {
+    ...state,
+    lastExposedAt: now,
+    lastPracticedAt: now,
+    lastPracticedSessionId: sessionId,
+    lastPracticedInteractionIndex: Object.values(counts).reduce((sum, count) => sum + count, 0)
+  });
 }
 
 export function startRoundMeaningRecognition(sessionId: string): void {
@@ -960,7 +989,16 @@ export function getParentWords(): ParentWordListItem[] {
           ? (JSON.parse(row.confused_with_word_ids_json) as string[])
           : [],
         nearReview: row.near_review === 1,
-        eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0
+        eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0,
+        recoveryDebt: 0,
+        lastPracticedAt: row.last_seen_at,
+        lastCleanRetrievalAt: row.last_correct_at,
+        lastSupportedSuccessAt: null,
+        lastRevealedAt: null,
+        lastExposedAt: row.last_seen_at,
+        lastPracticedSessionId: null,
+        lastPracticedInteractionIndex: null,
+        learnerStateContentVersion: 1
       };
       const breakdown = scoreFromState(state, attemptsByWordId.get(row.id) ?? null);
       masteryColour = breakdown.colour ?? "red";
@@ -1323,6 +1361,9 @@ export function createOrUpdateParentWord(input: WordFormInput): string {
   const normalized = normalizeWord(input.word);
   if (!normalized) throw new Error("Word is required.");
   const wordId = deterministicWordId(normalized);
+  const existingWord = db
+    .prepare("SELECT id FROM words WHERE normalized_word = ?")
+    .get(normalized) as { id: string } | undefined;
 
   db.prepare(
     `INSERT INTO words (id, word, normalized_word, difficulty_level, source, status, created_at, updated_at)
@@ -1331,12 +1372,52 @@ export function createOrUpdateParentWord(input: WordFormInput): string {
        word = excluded.word,
        difficulty_level = excluded.difficulty_level,
        status = 'active',
+       content_version = words.content_version + 1,
        updated_at = excluded.updated_at`
   ).run(wordId, input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, now);
 
   replaceOptionalWordRows(db, wordId, input, now);
   ensureLearnerStateForWord(db, wordId, now);
+  if (existingWord) {
+    resetLearnerStateAfterContentEdit(db, existingWord.id, now);
+  }
   return wordId;
+}
+
+function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now: string): void {
+  db.prepare(
+    `UPDATE learner_word_state
+     SET meaning_mastery = 0,
+         usage_mastery = 0,
+         spelling_mastery = 0,
+         stability_days = 1,
+         mastery_colour = 'red',
+         last_seen_at = NULL,
+         last_correct_at = NULL,
+         last_wrong_at = NULL,
+         next_review_at = NULL,
+         attempt_count = 0,
+         correct_count = 0,
+         wrong_count = 0,
+         last_hint_level_used = NULL,
+         average_hint_level_used = 0,
+         average_response_time_ms = 0,
+         failure_types_json = '[]',
+         confused_with_word_ids_json = '[]',
+         near_review = 0,
+         eligible_questions_since_last_mistake = 0,
+         recovery_debt = 0,
+         last_practiced_at = NULL,
+         last_clean_retrieval_at = NULL,
+         last_supported_success_at = NULL,
+         last_revealed_at = NULL,
+         last_exposed_at = NULL,
+         last_practiced_session_id = NULL,
+         last_practiced_interaction_index = NULL,
+         learner_state_content_version = (SELECT content_version FROM words WHERE id = ?),
+         updated_at = ?
+     WHERE learner_id = ? AND word_id = ?`
+  ).run(wordId, now, defaultLearnerId(), wordId);
 }
 
 export function importWordShells(text: string): number {
@@ -1562,7 +1643,18 @@ function submitRoundAnswer(
     now
   );
 
-  saveLearnerWordState(db, updateStateAfterAttempt(word.state, outcome));
+  saveLearnerWordState(
+    db,
+    applyPracticeEventToSelectionState(updateStateAfterAttempt(word.state, outcome), word.state, {
+      answeredAt: now,
+      isCorrect: assessment.isCorrect,
+      hintLevelUsed: input.hintLevelUsed,
+      revealAndMoveOn,
+      firstAttemptCorrect,
+      sessionId: session.id,
+      interactionIndex: getSessionAttemptCount(db, session.id)
+    })
+  );
   db.prepare("UPDATE practice_sessions SET actual_question_count = actual_question_count + 1, updated_at = ? WHERE id = ?").run(
     now,
     session.id
@@ -1955,6 +2047,107 @@ function getSessionRow(db: DatabaseSync, sessionId: string): SessionRow {
   return session;
 }
 
+function applyPracticeEventToSelectionState(
+  next: LearnerWordState,
+  previous: LearnerWordState,
+  event: {
+    answeredAt: string;
+    isCorrect: boolean;
+    hintLevelUsed: number;
+    revealAndMoveOn: boolean;
+    firstAttemptCorrect: boolean;
+    sessionId: string;
+    interactionIndex: number;
+  }
+): LearnerWordState {
+  const state: LearnerWordState = {
+    ...next,
+    lastPracticedAt: event.answeredAt,
+    lastExposedAt: event.answeredAt,
+    lastPracticedSessionId: event.sessionId,
+    lastPracticedInteractionIndex: event.interactionIndex,
+    recoveryDebt: Math.max(0, previous.recoveryDebt)
+  };
+
+  if (event.revealAndMoveOn) {
+    state.recoveryDebt = Math.max(state.recoveryDebt, 3);
+    state.lastRevealedAt = event.answeredAt;
+    return state;
+  }
+
+  if (!event.isCorrect) {
+    state.recoveryDebt = Math.max(state.recoveryDebt, 2);
+    return state;
+  }
+
+  const clean = event.firstAttemptCorrect && event.hintLevelUsed === 0;
+  if (clean) {
+    state.lastCleanRetrievalAt = event.answeredAt;
+    if (isEligibleRecoveryProof(previous, event)) {
+      state.recoveryDebt = Math.max(0, state.recoveryDebt - 1);
+    }
+    return state;
+  }
+
+  state.lastSupportedSuccessAt = event.answeredAt;
+  if (event.hintLevelUsed > 0 || !event.firstAttemptCorrect) {
+    state.recoveryDebt = Math.max(state.recoveryDebt, 2);
+  }
+  return state;
+}
+
+function isEligibleRecoveryProof(
+  previous: LearnerWordState,
+  event: { answeredAt: string; sessionId: string; interactionIndex: number }
+): boolean {
+  if (previous.recoveryDebt <= 0) return false;
+  const lastFailure = latestIso(previous.lastWrongAt, previous.lastRevealedAt);
+  if (!lastFailure) return false;
+  const laterSession = Boolean(previous.lastPracticedSessionId && previous.lastPracticedSessionId !== event.sessionId);
+  const laterCalendarDay = datePart(lastFailure) !== datePart(event.answeredAt);
+  if (previous.recoveryDebt >= 3) {
+    if (hoursBetween(lastFailure, event.answeredAt) >= 0.25) return true;
+    if (laterSession || laterCalendarDay) return true;
+    return hasEnoughInterveningInteractions(previous, event);
+  }
+  if (previous.recoveryDebt === 2) {
+    return laterSession || laterCalendarDay;
+  }
+  if (previous.recoveryDebt === 1) {
+    return daysBetween(lastFailure, event.answeredAt) >= 2;
+  }
+  return false;
+}
+
+function datePart(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function daysBetween(fromIso: string, toIso: string): number {
+  return Math.max(0, (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 86_400_000);
+}
+
+function hasEnoughInterveningInteractions(
+  previous: LearnerWordState,
+  event: { interactionIndex: number }
+): boolean {
+  const previousIndex = previous.lastPracticedInteractionIndex;
+  return previousIndex !== null && event.interactionIndex - previousIndex >= 7;
+}
+
+function latestIso(...values: Array<string | null | undefined>): string | null {
+  let latest: string | null = null;
+  for (const value of values) {
+    if (!value) continue;
+    if (!latest || new Date(value).getTime() > new Date(latest).getTime()) latest = value;
+  }
+  return latest;
+}
+
+function hoursBetween(fromIso: string, toIso: string): number {
+  return Math.max(0, (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 3_600_000);
+}
+
 function readSessionPlan(session: SessionRow): SessionPlanItem[] {
   const summary = JSON.parse(session.summary_json) as SessionSummary;
   return summary.plan ?? [];
@@ -1995,6 +2188,15 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
        confused_with_word_ids_json = ?,
        near_review = ?,
        eligible_questions_since_last_mistake = ?,
+       recovery_debt = ?,
+       last_practiced_at = ?,
+       last_clean_retrieval_at = ?,
+       last_supported_success_at = ?,
+       last_revealed_at = ?,
+       last_exposed_at = ?,
+       last_practiced_session_id = ?,
+       last_practiced_interaction_index = ?,
+       learner_state_content_version = ?,
        updated_at = ?
      WHERE id = ?`
   ).run(
@@ -2017,6 +2219,15 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
     JSON.stringify(state.confusedWithWordIds),
     state.nearReview ? 1 : 0,
     state.eligibleQuestionsSinceLastMistake,
+    state.recoveryDebt,
+    state.lastPracticedAt,
+    state.lastCleanRetrievalAt,
+    state.lastSupportedSuccessAt,
+    state.lastRevealedAt,
+    state.lastExposedAt,
+    state.lastPracticedSessionId,
+    state.lastPracticedInteractionIndex,
+    state.learnerStateContentVersion,
     new Date().toISOString(),
     state.id
   );
@@ -2053,7 +2264,16 @@ function mapState(row: StateRow): LearnerWordState {
     failureTypes: JSON.parse(row.failure_types_json) as FailureType[],
     confusedWithWordIds: JSON.parse(row.confused_with_word_ids_json) as string[],
     nearReview: row.near_review === 1,
-    eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake
+    eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake,
+    recoveryDebt: row.recovery_debt,
+    lastPracticedAt: row.last_practiced_at,
+    lastCleanRetrievalAt: row.last_clean_retrieval_at,
+    lastSupportedSuccessAt: row.last_supported_success_at,
+    lastRevealedAt: row.last_revealed_at,
+    lastExposedAt: row.last_exposed_at,
+    lastPracticedSessionId: row.last_practiced_session_id,
+    lastPracticedInteractionIndex: row.last_practiced_interaction_index,
+    learnerStateContentVersion: row.learner_state_content_version
   };
 }
 

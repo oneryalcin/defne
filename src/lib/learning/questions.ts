@@ -66,19 +66,22 @@ export function generateQuestion(
         target.antonyms[0] ?? `not ${target.word}`,
         [...antonymDistractors, ...target.synonyms]
       );
-    case "sentence_usage_choice":
+    case "sentence_usage_choice": {
+      const usageTarget = withContextExample(target, questionType);
       return choiceQuestion(
-        target,
+        usageTarget,
         questionType,
-        `Which sentence uses "${target.word}" correctly?`,
-        "Look for the sentence where the word fits the meaning.",
-        target.example,
-        distractors.map((word) => replaceWordInSentence(word.example, word.word, target.word))
+        `Which context uses "${target.word}" correctly?`,
+        "Look for the context where the word fits the meaning.",
+        usageTarget.example,
+        distractors.map((word) => replaceWordInSentence(selectedExample(word, questionType), word.word, target.word))
       );
+    }
     case "fill_sentence": {
-      const sentence = sentenceWithBlank(target);
+      const usageTarget = withContextExample(target, questionType);
+      const sentence = sentenceWithBlank(usageTarget);
       return choiceQuestion(
-        target,
+        usageTarget,
         questionType,
         sentence,
         "Choose the word that completes the sentence.",
@@ -117,6 +120,7 @@ export function generateQuestion(
       };
     }
     case "type_from_memory":
+      const memoryTarget = withContextExample(target, questionType);
       return {
         wordId: target.id,
         questionType,
@@ -126,7 +130,7 @@ export function generateQuestion(
         choices: [],
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target, target.word),
+        hints: deterministicHints(memoryTarget, target.word),
         targetWord: target.word
       };
   }
@@ -237,6 +241,21 @@ function spellingChoices(target: PracticeWord): string[] {
   if (word.length > 4) variants.add(`${word.slice(0, 2)}${word.slice(3)}`);
   variants.add(`${word}${word.slice(-1)}`);
   return shuffleChoices(word, [...variants], target.id);
+}
+
+function withContextExample(target: PracticeWord, questionType: QuestionType): PracticeWord {
+  return {
+    ...target,
+    example: selectedExample(target, questionType)
+  };
+}
+
+function selectedExample(target: PracticeWord, questionType: QuestionType): string {
+  const examples = target.examples.length > 0 ? target.examples : [target.example];
+  const cleanExamples = examples.map((example) => example.trim()).filter(Boolean);
+  if (cleanExamples.length === 0) return target.example;
+  const index = (target.state.attemptCount + stableHash(`${target.id}:${questionType}`)) % cleanExamples.length;
+  return cleanExamples[index];
 }
 
 function sentenceWithBlank(target: PracticeWord): string {

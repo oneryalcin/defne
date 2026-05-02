@@ -105,16 +105,23 @@ export async function submitAnswerAction(formData: FormData): Promise<void> {
     responseTimeMs: Number.isFinite(responseTimeMs) ? responseTimeMs : 0
   });
 
-  if (result.completed && result.isCorrect !== false) {
-    redirect(`/child/session/${sessionId}/summary`);
+  if (result.isCorrect && result.questionType === "fill_sentence" && result.attemptId) {
+    redirect(`/child/session/${sessionId}?attemptId=${result.attemptId}`);
   }
 
   if (result.isCorrect) {
+    if (result.completed) {
+      redirect(`/child/session/${sessionId}/summary`);
+    }
     const repairMarker =
       result.roundStep && result.passNumber && result.passNumber > 1
         ? `?repair=${encodeURIComponent(`${result.roundStep}-${result.passNumber}`)}`
         : "";
     redirect(`/child/session/${sessionId}${repairMarker}`);
+  }
+
+  if (result.completed && result.isCorrect !== false) {
+    redirect(`/child/session/${sessionId}/summary`);
   }
 
   redirect(

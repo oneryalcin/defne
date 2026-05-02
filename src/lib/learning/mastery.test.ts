@@ -351,6 +351,7 @@ function makeWord(word: string, overrides: Partial<LearnerWordState> = {}): Prac
     difficultyLevel: 2,
     definition: `${word} definition`,
     example: `A sentence with ${word}.`,
+    examples: [`A sentence with ${word}.`],
     synonyms: [`${word} synonym`],
     antonyms: [`not ${word}`],
     confusables: [],

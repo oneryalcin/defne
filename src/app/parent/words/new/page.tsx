@@ -31,7 +31,7 @@ export default function NewWordPage() {
           </label>
           <label className="wide">
             Example sentence
-            <input className="field" required name="example" placeholder="Maya was reluctant to enter the dark room." />
+            <input className="field" required name="example" placeholder="Aylin was reluctant to enter the dark room." />
           </label>
           <label>
             Synonym

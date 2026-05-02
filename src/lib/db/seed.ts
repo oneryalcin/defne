@@ -8,7 +8,8 @@ interface SeedEntry {
   word: string;
   difficulty: number;
   definition: string;
-  example: string;
+  example?: string;
+  examples?: string[];
   synonyms?: string[];
   antonyms?: string[];
   spellingNote?: string;
@@ -72,11 +73,14 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
   ).run(`definition_${wordId}`, wordId, entry.definition.trim(), now, now);
 
   replaceRows(db, "word_examples", wordId);
-  db.prepare(
-    `INSERT INTO word_examples
-      (id, word_id, sentence, source, status, created_at, updated_at)
-     VALUES (?, ?, ?, 'canonical', 'approved', ?, ?)`
-  ).run(`example_${wordId}`, wordId, entry.example.trim(), now, now);
+  const examples = uniqueTexts([...(entry.examples ?? []), entry.example ?? ""]);
+  for (const [index, example] of examples.entries()) {
+    db.prepare(
+      `INSERT INTO word_examples
+        (id, word_id, sentence, source, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'canonical', 'approved', ?, ?)`
+    ).run(`example_${wordId}_${index}`, wordId, example, now, now);
+  }
 
   replaceRows(db, "word_synonyms", wordId);
   for (const [index, synonym] of (entry.synonyms ?? []).entries()) {
@@ -119,6 +123,20 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
 
 function replaceRows(db: DatabaseSync, table: string, wordId: string): void {
   db.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
+}
+
+function uniqueTexts(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const clean = value.trim();
+    if (!clean) continue;
+    const key = clean.toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
+  }
+  return result;
 }
 
 function readSeedPack(): SeedPack {

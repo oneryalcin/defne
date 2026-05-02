@@ -19,7 +19,7 @@ export default async function SessionPage({
 
   if (attemptId) {
     const review = getAttemptReview(sessionId, attemptId);
-    if (review.isCorrect) {
+    if (review.isCorrect && review.questionType !== "fill_sentence") {
       redirect(reviewNextHref(review));
     }
     const isRoundReview = Boolean(review.roundStep);
@@ -265,9 +265,25 @@ function CardSupport({ card }: { card: RoundLearnCardView }) {
       ) : null}
       <div className="card-support-example">
         <span className="metric-label">Example</span>
-        <blockquote>{card.example}</blockquote>
+        <blockquote className="context-example">
+          {highlightWordInText(card.example, card.word)}
+        </blockquote>
       </div>
     </div>
+  );
+}
+
+function highlightWordInText(text: string, word: string) {
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(\\b${escaped}\\b)`, "gi"));
+  return parts.map((part, index) =>
+    part.toLocaleLowerCase("en-GB") === word.toLocaleLowerCase("en-GB") ? (
+      <mark className="context-example__word" key={`${part}-${index}`}>
+        {part}
+      </mark>
+    ) : (
+      part
+    )
   );
 }
 
@@ -394,6 +410,10 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
         <WordMeaningNote review={review} />
       ) : null}
 
+      {!review.isCorrect && shouldShowRecoveryContext(review) ? (
+        <RecoveryContext review={review} />
+      ) : null}
+
       {review.revealAndMoveOn ? (
         <div className="result-callout result-recovery">
           <strong>Answer revealed so the round can keep moving.</strong>
@@ -413,6 +433,21 @@ function ReviewPanel({ review }: { review: AttemptReview }) {
 
 function shouldShowMeaningNote(review: AttemptReview): boolean {
   return Boolean(review.targetDefinition) && review.questionType !== "definition_choice";
+}
+
+function shouldShowRecoveryContext(review: AttemptReview): boolean {
+  return Boolean(review.targetExample) && review.questionType !== "fill_sentence";
+}
+
+function RecoveryContext({ review }: { review: AttemptReview }) {
+  return (
+    <section className="recovery-context" aria-label="Example context">
+      <span>Example</span>
+      <blockquote>
+        {highlightWordInText(review.targetExample ?? "", review.targetWord)}
+      </blockquote>
+    </section>
+  );
 }
 
 function WordMeaningNote({ review }: { review: AttemptReview }) {

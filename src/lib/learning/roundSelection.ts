@@ -1,11 +1,21 @@
-import type { PracticeWord, RoundSelectionReason } from "../types";
-import { priorityScore, selectSessionPlan } from "./mastery";
-import { DEFAULT_NEAR_REVIEW_SPACING } from "./rounds";
+import type { PracticeWord, RoundSelectionReason, RoundSelectionReasonCode } from "../types";
+import { scoreFromState } from "./scoring";
 
-const CORE_ROUND_WORD_COUNT = 9;
-const COMEBACK_SLOT_COUNT = 3;
-const MASTERED_COMEBACK_DAYS = 5;
-const STABLE_COMEBACK_HOURS = 24;
+const RECOVERY_ACTIVE_WINDOW_DAYS = 14;
+const R_FLOOR = 0.55;
+const SUPPORTED_SUCCESS_INITIAL = 0.65;
+const WRONG_OR_REVEAL_INITIAL = 0.45;
+const FALLBACK_STABILITY_DAYS = 1.5;
+const WRONG_RECALL_CAP = 0.65;
+const REVEAL_RECALL_CAP = 0.5;
+const ORDINARY_TAU_HOURS = 6;
+const RECOVERY_TAU_HOURS = 0.75;
+const INTRODUCTION_TAU_HOURS = 2;
+const ORDINARY_RECENT_GATE_HOURS = 2;
+const INTRODUCTION_RECENT_GATE_HOURS = 2;
+const RECOVERY_MIN_HOURS = 0.25;
+const RECOVERY_MIN_INTERVENING_INTERACTIONS = 7;
+const STABLE_COLOURS = new Set(["light_green", "green"]);
 
 export interface RoundRemediationEvidence {
   revealAndMoveOnWordIds: string[];
@@ -17,185 +27,369 @@ export interface RoundWordSelection {
   reasons: RoundSelectionReason[];
 }
 
-type ReasonTemplate = Omit<RoundSelectionReason, "wordId" | "word">;
+interface SelectionCaps {
+  stableCap: number;
+  greenCap: number;
+  recoveryCap: number;
+  introductionCap: number;
+  veryHardCap: number;
+}
 
-const reasonTemplates = {
-  nearReview: {
-    reason: "near_review",
-    label: "Needs a clean comeback",
-    detail: "A recent mistake keeps this word in practice until it gets enough clean questions."
-  },
-  revealedRecently: {
-    reason: "revealed_recently",
-    label: "Answer was revealed recently",
-    detail: "The retry cap was reached, so the word comes back soon without blocking the round."
-  },
-  recoveredAfterMiss: {
-    reason: "recovered_after_miss",
-    label: "Recovered after a miss",
-    detail: "The word was completed, but not on the first attempt, so it needs another proof point."
-  },
-  newOrRed: {
-    reason: "new_or_red",
-    label: "New or still building",
-    detail: "This word has little secure evidence yet."
-  },
-  dueReview: {
-    reason: "due_review",
-    label: "Scheduled review",
-    detail: "Enough time has passed that recall should be checked again."
-  },
-  nearGreen: {
-    reason: "near_green",
-    label: "Almost secure",
-    detail: "This word is close to strong mastery and needs one more clean proof."
-  },
-  masteredComeback: {
-    reason: "mastered_comeback",
-    label: "Mastered check",
-    detail: "This mastered word has had enough space and gets a quick comeback check."
-  },
-  stableComeback: {
-    reason: "stable_comeback",
-    label: "Stable check",
-    detail: "This stable word has had at least a day of spacing and gets a quick comeback check."
-  },
-  priority: {
-    reason: "priority",
-    label: "Good next practice",
-    detail: "The scheduler picked this from weakness, spacing, and recent evidence."
-  }
-} as const satisfies Record<string, ReasonTemplate>;
+interface SelectionFeatures {
+  untouched: boolean;
+  introducedOnly: boolean;
+  hasRetrievalEvidence: boolean;
+  activeRecovery: boolean;
+  recovery: number;
+  due: number;
+  opportunity: number;
+  weakness: number;
+  novelty: number;
+  proof: number;
+  cooldown: number;
+  veryLowRecall: boolean;
+  stableOrMastered: boolean;
+  greenMastered: boolean;
+  tooRecentOrdinary: boolean;
+  tooRecentIntroduction: boolean;
+  tooRecentRecovery: boolean;
+  recall: number | null;
+  targetRecall: number | null;
+  utility: number;
+}
+
+type SelectionPass =
+  | "strict_caps"
+  | "relax_stable"
+  | "relax_green_if_needed"
+  | "relax_new"
+  | "relax_recovery"
+  | "relax_very_hard"
+  | "emergency_too_recent";
+
+interface Candidate {
+  word: PracticeWord;
+  features: SelectionFeatures;
+  reason: RoundSelectionReason;
+  jitter: number;
+}
 
 export function selectRoundWords(
   words: PracticeWord[],
   nowIso: string,
   targetCount: number,
-  remediation: RoundRemediationEvidence
+  _remediation: RoundRemediationEvidence
 ): RoundWordSelection {
   const count = Math.max(6, Math.min(12, Math.round(targetCount)));
-  const comebackSlots = Math.min(COMEBACK_SLOT_COUNT, Math.max(0, count - CORE_ROUND_WORD_COUNT));
-  const coreCount = count - comebackSlots;
-  const wordMap = new Map(words.map((word) => [word.id, word]));
-  // Random tie-break is fine here — once the round is committed the
-  // canonical word list lives in practice_rounds.word_ids_json and
-  // getMissionPreview will reuse it instead of reselecting.
-  const ranked = [...words].sort((a, b) => {
-    const diff = priorityScore(b, nowIso) - priorityScore(a, nowIso);
-    if (diff !== 0) return diff;
-    return Math.random() - 0.5;
-  });
-  const coreRanked = ranked.filter((word) => !isProtectedComebackWord(word, nowIso));
-  const picked = new Map<string, RoundSelectionReason>();
+  const caps = scaledCaps(count);
+  const candidates = words
+    .map((word) => {
+      const features = computeFeatures(word, nowIso);
+      return {
+        word,
+        features,
+        reason: reasonForWord(word, features),
+        jitter: deterministicJitter(`${word.id}:${nowIso.slice(0, 10)}`)
+      };
+    })
+    .sort(compareCandidates);
 
-  pickWords(picked, ranked.filter((word) => isActiveNearReview(word)), coreCount, reasonTemplates.nearReview);
-  pickWordIds(picked, wordMap, remediation.revealAndMoveOnWordIds, coreCount, reasonTemplates.revealedRecently);
-  pickWordIds(
-    picked,
-    wordMap,
-    remediation.eventuallyCorrectNotFirstAttemptWordIds,
-    coreCount,
-    reasonTemplates.recoveredAfterMiss
-  );
-  pickWords(picked, coreRanked.filter((word) => word.state.attemptCount === 0 || word.state.masteryColour === "red"), coreCount, reasonTemplates.newOrRed);
-  pickWords(picked, coreRanked.filter((word) => isDueForReview(word, nowIso)), coreCount, reasonTemplates.dueReview);
-  pickWords(picked, coreRanked.filter((word) => isNearGreenProofWord(word)), coreCount, reasonTemplates.nearGreen);
-  pickWords(
-    picked,
-    selectSessionPlan(words, nowIso, coreCount)
-      .map((item) => wordMap.get(item.wordId))
-      .filter((word): word is PracticeWord => Boolean(word))
-      .filter((word) => !isProtectedComebackWord(word, nowIso)),
-    coreCount,
-    reasonTemplates.priority
-  );
-  pickWords(picked, coreRanked, coreCount, reasonTemplates.priority);
+  const selected = new Map<string, Candidate>();
+  const passes: SelectionPass[] = [
+    "strict_caps",
+    "relax_stable",
+    "relax_green_if_needed",
+    "relax_new",
+    // Current child mission is retrieval-first; relax recovery before adding
+    // extra very-low-recall items that need scaffolded relearning.
+    "relax_recovery",
+    "relax_very_hard",
+    "emergency_too_recent"
+  ];
 
-  const dueMastered = ranked.filter((word) => isMasteredComebackDue(word, nowIso));
-  const dueStable = ranked.filter((word) => isStableComebackDue(word, nowIso));
-  const sizeBeforeComebacks = picked.size;
-
-  if (comebackSlots > 0) {
-    pickWords(picked, dueMastered, sizeBeforeComebacks + 1, reasonTemplates.masteredComeback);
-    pickWords(picked, dueStable, sizeBeforeComebacks + comebackSlots, reasonTemplates.stableComeback);
+  for (const pass of passes) {
+    for (const candidate of candidates) {
+      if (selected.size >= count) break;
+      if (selected.has(candidate.word.id)) continue;
+      if (!allowedUnderPass(candidate, [...selected.values()], caps, pass)) continue;
+      selected.set(candidate.word.id, candidate);
+    }
+    if (selected.size >= count) break;
   }
 
-  pickWords(picked, coreRanked, count, reasonTemplates.priority);
-  pickWords(picked, ranked, count, reasonTemplates.priority);
-
+  const picked = [...selected.values()];
   return {
-    wordIds: [...picked.keys()],
-    reasons: [...picked.values()]
+    wordIds: picked.map((candidate) => candidate.word.id),
+    reasons: picked.map((candidate) => candidate.reason)
   };
 }
 
-function pickWordIds(
-  picked: Map<string, RoundSelectionReason>,
-  wordMap: Map<string, PracticeWord>,
-  wordIds: string[],
-  count: number,
-  reason: ReasonTemplate
-): void {
-  for (const wordId of wordIds) {
-    if (picked.size >= count) return;
-    const word = wordMap.get(wordId);
-    if (word) pickWord(picked, word, reason);
+function scaledCaps(count: number): SelectionCaps {
+  return {
+    stableCap: Math.min(3, Math.ceil(0.25 * count)),
+    greenCap: Math.min(1, Math.ceil(0.1 * count)),
+    recoveryCap: Math.min(4, Math.ceil(0.35 * count)),
+    introductionCap: Math.min(3, Math.ceil(0.25 * count)),
+    veryHardCap: Math.min(2, Math.ceil(0.2 * count))
+  };
+}
+
+function compareCandidates(a: Candidate, b: Candidate): number {
+  const diff = b.features.utility - a.features.utility;
+  if (diff !== 0) return diff;
+  return b.jitter - a.jitter;
+}
+
+function allowedUnderPass(
+  candidate: Candidate,
+  selected: Candidate[],
+  caps: SelectionCaps,
+  pass: SelectionPass
+): boolean {
+  if (candidate.features.tooRecentRecovery && pass !== "emergency_too_recent") return false;
+  if (candidate.features.tooRecentOrdinary && pass !== "emergency_too_recent") return false;
+  if (candidate.features.tooRecentIntroduction && pass !== "emergency_too_recent") return false;
+
+  const next = [...selected, candidate];
+  const stable = next.filter((item) => item.features.stableOrMastered).length;
+  const green = next.filter((item) => item.features.greenMastered).length;
+  const recovery = next.filter((item) => item.features.activeRecovery).length;
+  const introduction = next.filter((item) => item.features.untouched || item.features.introducedOnly).length;
+  const veryHard = next.filter((item) => item.features.veryLowRecall).length;
+
+  if (stable > caps.stableCap && pass === "strict_caps") return false;
+  if (green > caps.greenCap && pass !== "relax_green_if_needed" && pass !== "emergency_too_recent") return false;
+  if (introduction > caps.introductionCap && pass !== "relax_new" && pass !== "relax_recovery" && pass !== "relax_very_hard" && pass !== "emergency_too_recent") return false;
+  if (recovery > caps.recoveryCap && pass !== "relax_recovery" && pass !== "relax_very_hard" && pass !== "emergency_too_recent") return false;
+  if (veryHard > caps.veryHardCap && pass !== "relax_very_hard" && pass !== "emergency_too_recent") return false;
+
+  return true;
+}
+
+export function computeFeatures(word: PracticeWord, nowIso: string): SelectionFeatures {
+  const state = word.state;
+  const untouched = !state.lastExposedAt && state.attemptCount === 0;
+  const introducedOnly = Boolean(state.lastExposedAt) && state.attemptCount === 0;
+  const hasRetrievalEvidence =
+    state.attemptCount > 0 ||
+    Boolean(state.lastCleanRetrievalAt || state.lastSupportedSuccessAt || state.lastWrongAt || state.lastRevealedAt);
+  const lastFailureAt = latestIso(state.lastWrongAt, state.lastRevealedAt);
+  const rawRecoveryDebt = Math.max(0, state.recoveryDebt);
+  const activeRecovery =
+    rawRecoveryDebt > 0 && daysSince(lastFailureAt, nowIso) <= RECOVERY_ACTIVE_WINDOW_DAYS;
+  const recovery = activeRecovery ? Math.min(rawRecoveryDebt, 3) / 3 : 0;
+  const stableOrMastered = STABLE_COLOURS.has(state.masteryColour);
+  const greenMastered = state.masteryColour === "green";
+
+  let recall: number | null = null;
+  let targetRecall: number | null = null;
+  let due = 0;
+  let opportunity = 0;
+  let novelty = 0;
+  let weakness = 0;
+  let veryLowRecall = false;
+
+  if (untouched || introducedOnly || !hasRetrievalEvidence) {
+    novelty = 0.6 + 0.4 * Math.min(1, daysSince(state.lastExposedAt, nowIso) / 7);
+  } else {
+    targetRecall = targetRecallForWord(word);
+    recall = predictedRecall(word, nowIso);
+    if (recall < R_FLOOR) veryLowRecall = true;
+    due = boundedDuePressure(recall, targetRecall);
+    opportunity = veryLowRecall ? 0 : opportunityAtTarget(recall, targetRecall);
+    weakness = 1 - scoreFromState(state, null, nowIso).lowerBound;
   }
+
+  const proof = proofPointPressure(word, nowIso, recovery);
+  const cooldown = cooldownMultiplier(word, nowIso, { untouched, introducedOnly, activeRecovery });
+  const tooRecentRecovery = activeRecovery && hoursSince(latestIso(lastFailureAt, state.lastExposedAt, state.lastPracticedAt), nowIso) < RECOVERY_MIN_HOURS;
+  const tooRecentIntroduction =
+    introducedOnly && hoursSince(state.lastExposedAt, nowIso) < INTRODUCTION_RECENT_GATE_HOURS;
+  const tooRecentOrdinary =
+    !introducedOnly &&
+    !activeRecovery &&
+    !untouched &&
+    hoursSince(state.lastPracticedAt, nowIso) < ORDINARY_RECENT_GATE_HOURS;
+  const baseUtility =
+    3 * recovery +
+    1.4 * due +
+    0.7 * opportunity +
+    0.8 * weakness +
+    0.7 * novelty +
+    0.4 * proof;
+  const hardnessMultiplier = veryLowRecall ? 0.35 : 1;
+  const utility = finiteOrZero(cooldown * hardnessMultiplier * baseUtility);
+
+  return {
+    untouched,
+    introducedOnly,
+    hasRetrievalEvidence,
+    activeRecovery,
+    recovery,
+    due,
+    opportunity,
+    weakness,
+    novelty,
+    proof,
+    cooldown,
+    veryLowRecall,
+    stableOrMastered,
+    greenMastered,
+    tooRecentOrdinary,
+    tooRecentIntroduction,
+    tooRecentRecovery,
+    recall,
+    targetRecall,
+    utility
+  };
 }
 
-function pickWords(
-  picked: Map<string, RoundSelectionReason>,
-  words: PracticeWord[],
-  count: number,
-  reason: ReasonTemplate
-): void {
-  for (const word of words) {
-    if (picked.size >= count) return;
-    pickWord(picked, word, reason);
+function predictedRecall(word: PracticeWord, nowIso: string): number {
+  const state = word.state;
+  let recall: number;
+
+  if (state.lastCleanRetrievalAt) {
+    recall = Math.exp(-daysSince(state.lastCleanRetrievalAt, nowIso) / Math.max(1, state.stabilityDays));
+  } else if (state.lastSupportedSuccessAt) {
+    recall =
+      SUPPORTED_SUCCESS_INITIAL *
+      Math.exp(-daysSince(state.lastSupportedSuccessAt, nowIso) / FALLBACK_STABILITY_DAYS);
+  } else {
+    const lastFailureAt = latestIso(state.lastWrongAt, state.lastRevealedAt);
+    recall =
+      WRONG_OR_REVEAL_INITIAL *
+      Math.exp(-daysSince(lastFailureAt, nowIso) / FALLBACK_STABILITY_DAYS);
   }
+
+  if (state.lastCleanRetrievalAt && state.lastWrongAt && isAfter(state.lastWrongAt, state.lastCleanRetrievalAt)) {
+    recall = Math.min(recall, WRONG_RECALL_CAP);
+  }
+  if (state.lastCleanRetrievalAt && state.lastRevealedAt && isAfter(state.lastRevealedAt, state.lastCleanRetrievalAt)) {
+    recall = Math.min(recall, REVEAL_RECALL_CAP);
+  }
+
+  return Math.max(0.05, Math.min(0.95, finiteOrZero(recall)));
 }
 
-function pickWord(picked: Map<string, RoundSelectionReason>, word: PracticeWord, reason: ReasonTemplate): void {
-  if (picked.has(word.id)) return;
-  picked.set(word.id, {
-    wordId: word.id,
-    word: word.word,
-    ...reason
-  });
+function targetRecallForWord(word: PracticeWord): number {
+  if (word.state.recoveryDebt > 0 || word.state.masteryColour === "red" || word.state.masteryColour === "orange") {
+    return 0.8;
+  }
+  if (word.state.masteryColour === "light_green") return 0.88;
+  if (word.state.masteryColour === "green") return 0.9;
+  return 0.82;
 }
 
-function isDueForReview(word: PracticeWord, nowIso: string): boolean {
-  return word.state.nextReviewAt ? new Date(word.state.nextReviewAt).getTime() <= new Date(nowIso).getTime() : false;
+function boundedDuePressure(recall: number, targetRecall: number): number {
+  if (recall >= targetRecall) return 0;
+  return Math.max(0, Math.min(1, Math.log(targetRecall / recall) / Math.log(targetRecall / R_FLOOR)));
 }
 
-function isActiveNearReview(word: PracticeWord): boolean {
-  return (
-    word.state.nearReview &&
-    word.state.eligibleQuestionsSinceLastMistake < DEFAULT_NEAR_REVIEW_SPACING
-  );
+function opportunityAtTarget(recall: number, targetRecall: number): number {
+  const r = Math.max(0.01, Math.min(0.99, recall));
+  const target = Math.max(0.6, Math.min(0.95, targetRecall));
+  const a = target / (1 - target);
+  const logRaw = a * Math.log(r) + Math.log(1 - r);
+  const logPeak = a * Math.log(target) + Math.log(1 - target);
+  return Math.max(0, Math.min(1, finiteOrZero(Math.exp(logRaw - logPeak))));
 }
 
-function isNearGreenProofWord(word: PracticeWord): boolean {
-  const weakest = Math.min(word.state.meaningMastery, word.state.usageMastery, word.state.spellingMastery);
-  return weakest >= 0.75 && weakest < 0.9;
+function proofPointPressure(word: PracticeWord, nowIso: string, recovery: number): number {
+  if (recovery > 0) return 0;
+  if (daysSince(word.state.lastPracticedAt, nowIso) < 1) return 0;
+  const confidence = scoreFromState(word.state, null, nowIso).lowerBound;
+  return (confidence >= 0.62 && confidence < 0.72) || (confidence >= 0.76 && confidence < 0.86) ? 1 : 0;
 }
 
-function isMasteredComebackDue(word: PracticeWord, nowIso: string): boolean {
-  return word.state.masteryColour === "green" && daysSinceLastSeen(word, nowIso) >= MASTERED_COMEBACK_DAYS;
+function cooldownMultiplier(
+  word: PracticeWord,
+  nowIso: string,
+  flags: Pick<SelectionFeatures, "untouched" | "introducedOnly" | "activeRecovery">
+): number {
+  if (flags.untouched) return 1;
+  let relevantEvent: string | null = null;
+  let tau = ORDINARY_TAU_HOURS;
+
+  if (flags.introducedOnly) {
+    relevantEvent = word.state.lastExposedAt;
+    tau = INTRODUCTION_TAU_HOURS;
+  } else if (flags.activeRecovery) {
+    relevantEvent = latestIso(word.state.lastWrongAt, word.state.lastRevealedAt, word.state.lastExposedAt, word.state.lastPracticedAt);
+    tau = RECOVERY_TAU_HOURS;
+  } else {
+    relevantEvent = word.state.lastPracticedAt;
+  }
+
+  if (!relevantEvent) return 1;
+  return Math.max(0, Math.min(1, 1 - Math.exp(-hoursSince(relevantEvent, nowIso) / tau)));
 }
 
-function isStableComebackDue(word: PracticeWord, nowIso: string): boolean {
-  return word.state.masteryColour === "light_green" && daysSinceLastSeen(word, nowIso) >= STABLE_COMEBACK_HOURS / 24;
+function reasonForWord(word: PracticeWord, features: SelectionFeatures): RoundSelectionReason {
+  let reason: RoundSelectionReasonCode = "useful_practice";
+  let label = "Useful practice";
+  let detail = "This word has a good balance of learning value and mission fit.";
+
+  if (features.activeRecovery) {
+    reason = "mistake_recovery";
+    label = "Needs mistake recovery";
+    detail = "A recent miss or reveal still needs clean spaced retrieval.";
+  } else if (features.untouched || features.introducedOnly) {
+    reason = "new_word";
+    label = "New word";
+    detail = "This word is ready for introduction before normal review scoring applies.";
+  } else if (features.veryLowRecall) {
+    reason = "needs_relearning";
+    label = "Needs relearning";
+    detail = "Recall looks very low, so this should be handled as scaffolded relearning.";
+  } else if (features.stableOrMastered && features.due > 0) {
+    reason = "stable_check";
+    label = "Stable check";
+    detail = "This stable word has decayed enough to deserve a quick check.";
+  } else if (features.due >= 0.5) {
+    reason = "scheduled_review";
+    label = "Scheduled review";
+    detail = "Predicted recall has fallen below the target range.";
+  } else if (features.proof > 0) {
+    reason = "almost_secure";
+    label = "Almost secure";
+    detail = "This word is close to the next mastery threshold and needs a clean proof point.";
+  }
+
+  return { wordId: word.id, word: word.word, reason, label, detail };
 }
 
-function isProtectedComebackWord(word: PracticeWord, nowIso: string): boolean {
-  if (isActiveNearReview(word)) return false;
-  if (word.state.masteryColour === "green") return !isMasteredComebackDue(word, nowIso);
-  if (word.state.masteryColour === "light_green") return !isStableComebackDue(word, nowIso);
-  return false;
+function deterministicJitter(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4_294_967_295 / 1000;
 }
 
-function daysSinceLastSeen(word: PracticeWord, nowIso: string): number {
-  if (!word.state.lastSeenAt) return Number.POSITIVE_INFINITY;
-  return (new Date(nowIso).getTime() - new Date(word.state.lastSeenAt).getTime()) / 86_400_000;
+function latestIso(...values: Array<string | null | undefined>): string | null {
+  let latest: string | null = null;
+  for (const value of values) {
+    if (!value) continue;
+    if (!latest || isAfter(value, latest)) latest = value;
+  }
+  return latest;
+}
+
+function isAfter(a: string, b: string): boolean {
+  return new Date(a).getTime() > new Date(b).getTime();
+}
+
+function daysSince(fromIso: string | null | undefined, toIso: string): number {
+  if (!fromIso) return Number.POSITIVE_INFINITY;
+  return Math.max(0, (new Date(toIso).getTime() - new Date(fromIso).getTime()) / 86_400_000);
+}
+
+function hoursSince(fromIso: string | null | undefined, toIso: string): number {
+  if (!fromIso) return Number.POSITIVE_INFINITY;
+  return daysSince(fromIso, toIso) * 24;
+}
+
+function finiteOrZero(value: number): number {
+  return Number.isFinite(value) ? value : 0;
 }

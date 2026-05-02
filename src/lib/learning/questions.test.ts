@@ -128,6 +128,15 @@ function makeState(wordId: string): LearnerWordState {
     failureTypes: [],
     confusedWithWordIds: [],
     nearReview: false,
-    eligibleQuestionsSinceLastMistake: 0
+    eligibleQuestionsSinceLastMistake: 0,
+    recoveryDebt: 0,
+    lastPracticedAt: null,
+    lastCleanRetrievalAt: null,
+    lastSupportedSuccessAt: null,
+    lastRevealedAt: null,
+    lastExposedAt: null,
+    lastPracticedSessionId: null,
+    lastPracticedInteractionIndex: null,
+    learnerStateContentVersion: 1
   };
 }

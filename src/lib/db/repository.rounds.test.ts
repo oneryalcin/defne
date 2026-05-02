@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
 import {
+  createOrUpdateParentWord,
   getMissionPreview,
   getSessionSummary,
   getSessionView,
@@ -267,34 +268,129 @@ describe("round repository orchestration", () => {
     expect(row.next_review_at).toBeTruthy();
   });
 
-  it("prioritizes near-review words in later rounds until three clean eligible questions clear them", () => {
+  it("records revealed words as recovery debt without forcing immediate repetition", () => {
     const revealedWord = completeRoundWithFirstContextWordRevealed();
-
-    for (let cleanRoundIndex = 0; cleanRoundIndex < 2; cleanRoundIndex += 1) {
-      const sessionId = startRoundMission(6);
-      let view = getSessionView(sessionId);
-      if (cleanRoundIndex === 0) {
-        expect(view.round?.cards[0]?.word).toBe(revealedWord);
-        expect(view.round?.cards[0]?.selectionReason?.reason).toBe("near_review");
-      }
-
-      completeLearnCards(sessionId);
-      startRoundMeaningRecognition(sessionId);
-      answerCurrentStepCorrectly(sessionId, "meaning_recognition");
-      answerCurrentStepCorrectly(sessionId, "context_usage");
-    }
 
     const row = getDb()
       .prepare(
-        `SELECT s.near_review, s.eligible_questions_since_last_mistake
+        `SELECT s.near_review, s.recovery_debt, s.last_revealed_at, s.last_clean_retrieval_at
          FROM learner_word_state s
          JOIN words w ON w.id = s.word_id
          WHERE w.word = ?`
       )
-      .get(revealedWord) as { near_review: number; eligible_questions_since_last_mistake: number };
+      .get(revealedWord) as {
+      near_review: number;
+      recovery_debt: number;
+      last_revealed_at: string | null;
+      last_clean_retrieval_at: string | null;
+    };
 
-    expect(row.eligible_questions_since_last_mistake).toBeGreaterThanOrEqual(3);
-    expect(row.near_review).toBe(0);
+    expect(row.near_review).toBe(1);
+    expect(row.recovery_debt).toBeGreaterThanOrEqual(3);
+    expect(row.last_revealed_at).toBeTruthy();
+    expect(new Date(row.last_revealed_at ?? 0).getTime()).toBeGreaterThan(
+      new Date(row.last_clean_retrieval_at ?? 0).getTime()
+    );
+  });
+
+  it("does not clear lower recovery debt from another same-day clean answer", () => {
+    const sessionId = startRoundMission(6);
+    completeLearnCards(sessionId);
+    startRoundMeaningRecognition(sessionId);
+
+    const view = getSessionView(sessionId);
+    const wordId = view.word?.id;
+    const canonicalAnswer = view.question?.canonicalAnswer;
+    if (!wordId || !canonicalAnswer) throw new Error("Expected a meaning recognition question");
+
+    const sameDayFailure = `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+    getDb()
+      .prepare(
+        `UPDATE learner_word_state
+         SET recovery_debt = 2,
+             last_wrong_at = ?,
+             last_practiced_session_id = ?,
+             last_practiced_interaction_index = 0
+         WHERE learner_id = 'learner_defne' AND word_id = ?`
+      )
+      .run(sameDayFailure, sessionId, wordId);
+
+    submitSessionAnswer({
+      sessionId,
+      submittedAnswer: canonicalAnswer,
+      hintLevelUsed: 0,
+      responseTimeMs: 900
+    });
+
+    const row = getDb()
+      .prepare(
+        `SELECT recovery_debt, last_clean_retrieval_at
+         FROM learner_word_state
+         WHERE learner_id = 'learner_defne' AND word_id = ?`
+      )
+      .get(wordId) as { recovery_debt: number; last_clean_retrieval_at: string | null };
+
+    expect(row.last_clean_retrieval_at).toBeTruthy();
+    expect(row.recovery_debt).toBe(2);
+  });
+
+  it("resets learner state when parent edits change word content", () => {
+    const db = getDb();
+    const word = db
+      .prepare(
+        `SELECT w.id, w.word, w.content_version
+         FROM words w
+         JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+         JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
+         ORDER BY w.word ASC
+         LIMIT 1`
+      )
+      .get() as { id: string; word: string; content_version: number };
+
+    db.prepare(
+      `UPDATE learner_word_state
+       SET meaning_mastery = 0.95,
+           usage_mastery = 0.95,
+           spelling_mastery = 0.95,
+           stability_days = 12,
+           mastery_colour = 'green',
+           attempt_count = 5,
+           correct_count = 5,
+           last_clean_retrieval_at = '2026-05-01T10:00:00.000Z',
+           learner_state_content_version = ?
+       WHERE learner_id = 'learner_defne' AND word_id = ?`
+    ).run(word.content_version, word.id);
+
+    createOrUpdateParentWord({
+      word: word.word,
+      difficultyLevel: 2,
+      definition: "A corrected parent definition.",
+      example: `A corrected example for ${word.word}.`
+    });
+
+    const row = db
+      .prepare(
+        `SELECT w.content_version, s.learner_state_content_version, s.mastery_colour,
+                s.attempt_count, s.correct_count, s.last_clean_retrieval_at
+         FROM words w
+         JOIN learner_word_state s ON s.word_id = w.id AND s.learner_id = 'learner_defne'
+         WHERE w.id = ?`
+      )
+      .get(word.id) as {
+      content_version: number;
+      learner_state_content_version: number;
+      mastery_colour: string;
+      attempt_count: number;
+      correct_count: number;
+      last_clean_retrieval_at: string | null;
+    };
+
+    expect(row.content_version).toBeGreaterThan(word.content_version);
+    expect(row.learner_state_content_version).toBe(row.content_version);
+    expect(row.mastery_colour).toBe("red");
+    expect(row.attempt_count).toBe(0);
+    expect(row.correct_count).toBe(0);
+    expect(row.last_clean_retrieval_at).toBeNull();
   });
 });
 

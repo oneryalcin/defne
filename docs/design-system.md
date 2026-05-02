@@ -16,8 +16,8 @@
 >
 > The concept boards in `docs/assets/visual-concepts/*.png` and
 > `public/assets/visual-concepts/*.png` are **tone seeds, not asset references.**
-> They predate the Defne / Maya naming convention (one board uses "Maya" as the
-> child) and contain motifs this document explicitly bans — streak cues,
+> They predate the current Defne naming convention (one board uses an old
+> placeholder child name) and contain motifs this document explicitly bans — streak cues,
 > confetti-like decoration, and embedded text inside images. The production
 > avatar library and screen assets must omit those motifs. Treat the boards as
 > "vibe and atmosphere" only.
@@ -178,7 +178,7 @@ The pilot will run on parent's laptop and a tablet/phone for the child. Both mus
 - No filler UI text: "Scroll to explore", "Tap to continue", "Swipe down", bouncing chevrons.
 - No celebratory full-screen confetti or coin showers.
 - No streak pressure, leaderboards, or social-style rewards.
-- No generic placeholder names ("John Doe", "Sarah Chan"). Use the project's pilot character: child = "Defne", parent = "Maya". Words from the seed list (`reluctant`, `cautious`, `fragile`, `sincere`, `peculiar`, `observe`, `hesitate`, `generous`, `consequence`, `confident`).
+- No generic placeholder names ("John Doe", "Sarah Chan"). Use the project's pilot character for child-facing examples: child = "Defne". Words from the seed list (`reluctant`, `cautious`, `fragile`, `sincere`, `peculiar`, `observe`, `hesitate`, `generous`, `consequence`, `confident`).
 - No fake round numbers (`99%`, `100%`). Use organic data: `78%`, `4 of 14`, `+0.18 since yesterday`.
 - No AI copywriting clichés ("Elevate", "Seamless", "Unleash", "Next-Gen").
 - No mastery colour without a text label next to it.

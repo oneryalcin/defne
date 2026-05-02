@@ -194,6 +194,7 @@ export interface AttemptReview {
   submittedAnswer: string;
   canonicalAnswer: string;
   targetDefinition: string | null;
+  targetExample: string | null;
   submittedWordDefinition: {
     word: string;
     definition: string;
@@ -215,6 +216,7 @@ export type SubmitSessionAnswerResult = {
   completed: boolean;
   attemptId: string | null;
   isCorrect: boolean | null;
+  questionType: QuestionType | null;
   roundStep: RoundLearningStep | null;
   passNumber: number | null;
 };
@@ -593,14 +595,14 @@ export function submitSessionAnswer(input: {
   const round = getRoundRowForSession(db, input.sessionId);
   if (round) return submitRoundAnswer(db, session, round, input);
 
-  if (session.status !== "in_progress") return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
+  if (session.status !== "in_progress") return { completed: true, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
 
   const plan = readSessionPlan(session);
   const attemptIndex = getSessionAttemptCount(db, input.sessionId);
   const current = plan[attemptIndex];
   if (!current) {
     completeSession(db, session.id);
-    return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
+    return { completed: true, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
   const words = getPracticeWords();
@@ -674,7 +676,7 @@ export function submitSessionAnswer(input: {
     );
   }
 
-  return { completed, attemptId, isCorrect: assessment.isCorrect, roundStep: null, passNumber: null };
+  return { completed, attemptId, isCorrect: assessment.isCorrect, questionType: current.questionType, roundStep: null, passNumber: null };
 }
 
 export function recordRoundCardView(sessionId: string, wordId: string): void {
@@ -731,7 +733,13 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
               a.submitted_answer, a.is_correct, a.hint_level_used, a.failure_type, a.created_at,
               a.round_step, a.pass_number, a.attempt_number_for_word_in_step,
               a.first_attempt_correct, a.eventually_correct, a.reveal_and_move_on,
-              w.word, d.definition, sn.note AS spelling_note
+              w.word, d.definition,
+              (SELECT e.sentence
+               FROM word_examples e
+               WHERE e.word_id = w.id AND e.status = 'approved'
+               ORDER BY e.id ASC
+               LIMIT 1) AS example,
+              sn.note AS spelling_note
        FROM practice_attempts a
        JOIN words w ON w.id = a.word_id
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
@@ -759,6 +767,7 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
         reveal_and_move_on: number;
         word: string;
         definition: string | null;
+        example: string | null;
         spelling_note: string | null;
       }
     | undefined;
@@ -802,6 +811,7 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     submittedAnswer: row.submitted_answer ?? "",
     canonicalAnswer: expected.canonicalAnswer ?? row.word,
     targetDefinition: row.definition,
+    targetExample: row.example,
     submittedWordDefinition,
     isCorrect: row.is_correct === 1,
     failureType: row.failure_type,
@@ -899,7 +909,12 @@ export function getParentWords(): ParentWordListItem[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example,
+      `SELECT w.id, w.word, w.difficulty_level, d.definition,
+              (SELECT e.sentence
+               FROM word_examples e
+               WHERE e.word_id = w.id AND e.status = 'approved'
+               ORDER BY e.id ASC
+               LIMIT 1) AS example,
               s.meaning_mastery, s.usage_mastery, s.spelling_mastery,
               s.stability_days, s.attempt_count, s.correct_count, s.wrong_count,
               s.last_hint_level_used, s.average_hint_level_used,
@@ -915,7 +930,6 @@ export function getParentWords(): ParentWordListItem[] {
                  WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 0) AS real_wrong
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
-       LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
        LEFT JOIN learner_word_state s ON s.word_id = w.id AND s.learner_id = ?
        WHERE w.status = 'active'
        ORDER BY w.word ASC`
@@ -1083,11 +1097,15 @@ export function getWordDetail(wordId: string): WordDetailView | null {
   const db = getDb();
   const wordRow = db
     .prepare(
-      `SELECT w.id, w.word, w.difficulty_level, d.definition, e.sentence AS example,
+      `SELECT w.id, w.word, w.difficulty_level, d.definition,
+              (SELECT e.sentence
+               FROM word_examples e
+               WHERE e.word_id = w.id AND e.status = 'approved'
+               ORDER BY e.id ASC
+               LIMIT 1) AS example,
               sn.note AS spelling_note
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
-       LEFT JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
        LEFT JOIN spelling_notes sn ON sn.word_id = w.id
        WHERE w.id = ? AND w.status = 'active'`
     )
@@ -1183,6 +1201,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       difficultyLevel: wordRow.difficulty_level,
       definition: wordRow.definition ?? "",
       example: wordRow.example ?? "",
+      examples: getExamples(db, wordRow.id),
       synonyms: synonyms.map((s) => s.lemma),
       antonyms: antonyms.map((s) => s.lemma),
       confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
@@ -1570,7 +1589,7 @@ function submitRoundAnswer(
   }
 ): SubmitSessionAnswerResult {
   if (session.status !== "in_progress" || round.status !== "in_progress") {
-    return { completed: true, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
+    return { completed: true, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
   if (!isScoredRoundStep(round.current_step)) {
     throw new Error("This round is not ready for scored answers yet.");
@@ -1581,7 +1600,7 @@ function submitRoundAnswer(
   const cursor = nextRoundStepQuestion(wordIds, round.current_step, attempts, round.max_retry_passes);
   if (!cursor) {
     advanceRoundAfterStepIfReady(db, session.id, round);
-    return { completed: false, attemptId: null, isCorrect: null, roundStep: null, passNumber: null };
+    return { completed: false, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
   const words = getPracticeWords();
@@ -1664,7 +1683,7 @@ function submitRoundAnswer(
   if (!refreshedRound) throw new Error(`Round missing for session ${session.id}`);
   const completed = advanceRoundAfterStepIfReady(db, session.id, refreshedRound);
 
-  return { completed, attemptId, isCorrect: assessment.isCorrect, roundStep: cursor.step, passNumber: cursor.passNumber };
+  return { completed, attemptId, isCorrect: assessment.isCorrect, questionType, roundStep: cursor.step, passNumber: cursor.passNumber };
 }
 
 function advanceRoundAfterStepIfReady(db: DatabaseSync, sessionId: string, round: PracticeRoundRow): boolean {
@@ -1910,24 +1929,26 @@ function getPracticeWords(): PracticeWord[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT w.id, w.word, w.normalized_word, w.difficulty_level, d.definition, e.sentence AS example
+      `SELECT w.id, w.word, w.normalized_word, w.difficulty_level, d.definition
        FROM words w
        JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
-       JOIN word_examples e ON e.word_id = w.id AND e.status = 'approved'
        WHERE w.status = 'active'
+         AND EXISTS (SELECT 1 FROM word_examples e WHERE e.word_id = w.id AND e.status = 'approved')
        ORDER BY w.word ASC`
     )
     .all() as unknown as WordRow[];
 
   return rows.map((row) => {
     const state = getStateForWord(db, row.id);
+    const examples = getExamples(db, row.id);
     return {
       id: row.id,
       word: row.word,
       normalizedWord: row.normalized_word,
       difficultyLevel: row.difficulty_level,
       definition: row.definition ?? "",
-      example: row.example ?? "",
+      example: examples[0] ?? "",
+      examples,
       synonyms: getTextList(db, "word_synonyms", "synonym", row.id),
       antonyms: getTextList(db, "word_antonyms", "antonym", row.id),
       confusables: getTextList(db, "word_confusables", "confusable_text", row.id),
@@ -2282,6 +2303,18 @@ function getTextList(db: DatabaseSync, table: string, column: string, wordId: st
     value: string | null;
   }>;
   return rows.map((row) => row.value).filter((value): value is string => Boolean(value));
+}
+
+function getExamples(db: DatabaseSync, wordId: string): string[] {
+  const rows = db
+    .prepare(
+      `SELECT sentence
+       FROM word_examples
+       WHERE word_id = ? AND status = 'approved'
+       ORDER BY id ASC`
+    )
+    .all(wordId) as Array<{ sentence: string }>;
+  return rows.map((row) => row.sentence).filter(Boolean);
 }
 
 function getSpellingNote(db: DatabaseSync, wordId: string): string | null {

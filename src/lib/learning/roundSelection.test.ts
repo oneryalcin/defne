@@ -119,6 +119,7 @@ function word(name: string, overrides: Partial<LearnerWordState> = {}): Practice
     difficultyLevel: 2,
     definition: `${name} definition`,
     example: `${name} example`,
+    examples: [`${name} example`],
     synonyms: [],
     antonyms: [],
     confusables: [],

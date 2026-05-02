@@ -68,6 +68,7 @@ export interface PracticeWord {
   difficultyLevel: number;
   definition: string;
   example: string;
+  examples: string[];
   synonyms: string[];
   antonyms: string[];
   confusables: string[];

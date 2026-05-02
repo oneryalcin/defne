@@ -61,6 +61,7 @@ describe("question generation", () => {
         word: "hinder",
         normalizedWord: "hinder",
         example: "The heavy rain hindered their journey.",
+        examples: ["The heavy rain hindered their journey."],
         spellingNote: "hin + der"
       },
       words
@@ -81,6 +82,35 @@ describe("question generation", () => {
     expect(question.choices).toContain("shy or nervous");
     expect(question.choices).not.toContain("far away from other places");
   });
+
+  it("rotates fill-sentence contexts from the word's approved examples", () => {
+    const target = {
+      ...words[0],
+      examples: [
+        "Nina was reluctant to touch the moon rock until the museum guide put on gloves first.",
+        "The goalkeeper looked reluctant to leave the pitch after saving two penalties.",
+        "At first, the rescue dog was reluctant to step onto the boat, but the calm trainer waited beside it."
+      ]
+    };
+
+    const first = generateQuestion("fill_sentence", target, words);
+    const later = generateQuestion(
+      "fill_sentence",
+      {
+        ...target,
+        state: {
+          ...target.state,
+          attemptCount: 1
+        }
+      },
+      words
+    );
+
+    expect(first.prompt).not.toBe(later.prompt);
+    expect(first.prompt).toContain("_____");
+    expect(later.prompt).toContain("_____");
+    expect(first.hints[0]).toContain(first.prompt);
+  });
 });
 
 function makeWord(
@@ -96,7 +126,12 @@ function makeWord(
     normalizedWord: word,
     difficultyLevel: 2,
     definition,
-    example: `Maya used ${word} in a careful sentence.`,
+    example: `Aylin used ${word} in a careful sentence.`,
+    examples: [
+      `Aylin used ${word} in a careful sentence.`,
+      `The class heard ${word} in a different story.`,
+      `A museum guide used ${word} during the tour.`
+    ],
     synonyms,
     antonyms,
     confusables,

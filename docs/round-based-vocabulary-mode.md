@@ -1,5 +1,11 @@
 # Round-Based Vocabulary Mode
 
+Current selector note: this document defines the round learning flow. The
+current V2.1 word selection algorithm is defined in
+[Learning Selection Algorithm](learning-selection-algorithm.md). Any older
+references in this document to fixed 9+3 slots are historical background, not
+the current selector contract.
+
 ## Purpose
 
 This document defines a focused vocabulary round mode for learning a small batch

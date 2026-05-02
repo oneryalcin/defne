@@ -95,7 +95,9 @@ Build:
 - Mastery colour updates.
 - Attempt-to-state update logic.
 
-Use [Mastery Scoring And Session Selection](mastery-scoring-and-session-selection.md) as the source of truth.
+Use [Learning Selection Algorithm](learning-selection-algorithm.md) as the
+source of truth for current word selection. The older mastery/session selection
+document is background for the earlier priority-scoring approach.
 
 Acceptance checks:
 

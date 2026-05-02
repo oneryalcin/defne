@@ -105,7 +105,8 @@ MVP must include:
 - Deterministic scoring and scheduling.
 - Daily mission session structure.
 
-See [Mastery Scoring And Session Selection](mastery-scoring-and-session-selection.md) for the learning algorithm.
+See [Learning Selection Algorithm](learning-selection-algorithm.md) for the
+current word selection algorithm.
 See [Round-Based Vocabulary Mode](round-based-vocabulary-mode.md) for the batch
 learning flow: learn cards, definition recognition, sentence-context use, retry
 of missed words, and first-attempt versus eventually-correct scoring.

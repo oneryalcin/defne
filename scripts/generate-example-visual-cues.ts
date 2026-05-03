@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { promisify } from "node:util";
+import sharp from "sharp";
 import {
   EXAMPLE_VISUAL_CUE_PROMPT_VERSION,
   buildExampleVisualCuePrompt,
@@ -39,7 +38,6 @@ interface ExampleCueCandidate extends ExampleVisualCueInput {
 }
 
 const PROJECT_ROOT = process.cwd();
-const execFileAsync = promisify(execFile);
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -394,22 +392,14 @@ function sleep(ms: number): Promise<void> {
 
 async function optimiseImageForApp(filePath: string, resizeMax: number, jpegQuality: number): Promise<void> {
   try {
-    await execFileAsync("sips", [
-      "-Z",
-      String(resizeMax),
-      "--setProperty",
-      "format",
-      "jpeg",
-      "--setProperty",
-      "formatOptions",
-      String(jpegQuality),
-      filePath,
-      "--out",
-      filePath
-    ]);
+    const optimized = await sharp(filePath)
+      .resize({ width: resizeMax, height: resizeMax, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: jpegQuality, mozjpeg: true })
+      .toBuffer();
+    await writeFile(filePath, optimized);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to optimise ${filePath} with sips: ${message}`);
+    throw new Error(`Failed to optimise ${filePath} with sharp: ${message}`);
   }
 }
 

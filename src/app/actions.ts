@@ -6,6 +6,7 @@ import {
   createOrUpdateParentWord,
   importWordShells,
   recordRoundCardView,
+  setVisualCuePreference,
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer
@@ -89,6 +90,16 @@ export async function startMeaningRecognitionAction(formData: FormData): Promise
   const sessionId = String(formData.get("sessionId") ?? "");
   startRoundMeaningRecognition(sessionId);
   redirect(`/child/session/${sessionId}`);
+}
+
+export async function setVisualCuesAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  setVisualCuePreference({
+    learnCards: formData.get("visualCueLearnCards") === "on",
+    meaningQuestions: formData.get("visualCueMeaningQuestions") === "on",
+    contextQuestions: formData.get("visualCueContextQuestions") === "on"
+  });
+  redirect("/parent");
 }
 
 export async function submitAnswerAction(formData: FormData): Promise<void> {

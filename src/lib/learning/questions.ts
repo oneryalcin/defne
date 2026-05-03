@@ -5,6 +5,7 @@ export type AnswerMode = "choice" | "text";
 
 export interface PracticeQuestion {
   wordId: string;
+  selectedExampleId: string | null;
   questionType: QuestionType;
   answerMode: AnswerMode;
   prompt: string;
@@ -32,6 +33,11 @@ export function generateQuestion(
   allWords: PracticeWord[],
   options: QuestionGenerationOptions = {}
 ): PracticeQuestion {
+  const context = selectedExample(target, questionType);
+  const contextTarget = {
+    ...target,
+    example: context.sentence
+  };
   const distractors = stableDistractors(target, allWords, options.preferredDistractorWordIds ?? []);
   const definitionDistractors = distractors.map((word) => word.definition).filter(Boolean);
   const synonymDistractors = distractors.flatMap((word) => word.synonyms).filter(Boolean);
@@ -41,58 +47,62 @@ export function generateQuestion(
   switch (questionType) {
     case "definition_choice":
       return choiceQuestion(
-        target,
+        contextTarget,
         questionType,
         `What does "${target.word}" mean?`,
         "Choose the closest meaning.",
         target.definition,
-        definitionDistractors
+        definitionDistractors,
+        context.id
       );
     case "synonym_choice":
       return choiceQuestion(
-        target,
+        contextTarget,
         questionType,
         `Which word is closest in meaning to "${target.word}"?`,
         "Choose the best near-synonym.",
         target.synonyms[0] ?? target.definition,
-        [...synonymDistractors, ...target.antonyms]
+        [...synonymDistractors, ...target.antonyms],
+        context.id
       );
     case "antonym_choice":
       return choiceQuestion(
-        target,
+        contextTarget,
         questionType,
         `Which word is most opposite to "${target.word}"?`,
         "Choose the best opposite or contrast.",
         target.antonyms[0] ?? `not ${target.word}`,
-        [...antonymDistractors, ...target.synonyms]
+        [...antonymDistractors, ...target.synonyms],
+        context.id
       );
     case "sentence_usage_choice": {
-      const usageTarget = withContextExample(target, questionType);
       return choiceQuestion(
-        usageTarget,
+        contextTarget,
         questionType,
         `Which context uses "${target.word}" correctly?`,
         "Look for the context where the word fits the meaning.",
-        usageTarget.example,
-        distractors.map((word) => replaceWordInSentence(selectedExample(word, questionType), word.word, target.word))
+        contextTarget.example,
+        distractors.map((word) => replaceWordInSentence(selectedExample(word, questionType).sentence, word.word, target.word)),
+        context.id
       );
     }
     case "fill_sentence": {
-      const usageTarget = withContextExample(target, questionType);
-      const sentence = sentenceWithBlank(usageTarget);
+      const sentence = sentenceWithBlank(contextTarget);
       return choiceQuestion(
-        usageTarget,
+        contextTarget,
         questionType,
         sentence,
         "Choose the word that completes the sentence.",
         target.word,
-        [...wordDistractors, ...target.confusables]
+        [...wordDistractors, ...target.confusables],
+        context.id
       );
     }
     case "confusable_choice": {
       const choices = uniqueNormalised([target.word, ...target.confusables, ...wordDistractors]).slice(0, 4);
       return {
         wordId: target.id,
+        selectedExampleId: context.id,
         questionType,
         answerMode: "choice",
         prompt: `Which word means: ${target.definition}?`,
@@ -100,7 +110,7 @@ export function generateQuestion(
         choices: shuffleChoices(target.word, choices, target.id),
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target, target.word),
+        hints: deterministicHints(contextTarget, target.word),
         targetWord: target.word
       };
     }
@@ -108,6 +118,7 @@ export function generateQuestion(
       const choices = spellingChoices(target);
       return {
         wordId: target.id,
+        selectedExampleId: context.id,
         questionType,
         answerMode: "choice",
         prompt: `Which spelling is correct for the word meaning: ${target.definition}?`,
@@ -115,14 +126,14 @@ export function generateQuestion(
         choices,
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(target, target.word),
+        hints: deterministicHints(contextTarget, target.word),
         targetWord: target.word
       };
     }
     case "type_from_memory":
-      const memoryTarget = withContextExample(target, questionType);
       return {
         wordId: target.id,
+        selectedExampleId: context.id,
         questionType,
         answerMode: "text",
         prompt: `Type the word that means: ${target.definition}`,
@@ -130,7 +141,7 @@ export function generateQuestion(
         choices: [],
         expectedAnswers: [normaliseAnswer(target.word)],
         canonicalAnswer: target.word,
-        hints: deterministicHints(memoryTarget, target.word),
+        hints: deterministicHints(contextTarget, target.word),
         targetWord: target.word
       };
   }
@@ -164,11 +175,13 @@ function choiceQuestion(
   prompt: string,
   instruction: string,
   canonicalAnswer: string,
-  distractors: string[]
+  distractors: string[],
+  selectedExampleId: string | null
 ): PracticeQuestion {
   const choices = shuffleChoices(canonicalAnswer, uniqueNormalised([canonicalAnswer, ...distractors]).slice(0, 4), target.id);
   return {
     wordId: target.id,
+    selectedExampleId,
     questionType,
     answerMode: "choice",
     prompt,
@@ -243,17 +256,22 @@ function spellingChoices(target: PracticeWord): string[] {
   return shuffleChoices(word, [...variants], target.id);
 }
 
-function withContextExample(target: PracticeWord, questionType: QuestionType): PracticeWord {
-  return {
-    ...target,
-    example: selectedExample(target, questionType)
-  };
-}
-
-function selectedExample(target: PracticeWord, questionType: QuestionType): string {
-  const examples = target.examples.length > 0 ? target.examples : [target.example];
-  const cleanExamples = examples.map((example) => example.trim()).filter(Boolean);
-  if (cleanExamples.length === 0) return target.example;
+function selectedExample(target: PracticeWord, questionType: QuestionType): { id: string | null; sentence: string } {
+  const exampleRefs = target.exampleRefs ?? [];
+  const refs =
+    exampleRefs.length > 0
+      ? exampleRefs
+      : (target.examples.length > 0 ? target.examples : [target.example]).map((sentence) => ({
+          id: null,
+          sentence
+        }));
+  const cleanExamples = refs
+    .map((example) => ({
+      id: example.id,
+      sentence: example.sentence.trim()
+    }))
+    .filter((example) => Boolean(example.sentence));
+  if (cleanExamples.length === 0) return { id: null, sentence: target.example };
   const index = (target.state.attemptCount + stableHash(`${target.id}:${questionType}`)) % cleanExamples.length;
   return cleanExamples[index];
 }

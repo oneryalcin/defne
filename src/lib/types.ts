@@ -69,6 +69,10 @@ export interface PracticeWord {
   definition: string;
   example: string;
   examples: string[];
+  exampleRefs?: Array<{
+    id: string;
+    sentence: string;
+  }>;
   synonyms: string[];
   antonyms: string[];
   confusables: string[];

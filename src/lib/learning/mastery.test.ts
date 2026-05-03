@@ -60,7 +60,7 @@ describe("mastery scoring", () => {
     });
     // Heavy hint use disables the Reliable floor; lower bound from 2/2
     // sits in the yellow band.
-    expect(masteryColourForState(state)).toBe("yellow");
+    expect(scoreFromState(state, null, "2026-05-02T08:00:00.000Z").colour).toBe("yellow");
   });
 
   it("mastered requires Reliable AND survived decay AND ≥4 corrects", () => {

@@ -220,6 +220,28 @@ describe("round repository orchestration", () => {
     expect(view.round?.currentStep).toBe("context_usage");
   });
 
+  it("uses the next canonical example on the second learn-card exposure", () => {
+    const sessionId = startRoundMission(6);
+    const view = getSessionView(sessionId);
+    const card = view.round?.selectedCard;
+    if (!card) throw new Error("Expected a learn card");
+
+    const examples = getDb()
+      .prepare(
+        `SELECT sentence
+         FROM word_examples
+         WHERE word_id = ? AND status = 'approved'
+         ORDER BY id ASC`
+      )
+      .all(card.id) as Array<{ sentence: string }>;
+    expect(examples.length).toBeGreaterThanOrEqual(2);
+    expect(card.example).toBe(examples[0].sentence);
+
+    recordRoundCardView(sessionId, card.id);
+    const secondView = getSessionView(sessionId, card.id);
+    expect(secondView.round?.selectedCard?.example).toBe(examples[1].sentence);
+  });
+
   it("marks reveal-and-move-on after the retry cap and keeps the word in near review", () => {
     const sessionId = startRoundMission(6);
     completeLearnCards(sessionId);

@@ -28,7 +28,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(7);
+    expect(migrations.count).toBe(8);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -44,6 +44,12 @@ describe("SQLite setup", () => {
     expect(stateColumns.some((column) => column.name === "near_review")).toBe(true);
     expect(stateColumns.some((column) => column.name === "recovery_debt")).toBe(true);
     expect(stateColumns.some((column) => column.name === "last_clean_retrieval_at")).toBe(true);
+    expect(stateColumns.some((column) => column.name === "meaning_mastery")).toBe(false);
+    expect(stateColumns.some((column) => column.name === "usage_mastery")).toBe(false);
+    expect(stateColumns.some((column) => column.name === "spelling_mastery")).toBe(false);
+
+    const spellingNotesTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'spelling_notes'").get();
+    expect(spellingNotesTable).toBeFalsy();
 
     const wordColumns = db.prepare("PRAGMA table_info(words)").all() as Array<{ name: string }>;
     expect(wordColumns.some((column) => column.name === "content_version")).toBe(true);

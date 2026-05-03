@@ -64,15 +64,15 @@ re-mastery, which keeps the engine honest without punishing the child visually.
 
 ### 3. The reward is silent when pedagogy is failing
 
-If a single mastery dimension is stuck weak — for example,
-`spelling_mastery` red across many words — the tree should not advance
-meaningfully even if other dimensions are improving. Otherwise the reward
-lies to the child and the parent dashboard loses trust.
+If scheduler evidence is thin — for example, many words only have supported
+successes or recent reveals — the tree should not advance meaningfully even if
+the child spent time in the app. Otherwise the reward lies to the child and
+the parent dashboard loses trust.
 
 Concretely: the growth-points budget for a stage requires evidence across
-multiple dimensions over time, not single-session bursts. A child who only
-ever does multiple-choice can move some words to Light Green but should not
-push the tree through full stages without spelling and production evidence.
+retrieval quality over time, not single-session bursts. A child who only ever
+gets scaffolded practice can make progress, but should not push the tree
+through full stages without clean recall evidence.
 
 ## Growth Points (The Hidden Unit)
 

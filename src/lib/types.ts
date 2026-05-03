@@ -25,15 +25,10 @@ export type FailureType =
   | "guessed"
   | "forgot_after_delay";
 
-export type MasteryDimension = "meaning" | "usage" | "spelling";
-
 export interface LearnerWordState {
   id: string;
   learnerId: string;
   wordId: string;
-  meaningMastery: number;
-  usageMastery: number;
-  spellingMastery: number;
   stabilityDays: number;
   masteryColour: MasteryColour;
   lastSeenAt: string | null;
@@ -76,7 +71,6 @@ export interface PracticeWord {
   synonyms: string[];
   antonyms: string[];
   confusables: string[];
-  spellingNote: string | null;
   state: LearnerWordState;
 }
 
@@ -139,7 +133,6 @@ export interface RoundMistakeEvidence {
 export interface SessionSummary {
   plan?: SessionPlanItem[];
   wordsImproved?: string[];
-  spellingTraps?: string[];
   revisitTomorrow?: string[];
   round?: {
     roundId: string;
@@ -147,7 +140,6 @@ export interface SessionSummary {
     eventuallyCorrectWords: string[];
     revealAndMoveOnWords: string[];
     nearReviewWords: string[];
-    spellingStillWeakWords: string[];
     selectionReasons?: RoundSelectionReason[];
     mistakeEvidence?: RoundMistakeEvidence[];
     explanation: string;

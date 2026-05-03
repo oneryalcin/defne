@@ -12,7 +12,6 @@ interface SeedEntry {
   examples?: string[];
   synonyms?: string[];
   antonyms?: string[];
-  spellingNote?: string;
   confusables?: string[];
 }
 
@@ -102,15 +101,6 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
         (id, word_id, confusable_text, explanation, created_at, updated_at)
        VALUES (?, ?, ?, NULL, ?, ?)`
     ).run(`confusable_${wordId}_${index}`, wordId, confusable.trim(), now, now);
-  }
-
-  replaceRows(db, "spelling_notes", wordId);
-  if (entry.spellingNote?.trim()) {
-    db.prepare(
-      `INSERT INTO spelling_notes
-        (id, word_id, note, tricky_part, pattern, created_at, updated_at)
-       VALUES (?, ?, ?, NULL, NULL, ?, ?)`
-    ).run(`spelling_${wordId}`, wordId, entry.spellingNote.trim(), now, now);
   }
 }
 

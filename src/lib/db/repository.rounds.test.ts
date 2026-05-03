@@ -66,7 +66,6 @@ describe("round repository orchestration", () => {
         eventuallyCorrectWords: [],
         revealAndMoveOnWords: [],
         nearReviewWords: [],
-        spellingStillWeakWords: [],
         selectionReasons: [],
         mistakeEvidence: [],
         explanation: "stale"
@@ -373,10 +372,7 @@ describe("round repository orchestration", () => {
 
     db.prepare(
       `UPDATE learner_word_state
-       SET meaning_mastery = 0.95,
-           usage_mastery = 0.95,
-           spelling_mastery = 0.95,
-           stability_days = 12,
+       SET stability_days = 12,
            mastery_colour = 'green',
            attempt_count = 5,
            correct_count = 5,
@@ -429,8 +425,7 @@ describe("round repository orchestration", () => {
       ],
       synonyms: ["hesitant", "unwilling"],
       antonyms: ["eager", "keen"],
-      confusables: ["reticent", "hesitant"],
-      spellingNote: "Ends with -ant, not -ent."
+      confusables: ["reticent", "hesitant"]
     });
 
     upsertParentExampleVisualCues(wordId, [

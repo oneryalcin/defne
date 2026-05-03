@@ -123,7 +123,6 @@ function word(name: string, overrides: Partial<LearnerWordState> = {}): Practice
     synonyms: [],
     antonyms: [],
     confusables: [],
-    spellingNote: null,
     state: state(`word_${name}`, overrides)
   };
 }
@@ -133,9 +132,6 @@ function state(wordId: string, overrides: Partial<LearnerWordState>): LearnerWor
     id: `state_${wordId}`,
     learnerId: "learner_1",
     wordId,
-    meaningMastery: 0.6,
-    usageMastery: 0.6,
-    spellingMastery: 0.6,
     stabilityDays: 2,
     masteryColour: "red",
     lastSeenAt: null,

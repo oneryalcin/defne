@@ -61,15 +61,13 @@ describe("question generation", () => {
         word: "hinder",
         normalizedWord: "hinder",
         example: "The heavy rain hindered their journey.",
-        examples: ["The heavy rain hindered their journey."],
-        spellingNote: "hin + der"
+        examples: ["The heavy rain hindered their journey."]
       },
       words
     );
 
     expect(question.hints[0]).toContain("The heavy rain _____ their journey.");
     expect(question.hints[0].toLowerCase()).not.toContain("hinder");
-    expect(question.hints.slice(0, -1).join(" ").toLowerCase()).not.toContain("hin + der");
   });
 
   it("prefers same-round words as multiple-choice distractors", () => {
@@ -135,7 +133,6 @@ function makeWord(
     synonyms,
     antonyms,
     confusables,
-    spellingNote: "watch the ending",
     state: makeState(`word_${word}`)
   };
 }
@@ -145,9 +142,6 @@ function makeState(wordId: string): LearnerWordState {
     id: `state_${wordId}`,
     learnerId: "learner_1",
     wordId,
-    meaningMastery: 0,
-    usageMastery: 0,
-    spellingMastery: 0,
     stabilityDays: 1,
     masteryColour: "red",
     lastSeenAt: null,

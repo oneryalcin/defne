@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { masteryColourForState, selectSessionPlan, updateStateAfterAttempt } from "../learning/mastery";
+import { masteryColourForState, updateStateAfterAttempt } from "../learning/mastery";
 import { priorityBreakdownForState, scoreFromState } from "../learning/scoring";
 import {
   deckPriorities,
@@ -64,9 +64,6 @@ interface StateRow {
   id: string;
   learner_id: string;
   word_id: string;
-  meaning_mastery: number;
-  usage_mastery: number;
-  spelling_mastery: number;
   stability_days: number;
   mastery_colour: LearnerWordState["masteryColour"];
   last_seen_at: string | null;
@@ -129,7 +126,6 @@ export interface MissionPreview {
     definition: string;
     masteryColour: LearnerWordState["masteryColour"] | null;
     selectionReason: RoundSelectionReason;
-    weakestDimension: string;
     /** Debug breakdown of why the scheduler picked this word. */
     priorityFactors: Array<{
       name: string;
@@ -183,7 +179,6 @@ export interface RoundLearnCardView {
   synonyms: string[];
   antonyms: string[];
   confusables: string[];
-  spellingNote: string | null;
   viewCount: number;
   visualCue: VisualCue | null;
   supportMode: LearnCardSupportMode;
@@ -223,7 +218,6 @@ export interface AttemptReview {
   failureType: FailureType;
   hintLevelUsed: number;
   hints: string[];
-  spellingNote: string | null;
   roundStep: RoundLearningStep | null;
   passNumber: number | null;
   attemptNumberForWordInStep: number | null;
@@ -270,7 +264,6 @@ export interface ParentDashboard {
     summary: SessionSummary;
   } | null;
   redOrangeWords: ParentWordListItem[];
-  spellingMistakes: Array<{ word: string; mistakes: number; note: string | null }>;
   dueWords: ParentWordListItem[];
   closeToGreen: ParentWordListItem[];
   latestRound: SessionSummary["round"] | null;
@@ -285,7 +278,6 @@ export interface WordFormInput {
   synonyms?: string[];
   antonym?: string;
   antonyms?: string[];
-  spellingNote?: string;
   confusable?: string;
   confusables?: string[];
   difficultyLevel?: number;
@@ -410,7 +402,6 @@ export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
             ? null
             : masteryColourForState(word.state, wordAttempts),
         selectionReason,
-        weakestDimension: weakestDimensionLabel(word.state),
         priorityFactors: priority.factors,
         priorityScore: priority.score,
       };
@@ -494,7 +485,6 @@ export function startRoundMission(roundWordCount = 12): string {
       eventuallyCorrectWords: [],
       revealAndMoveOnWords: [],
       nearReviewWords: [],
-      spellingStillWeakWords: [],
       selectionReasons: selection.reasons,
       mistakeEvidence: [],
       explanation: "Round started. The word list is selected from recent mistakes, due reviews, and building words."
@@ -581,25 +571,6 @@ function abandonStaleInProgressRounds(
        WHERE id = ? AND status = 'in_progress'`
     ).run(now, now, row.session_id);
   }
-}
-
-export function startDailyMission(targetQuestionCount = 15): string {
-  const db = getDb();
-  const words = getPracticeWords();
-  const plan = selectSessionPlan(words, new Date().toISOString(), targetQuestionCount);
-  if (plan.length === 0) {
-    throw new Error("No complete vocabulary words are available for a mission.");
-  }
-
-  const now = new Date().toISOString();
-  const sessionId = randomUUID();
-  const summary: SessionSummary = { plan };
-  db.prepare(
-    `INSERT INTO practice_sessions
-      (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
-     VALUES (?, ?, 'daily_mission', 'in_progress', ?, 0, ?, ?, ?, ?)`
-  ).run(sessionId, defaultLearnerId(), plan.length, now, JSON.stringify(summary), now, now);
-  return sessionId;
 }
 
 export function getSessionView(sessionId: string, selectedCardId?: string): SessionView {
@@ -808,12 +779,10 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
                FROM word_examples e
                WHERE e.word_id = w.id AND e.status = 'approved'
                ORDER BY e.id ASC
-               LIMIT 1) AS example,
-              sn.note AS spelling_note
+               LIMIT 1) AS example
        FROM practice_attempts a
        JOIN words w ON w.id = a.word_id
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
-       LEFT JOIN spelling_notes sn ON sn.word_id = w.id
        WHERE a.session_id = ? AND a.id = ?`
     )
     .get(sessionId, attemptId) as unknown as
@@ -838,7 +807,6 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
         word: string;
         definition: string | null;
         example: string | null;
-        spelling_note: string | null;
       }
     | undefined;
 
@@ -893,7 +861,6 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     failureType: row.failure_type,
     hintLevelUsed: row.hint_level_used,
     hints: prompt.hints ?? [],
-    spellingNote: row.spelling_note,
     roundStep: row.round_step,
     passNumber: row.pass_number,
     attemptNumberForWordInStep: row.attempt_number_for_word_in_step,
@@ -951,19 +918,6 @@ export function getParentDashboard(): ParentDashboard {
     ? ((JSON.parse(latestRoundRow.summary_json) as SessionSummary).round ?? null)
     : null;
 
-  const spellingRows = db
-    .prepare(
-      `SELECT w.word, COUNT(*) AS mistakes, sn.note
-       FROM practice_attempts a
-       JOIN words w ON w.id = a.word_id
-       LEFT JOIN spelling_notes sn ON sn.word_id = w.id
-       WHERE a.learner_id = ? AND a.failure_type = 'spelling_error'
-       GROUP BY w.id, w.word, sn.note
-       ORDER BY mistakes DESC, w.word ASC
-       LIMIT 10`
-    )
-    .all(defaultLearnerId()) as unknown as Array<{ word: string; mistakes: number; note: string | null }>;
-
   return {
     totalWords,
     completeWords,
@@ -977,7 +931,6 @@ export function getParentDashboard(): ParentDashboard {
         }
       : null,
     redOrangeWords,
-    spellingMistakes: spellingRows,
     dueWords,
     closeToGreen,
     latestRound
@@ -994,7 +947,6 @@ export function getParentWords(): ParentWordListItem[] {
                WHERE e.word_id = w.id AND e.status = 'approved'
                ORDER BY e.id ASC
                LIMIT 1) AS example,
-              s.meaning_mastery, s.usage_mastery, s.spelling_mastery,
               s.stability_days, s.attempt_count, s.correct_count, s.wrong_count,
               s.last_hint_level_used, s.average_hint_level_used,
               s.average_response_time_ms, s.last_seen_at, s.last_correct_at,
@@ -1019,9 +971,6 @@ export function getParentWords(): ParentWordListItem[] {
     difficulty_level: number;
     definition: string | null;
     example: string | null;
-    meaning_mastery: number | null;
-    usage_mastery: number | null;
-    spelling_mastery: number | null;
     stability_days: number | null;
     attempt_count: number | null;
     correct_count: number | null;
@@ -1060,9 +1009,6 @@ export function getParentWords(): ParentWordListItem[] {
         id: `state_${defaultLearnerId()}_${row.id}`,
         learnerId: defaultLearnerId(),
         wordId: row.id,
-        meaningMastery: row.meaning_mastery ?? 0,
-        usageMastery: row.usage_mastery ?? 0,
-        spellingMastery: row.spelling_mastery ?? 0,
         stabilityDays: row.stability_days ?? 1,
         masteryColour: row.mastery_colour ?? "red",
         lastSeenAt: row.last_seen_at,
@@ -1121,7 +1067,6 @@ export interface WordDetailView {
   word: string;
   definition: string | null;
   example: string | null;
-  spellingNote: string | null;
   synonyms: string[];
   antonyms: string[];
   confusables: string[];
@@ -1181,11 +1126,9 @@ export function getWordDetail(wordId: string): WordDetailView | null {
                FROM word_examples e
                WHERE e.word_id = w.id AND e.status = 'approved'
                ORDER BY e.id ASC
-               LIMIT 1) AS example,
-              sn.note AS spelling_note
+               LIMIT 1) AS example
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
-       LEFT JOIN spelling_notes sn ON sn.word_id = w.id
        WHERE w.id = ? AND w.status = 'active'`
     )
     .get(wordId) as
@@ -1195,7 +1138,6 @@ export function getWordDetail(wordId: string): WordDetailView | null {
         difficulty_level: number;
         definition: string | null;
         example: string | null;
-        spelling_note: string | null;
       }
     | undefined;
   if (!wordRow) return null;
@@ -1285,7 +1227,6 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       synonyms: synonyms.map((s) => s.lemma),
       antonyms: antonyms.map((s) => s.lemma),
       confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
-      spellingNote: wordRow.spelling_note,
       state: liveState,
     };
     const priority = priorityBreakdownForState(
@@ -1360,7 +1301,6 @@ export function getWordDetail(wordId: string): WordDetailView | null {
     word: wordRow.word,
     definition: wordRow.definition,
     example: wordRow.example,
-    spellingNote: wordRow.spelling_note,
     synonyms: synonyms.map((s) => s.lemma),
     antonyms: antonyms.map((s) => s.lemma),
     confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
@@ -1535,10 +1475,7 @@ export function upsertParentExampleVisualCues(wordId: string, cues: ParentExampl
 function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now: string): void {
   db.prepare(
     `UPDATE learner_word_state
-     SET meaning_mastery = 0,
-         usage_mastery = 0,
-         spelling_mastery = 0,
-         stability_days = 1,
+     SET stability_days = 1,
          mastery_colour = 'red',
          last_seen_at = NULL,
          last_correct_at = NULL,
@@ -1895,12 +1832,10 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const refreshedWords = getPracticeWords();
   const refreshedWordMap = new Map(refreshedWords.map((word) => [word.id, word]));
   const nearReviewWordIds = wordIds.filter((wordId) => refreshedWordMap.get(wordId)?.state.nearReview);
-  const spellingStillWeakWordIds = wordIds.filter((wordId) => (refreshedWordMap.get(wordId)?.state.spellingMastery ?? 0) < 0.78);
   const nearReviewWords = nearReviewWordIds.map(wordName);
   const eventuallyCorrectWords = eventuallyCorrectWordIds.map(wordName);
   const revealAndMoveOnWords = revealAndMoveOnWordIds.map(wordName);
   const firstAttemptSecureWords = firstAttemptSecureWordIds.map(wordName);
-  const spellingStillWeakWords = spellingStillWeakWordIds.map(wordName);
   const mistakeEvidence = wordIds
     .map((wordId) => {
       const meaningMistakes = meaningByWord.get(wordId)?.mistakeCount ?? 0;
@@ -1917,7 +1852,7 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const explanation =
     eventuallyCorrectWords.length > 0 || revealAndMoveOnWords.length > 0
       ? `Defne completed the cautious round, but it is still Building because ${eventuallyCorrectWords.length + revealAndMoveOnWords.length} word${eventuallyCorrectWords.length + revealAndMoveOnWords.length === 1 ? "" : "s"} needed recovery rather than first-attempt recall.`
-      : "Defne completed this round with first-attempt meaning and context recall; spelling still needs separate proof before words turn green.";
+      : "Defne completed this round with first-attempt meaning and context recall.";
 
   return {
     plan: wordIds.flatMap((wordId) => [
@@ -1925,7 +1860,6 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
       { wordId, questionType: "fill_sentence" }
     ]),
     wordsImproved: unique([...firstAttemptSecureWords, ...eventuallyCorrectWords]).slice(0, 8),
-    spellingTraps: spellingStillWeakWords.slice(0, 8),
     revisitTomorrow: unique([...nearReviewWords, ...revealAndMoveOnWords]).slice(0, 8),
     round: {
       roundId: round.id,
@@ -1933,7 +1867,6 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
       eventuallyCorrectWords,
       revealAndMoveOnWords,
       nearReviewWords,
-      spellingStillWeakWords,
       selectionReasons: startedSummary.round?.selectionReasons ?? [],
       mistakeEvidence,
       explanation
@@ -2021,7 +1954,6 @@ function toRoundLearnCardView(
     synonyms: word.synonyms,
     antonyms: word.antonyms,
     confusables: word.confusables,
-    spellingNote: word.spellingNote,
     viewCount,
     visualCue:
       visualCuePreferences.enabled && visualCuePreferences.learnCards
@@ -2087,8 +2019,7 @@ function isScoredRoundStep(step: RoundLearningStep): step is RoundStep {
 function stepLabel(step: RoundLearningStep): string {
   if (step === "learn_cards") return "Learn cards";
   if (step === "meaning_recognition") return "Meaning recognition";
-  if (step === "context_usage") return "Context usage";
-  return "Spelling production";
+  return "Context usage";
 }
 
 function getPracticeWords(): PracticeWord[] {
@@ -2120,7 +2051,6 @@ function getPracticeWords(): PracticeWord[] {
       synonyms: getTextList(db, "word_synonyms", "synonym", row.id),
       antonyms: getTextList(db, "word_antonyms", "antonym", row.id),
       confusables: getTextList(db, "word_confusables", "confusable_text", row.id),
-      spellingNote: getSpellingNote(db, row.id),
       state
     };
   });
@@ -2178,16 +2108,6 @@ function replaceOptionalWordRows(db: DatabaseSync, wordId: string, input: WordFo
     }
   }
 
-  if (input.spellingNote !== undefined) {
-    db.prepare("DELETE FROM spelling_notes WHERE word_id = ?").run(wordId);
-    if (input.spellingNote.trim()) {
-      db.prepare(
-        `INSERT INTO spelling_notes
-          (id, word_id, note, tricky_part, pattern, created_at, updated_at)
-         VALUES (?, ?, ?, NULL, NULL, ?, ?)`
-      ).run(`spelling_${wordId}`, wordId, input.spellingNote.trim(), now, now);
-    }
-  }
 }
 
 function replaceListValues(
@@ -2226,18 +2146,17 @@ function buildSessionSummary(db: DatabaseSync, sessionId: string, completedAt: s
   const plan = readSessionPlan(session);
   const rows = db
     .prepare(
-      `SELECT w.word, a.is_correct, a.failure_type
+      `SELECT w.word, a.is_correct
        FROM practice_attempts a
        JOIN words w ON w.id = a.word_id
        WHERE a.session_id = ?
        ORDER BY a.created_at ASC`
     )
-    .all(sessionId) as unknown as Array<{ word: string; is_correct: number; failure_type: FailureType }>;
+    .all(sessionId) as unknown as Array<{ word: string; is_correct: number }>;
 
   return {
     plan,
     wordsImproved: unique(rows.filter((row) => row.is_correct === 1).map((row) => row.word)).slice(0, 8),
-    spellingTraps: unique(rows.filter((row) => row.failure_type === "spelling_error").map((row) => row.word)).slice(0, 8),
     revisitTomorrow: unique(rows.filter((row) => row.is_correct === 0).map((row) => row.word)).slice(0, 8),
     completedAt
   };
@@ -2373,9 +2292,6 @@ function getStateForWord(db: DatabaseSync, wordId: string): LearnerWordState {
 function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
   db.prepare(
     `UPDATE learner_word_state SET
-       meaning_mastery = ?,
-       usage_mastery = ?,
-       spelling_mastery = ?,
        stability_days = ?,
        mastery_colour = ?,
        last_seen_at = ?,
@@ -2404,9 +2320,6 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
        updated_at = ?
      WHERE id = ?`
   ).run(
-    state.meaningMastery,
-    state.usageMastery,
-    state.spellingMastery,
     state.stabilityDays,
     state.masteryColour,
     state.lastSeenAt,
@@ -2450,9 +2363,6 @@ function mapState(row: StateRow): LearnerWordState {
     id: row.id,
     learnerId: row.learner_id,
     wordId: row.word_id,
-    meaningMastery: row.meaning_mastery,
-    usageMastery: row.usage_mastery,
-    spellingMastery: row.spelling_mastery,
     stabilityDays: row.stability_days,
     masteryColour: row.mastery_colour,
     lastSeenAt: row.last_seen_at,
@@ -2591,22 +2501,6 @@ function getVisualCueForExample(db: DatabaseSync, exampleId: string | null, word
 function normaliseCueSrc(src: string): string {
   if (src.startsWith("/") || src.startsWith("http://") || src.startsWith("https://")) return src;
   return `/${src.replace(/^public\//, "")}`;
-}
-
-function getSpellingNote(db: DatabaseSync, wordId: string): string | null {
-  const row = db.prepare("SELECT note FROM spelling_notes WHERE word_id = ? LIMIT 1").get(wordId) as
-    | { note: string }
-    | undefined;
-  return row?.note ?? null;
-}
-
-function weakestDimensionLabel(state: LearnerWordState): string {
-  const values = [
-    ["Meaning", state.meaningMastery],
-    ["Usage", state.usageMastery],
-    ["Spelling", state.spellingMastery]
-  ] as const;
-  return values.reduce((weakest, next) => (next[1] < weakest[1] ? next : weakest))[0];
 }
 
 function unique(values: string[]): string[] {

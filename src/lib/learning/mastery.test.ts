@@ -3,7 +3,6 @@ import {
   masteryColourForState,
   priorityScore,
   recallProbability,
-  selectSessionPlan,
   updateStateAfterAttempt
 } from "./mastery";
 import { scoreFromState } from "./scoring";
@@ -13,23 +12,6 @@ describe("mastery scoring", () => {
   it("uses exponential recall decay", () => {
     expect(recallProbability(3, 6)).toBeCloseTo(0.606, 2);
     expect(recallProbability(0, 6)).toBeCloseTo(1);
-  });
-
-  it("ignores spelling when judging colour", () => {
-    // 5 clean correct, no wrongs, ≥7d stability, ≥4 corrects → Mastered.
-    // Spelling dimension is intentionally ignored.
-    const state = makeState({
-      meaningMastery: 0.95,
-      usageMastery: 0.95,
-      spellingMastery: 0.0,
-      stabilityDays: 20,
-      correctCount: 5,
-      attemptCount: 5,
-      wrongCount: 0,
-      averageHintLevelUsed: 0,
-      lastSeenAt: "2026-04-30T12:00:00.000Z"
-    });
-    expect(masteryColourForState(state)).toBe("green");
   });
 
   it("words never attempted stay red", () => {
@@ -58,12 +40,10 @@ describe("mastery scoring", () => {
       stabilityDays: 2,
       lastSeenAt: "2026-05-01T08:00:00.000Z"
     });
-    // Heavy hint use disables the Reliable floor; lower bound from 2/2
-    // sits in the yellow band.
     expect(scoreFromState(state, null, "2026-05-02T08:00:00.000Z").colour).toBe("yellow");
   });
 
-  it("mastered requires Reliable AND survived decay AND ≥4 corrects", () => {
+  it("mastered requires reliable proof, stability, and at least four corrects", () => {
     const onlyHigh = makeState({
       attemptCount: 2,
       correctCount: 2,
@@ -178,8 +158,7 @@ describe("mastery scoring", () => {
       lastWrongAt: "2026-05-01T10:00:00.000Z",
       attemptCount: 5,
       correctCount: 3,
-      wrongCount: 2,
-      usageMastery: 0.45
+      wrongCount: 2
     });
 
     const result = updateStateAfterAttempt(base, {
@@ -196,19 +175,40 @@ describe("mastery scoring", () => {
     expect(result.nearReview).toBe(false);
   });
 
-  it("ranks recently failed weak words above stable green words", () => {
+  it("updates aggregate evidence without maintaining legacy dimension scores", () => {
+    const base = makeState({
+      lastSeenAt: "2026-04-30T12:00:00.000Z",
+      attemptCount: 2,
+      correctCount: 1,
+      wrongCount: 1,
+      averageHintLevelUsed: 0
+    });
+
+    const result = updateStateAfterAttempt(base, {
+      questionType: "definition_choice",
+      isCorrect: true,
+      hintLevelUsed: 2,
+      maxHintLevelAvailable: 4,
+      responseTimeMs: 4000,
+      failureType: "none",
+      answeredAt: "2026-05-01T12:00:00.000Z"
+    });
+
+    expect(result.attemptCount).toBe(3);
+    expect(result.correctCount).toBe(2);
+    expect(result.averageHintLevelUsed).toBeCloseTo(2 / 3);
+    expect(result.stabilityDays).toBeGreaterThan(base.stabilityDays);
+  });
+
+  it("ranks recently failed words above stable green words", () => {
     const now = "2026-05-01T12:00:00.000Z";
     const failed = makeWord("reluctant", {
-      meaningMastery: 0.25,
-      usageMastery: 0.3,
       attemptCount: 3,
       wrongCount: 2,
       lastWrongAt: "2026-05-01T08:00:00.000Z",
       lastSeenAt: "2026-05-01T08:00:00.000Z"
     });
     const stable = makeWord("vivid", {
-      meaningMastery: 0.95,
-      usageMastery: 0.95,
       masteryColour: "green",
       stabilityDays: 20,
       correctCount: 6,
@@ -219,98 +219,12 @@ describe("mastery scoring", () => {
     });
 
     expect(priorityScore(failed, now)).toBeGreaterThan(priorityScore(stable, now));
-    expect(selectSessionPlan([stable, failed], now, 1)[0]?.wordId).toBe(failed.id);
-  });
-
-  it("rewards heavy-hint correct answers less than unassisted correct answers", () => {
-    const base = makeState({
-      meaningMastery: 0.4,
-      lastSeenAt: "2026-04-30T12:00:00.000Z"
-    });
-    const unassisted = updateStateAfterAttempt(base, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 0,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 4000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-    const hinted = updateStateAfterAttempt(base, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 3,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 4000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-
-    expect(unassisted.meaningMastery).toBeGreaterThan(hinted.meaningMastery);
-  });
-
-  it("response time is not a factor — fast and slow correct answers score the same", () => {
-    const base = makeState({
-      meaningMastery: 0.4,
-      lastSeenAt: "2026-04-30T12:00:00.000Z"
-    });
-    const fast = updateStateAfterAttempt(base, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 0,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 2000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-    const slow = updateStateAfterAttempt(base, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 0,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 35000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-    expect(fast.meaningMastery).toBeCloseTo(slow.meaningMastery, 6);
-  });
-
-  it("delay since last seen still rewards retention", () => {
-    const sameDay = makeState({
-      meaningMastery: 0.4,
-      lastSeenAt: "2026-05-01T08:00:00.000Z"
-    });
-    const overnight = makeState({
-      meaningMastery: 0.4,
-      lastSeenAt: "2026-04-30T08:00:00.000Z"
-    });
-    const sameDayResult = updateStateAfterAttempt(sameDay, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 0,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 4000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-    const overnightResult = updateStateAfterAttempt(overnight, {
-      questionType: "definition_choice",
-      isCorrect: true,
-      hintLevelUsed: 0,
-      maxHintLevelAvailable: 4,
-      responseTimeMs: 4000,
-      failureType: "none",
-      answeredAt: "2026-05-01T12:00:00.000Z"
-    });
-    expect(overnightResult.meaningMastery).toBeGreaterThan(sameDayResult.meaningMastery);
   });
 
   it("untouched words have lower priority than struggling ones", () => {
     const now = "2026-05-01T12:00:00.000Z";
     const fresh = makeWord("nascent", { attemptCount: 0 });
     const struggling = makeWord("modest", {
-      meaningMastery: 0.2,
-      usageMastery: 0.25,
       attemptCount: 2,
       wrongCount: 1,
       lastWrongAt: "2026-05-01T08:00:00.000Z",
@@ -322,15 +236,11 @@ describe("mastery scoring", () => {
   it("mastered words have very low priority", () => {
     const now = "2026-05-01T12:00:00.000Z";
     const struggling = makeWord("modest", {
-      meaningMastery: 0.4,
-      usageMastery: 0.5,
       attemptCount: 3,
       wrongCount: 1,
       lastSeenAt: "2026-04-30T12:00:00.000Z"
     });
     const mastered = makeWord("vivid", {
-      meaningMastery: 0.95,
-      usageMastery: 0.95,
       masteryColour: "green",
       stabilityDays: 20,
       correctCount: 6,
@@ -355,7 +265,6 @@ function makeWord(word: string, overrides: Partial<LearnerWordState> = {}): Prac
     synonyms: [`${word} synonym`],
     antonyms: [`not ${word}`],
     confusables: [],
-    spellingNote: "watch the middle letters",
     state: makeState(overrides)
   };
 }
@@ -365,9 +274,6 @@ function makeState(overrides: Partial<LearnerWordState> = {}): LearnerWordState 
     id: "state_1",
     learnerId: "learner_1",
     wordId: "word_1",
-    meaningMastery: 0,
-    usageMastery: 0,
-    spellingMastery: 0,
     stabilityDays: 1,
     masteryColour: "red",
     lastSeenAt: null,

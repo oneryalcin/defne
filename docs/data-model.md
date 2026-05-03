@@ -38,7 +38,6 @@ words 1--many word_examples
 words 1--many word_synonyms
 words 1--many word_antonyms
 words 1--many word_confusables
-words 1--many spelling_notes
 words 1--many learner_word_state
 words 1--many generated_hints
 words 1--many generated_examples
@@ -190,39 +189,16 @@ CREATE TABLE word_confusables (
 
 Use `confusable_word_id` when the other word exists in the database. Use `confusable_text` when it does not.
 
-### `spelling_notes`
-
-```sql
-CREATE TABLE spelling_notes (
-  id TEXT PRIMARY KEY,
-  word_id TEXT NOT NULL REFERENCES words(id) ON DELETE CASCADE,
-  note TEXT NOT NULL,
-  tricky_part TEXT,
-  pattern TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-```
-
-Examples:
-
-- `necessary`: `one c, double s`
-- `accommodation`: `double c, double m`
-- `separate`: `has par in the middle`
-
 ### `learner_word_state`
 
-Stores learner-specific mastery and scheduling state.
+Stores learner-specific vocabulary scheduling state. Spelling will use its own
+practice-area state when it is added.
 
 ```sql
 CREATE TABLE learner_word_state (
   id TEXT PRIMARY KEY,
   learner_id TEXT NOT NULL REFERENCES learners(id) ON DELETE CASCADE,
   word_id TEXT NOT NULL REFERENCES words(id) ON DELETE CASCADE,
-
-  meaning_mastery REAL NOT NULL DEFAULT 0 CHECK (meaning_mastery >= 0 AND meaning_mastery <= 1),
-  usage_mastery REAL NOT NULL DEFAULT 0 CHECK (usage_mastery >= 0 AND usage_mastery <= 1),
-  spelling_mastery REAL NOT NULL DEFAULT 0 CHECK (spelling_mastery >= 0 AND spelling_mastery <= 1),
 
   stability_days REAL NOT NULL DEFAULT 1 CHECK (stability_days >= 1),
   mastery_colour TEXT NOT NULL DEFAULT 'red' CHECK (mastery_colour IN ('red', 'orange', 'yellow', 'light_green', 'green')),
@@ -282,7 +258,7 @@ CREATE TABLE practice_sessions (
 
 Stores one focused round inside a session. A round is narrower than a whole
 daily mission: it tracks the 12 words currently moving through learn cards,
-meaning recognition, context usage, and later spelling production.
+meaning recognition, and context usage.
 
 ```sql
 CREATE TABLE practice_rounds (
@@ -293,8 +269,7 @@ CREATE TABLE practice_rounds (
   current_step TEXT NOT NULL DEFAULT 'learn_cards' CHECK (current_step IN (
     'learn_cards',
     'meaning_recognition',
-    'context_usage',
-    'spelling_production'
+    'context_usage'
   )),
   max_retry_passes INTEGER NOT NULL DEFAULT 3 CHECK (max_retry_passes > 0),
   word_ids_json TEXT NOT NULL,
@@ -308,8 +283,7 @@ CREATE TABLE practice_rounds (
 ```
 
 `summary_json` should include parent-facing distinctions such as first-attempt
-secure, eventually-correct, reveal-and-move-on, near-review, and spelling still
-weak.
+secure, eventually-correct, reveal-and-move-on, and near-review.
 
 ### `practice_attempts`
 
@@ -329,9 +303,7 @@ CREATE TABLE practice_attempts (
     'antonym_choice',
     'sentence_usage_choice',
     'fill_sentence',
-    'confusable_choice',
-    'spelling_choice',
-    'type_from_memory'
+    'confusable_choice'
   )),
 
   prompt_json TEXT NOT NULL,
@@ -346,8 +318,7 @@ CREATE TABLE practice_attempts (
   round_step TEXT CHECK (round_step IN (
     'learn_cards',
     'meaning_recognition',
-    'context_usage',
-    'spelling_production'
+    'context_usage'
   )),
   pass_number INTEGER CHECK (pass_number IS NULL OR pass_number > 0),
   attempt_number_for_word_in_step INTEGER CHECK (
@@ -492,4 +463,4 @@ Rules:
 - Deleting a word cascades canonical child rows and learner state for that word.
 - Generated content can exist in `draft` state but does not appear in the child flow until approved.
 - Session selection can query due words by learner and `next_review_at`.
-- Parent dashboard can query red/orange words, repeated spelling errors, and recent sessions from indexed tables.
+- Parent dashboard can query red/orange words, due words, and recent sessions from indexed tables.

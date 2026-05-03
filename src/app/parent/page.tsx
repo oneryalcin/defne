@@ -29,28 +29,6 @@ const MASTERY_KEY: Record<MasteryColour, string> = {
   green: "is-green",
 };
 
-const DEMO_PATTERNS = [
-  {
-    code: "-ous endings",
-    instances: 4,
-    examples: [
-      ["caut", "ius", "cautious"],
-      ["cur", "ius", "curious"],
-    ],
-  },
-  {
-    code: "-ent / -ant",
-    instances: 2,
-    examples: [["persist", "ant", "persistent"]],
-  },
-];
-
-const DEMO_DECAY = [
-  { word: "eager", days: 11, from: "Mastered", to: "Reliable" },
-  { word: "grateful", days: 14, from: "Mastered", to: "Nearly steady" },
-  { word: "frequent", days: 9, from: "Reliable", to: "Nearly steady" },
-];
-
 type SearchParams = Promise<{ p?: string }> | { p?: string };
 
 export default async function ParentDashboardPage({
@@ -195,8 +173,8 @@ export default async function ParentDashboardPage({
                   <strong>—</strong>
                 </div>
                 <div className="bento-stats__row">
-                  <span>Spelling diffs</span>
-                  <strong>{dashboard.spellingMistakes.length}</strong>
+                  <span>Ready words</span>
+                  <strong>{dashboard.completeWords}</strong>
                 </div>
               </div>
             </div>
@@ -213,8 +191,7 @@ export default async function ParentDashboardPage({
                 : "Nothing flagged for focus right now."}
             </h2>
             <p className="section-head__sub">
-              The lowest dimension drives what the next round practises. Per-dimension breakdown is a
-              <DemoTag /> until meaning/usage/spelling are surfaced from word state.
+              The current selector uses recent attempts, recovery debt, recall decay, and confidence.
             </p>
           </header>
 
@@ -225,16 +202,15 @@ export default async function ParentDashboardPage({
                   <tr>
                     <th>Word</th>
                     <th>Mastery</th>
-                    <th>Meaning</th>
-                    <th>Usage</th>
-                    <th>Spelling</th>
+                    <th>Attempts</th>
+                    <th>Correct</th>
+                    <th>Wrong</th>
                     <th>Why it&apos;s here</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stillWorking.map((word) => {
                     const colour = word.masteryColour ?? "yellow";
-                    const ratio = masteryRatio(colour);
                     return (
                       <tr key={word.id}>
                         <td className="cell-word">{word.word}</td>
@@ -244,15 +220,9 @@ export default async function ParentDashboardPage({
                             {MASTERY_LABELS[colour]}
                           </span>
                         </td>
-                        <td>
-                          <DemoMeter colour={colour} ratio={ratio - 0.1} />
-                        </td>
-                        <td>
-                          <DemoMeter colour={colour} ratio={ratio} />
-                        </td>
-                        <td>
-                          <DemoMeter colour={colour} ratio={Math.max(0.2, ratio - 0.2)} />
-                        </td>
+                        <td className="cell-mono">{word.attemptCount}</td>
+                        <td className="cell-mono">{word.correctCount}</td>
+                        <td className="cell-mono">{word.wrongCount}</td>
                         <td className="dim">{word.definition ?? "Needs definition"}</td>
                       </tr>
                     );
@@ -263,96 +233,6 @@ export default async function ParentDashboardPage({
           ) : (
             <p className="empty-state">No words sitting in needs-work or building yet.</p>
           )}
-        </section>
-
-        {/* Section: Repeated mistakes */}
-        <section className="dash-section" aria-labelledby="repeated-mistakes">
-          <header className="section-head">
-            <span className="section-head__label">Repeated mistakes</span>
-            <h2 id="repeated-mistakes" className="section-head__title">
-              {dashboard.spellingMistakes.length > 0
-                ? "Spelling residue worth surfacing."
-                : "No spelling residue this week."}
-            </h2>
-            <p className="section-head__sub">
-              Pattern detection is a <DemoTag /> — current data shows individual misses by word.
-              The grouped view will replace this once the analyser ships.
-            </p>
-          </header>
-
-          <div className="bento-grid">
-            <div className="bento col-7">
-              <span className="bento__eyebrow">Spelling residue</span>
-              <h3>What slipped most</h3>
-              {dashboard.spellingMistakes.length > 0 ? (
-                <ul className="decay-list">
-                  {dashboard.spellingMistakes.slice(0, 5).map((item) => (
-                    <li key={item.word} className="decay-row">
-                      <strong>{item.word}</strong>
-                      <span className="decay-row__movement">
-                        {item.note ?? "No spelling note yet"}
-                      </span>
-                      <span className="cell-mono">{item.mistakes} miss</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <ul className="spell-pat-list" aria-label="Spelling patterns (demo)">
-                  {DEMO_PATTERNS.map((pat) => (
-                    <li key={pat.code} className="spell-pat">
-                      <div className="spell-pat__head">
-                        <span className="spell-pat__code">{pat.code}</span>
-                        <span className="spell-pat__count">
-                          {pat.instances} instances · demo
-                        </span>
-                      </div>
-                      <div className="spell-pat__examples">
-                        {pat.examples.map(([prefix, wrong, full]) => (
-                          <span key={full} className="spell-pat__ex">
-                            <span>
-                              {prefix}
-                              <span className="letter-miss-inline">{wrong}</span>
-                            </span>
-                            <span aria-hidden="true">→</span>
-                            <span>{full}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="bento col-5">
-              <span className="bento__eyebrow">
-                Decay queue <DemoTag />
-              </span>
-              <h3>Drifted from earlier weeks</h3>
-              <ul className="decay-list">
-                {(dashboard.dueWords.length > 0
-                  ? dashboard.dueWords.slice(0, 5).map((w) => ({
-                      word: w.word,
-                      days: 7,
-                      from: MASTERY_LABELS[w.masteryColour ?? "yellow"],
-                      to: MASTERY_LABELS["orange"],
-                    }))
-                  : DEMO_DECAY
-                ).map((row) => (
-                  <li key={row.word} className="decay-row">
-                    <strong>{row.word}</strong>
-                    <span className="decay-row__movement">
-                      {row.from} → {row.to}
-                    </span>
-                    <span className="cell-mono">{row.days}d</span>
-                  </li>
-                ))}
-              </ul>
-              <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 13, color: "var(--steel-secondary)" }}>
-                These return automatically over the next two rounds.
-              </p>
-            </div>
-          </div>
         </section>
 
         {/* Section: Next round */}
@@ -504,14 +384,13 @@ export default async function ParentDashboardPage({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                   gap: 18,
                 }}
               >
                 <RoundList title="First-attempt secure" items={dashboard.latestRound.firstAttemptSecureWords} />
                 <RoundList title="Completed with recovery" items={dashboard.latestRound.eventuallyCorrectWords} />
                 <RoundList title="Near review" items={dashboard.latestRound.nearReviewWords} />
-                <RoundList title="Spelling still weak" items={dashboard.latestRound.spellingStillWeakWords} />
               </div>
             </div>
           </section>
@@ -592,25 +471,6 @@ function Distribution({
   );
 }
 
-function DemoMeter({
-  colour,
-  ratio,
-}: {
-  colour: MasteryColour;
-  ratio: number;
-}) {
-  const safe = Math.max(0.08, Math.min(1, ratio));
-  return (
-    <div className={`mini-meter ${MASTERY_KEY[colour]}`} aria-label={`Demo meter ${Math.round(safe * 100)}%`}>
-      <span />
-      <span className="mini-meter__track">
-        <span className="mini-meter__fill" style={{ width: `${Math.round(safe * 100)}%` }} />
-      </span>
-      <span className="mini-meter__val">{Math.round(safe * 100)}</span>
-    </div>
-  );
-}
-
 function RoundsTimelineDemo() {
   const days = [
     { day: "Mon", val: 12 },
@@ -682,21 +542,6 @@ function RoundList({ title, items }: { title: string; items: string[] }) {
 
 function DemoTag() {
   return <span className="demo-tag" title="Backend hookup pending">demo</span>;
-}
-
-function masteryRatio(colour: MasteryColour): number {
-  switch (colour) {
-    case "red":
-      return 0.35;
-    case "orange":
-      return 0.55;
-    case "yellow":
-      return 0.7;
-    case "light_green":
-      return 0.85;
-    case "green":
-      return 0.95;
-  }
 }
 
 function countMastery(colours: MasteryColour[]): Record<MasteryColour, number> {

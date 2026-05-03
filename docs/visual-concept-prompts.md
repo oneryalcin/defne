@@ -31,10 +31,10 @@ Screen 1: Daily Mission (MVP-1A)
 A child dashboard with a small journey map, a recurring stylised pencil-drawing girl avatar, 15-minute mission card, mastery colour strip from red to green with text labels, and today’s focus words. Feeling: inviting, focused, ready to practise.
 
 Screen 2: Question + Hint (MVP-1A / MVP-1B)
-A vocabulary question for the word “reluctant” in a sentence context. Show multiple-choice answers, a progressive hint panel, and a small avatar giving a gentle clue. Show mastery dimensions as Meaning, Usage, Spelling with subtle meters. No answer giveaway.
+A vocabulary question for the word “reluctant” in a sentence context. Show multiple-choice answers, a progressive hint panel, and a small avatar giving a gentle clue. Show a calm mastery colour and recovery status, not per-dimension meters. No answer giveaway.
 
 Screen 3: Parent Progress (MVP-1A)
-A parent/admin dashboard showing weak words, spelling traps, forgotten-after-delay words, and latest session summary. Dense enough for a parent, calm and readable. Include red/orange/yellow/green status with text labels, not colour alone.
+A parent/admin dashboard showing weak words, due words, forgotten-after-delay words, and latest session summary. Dense enough for a parent, calm and readable. Include red/orange/yellow/green status with text labels, not colour alone.
 
 Screen 4: Visual Memory (Later Stage)
 A word memory card for “cautious” with the same pencil-drawing girl carefully crossing icy stepping stones. The image supports meaning, while the UI renders the word, definition, spelling chunk “cau + tious”, and a short recall prompt. Show parent-approved visual card state subtly.

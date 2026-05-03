@@ -540,6 +540,5 @@ function roundStepLabel(step: RoundSessionView["currentStep"] | AttemptReview["r
   if (step === "meaning_recognition") return "Meaning recognition";
   if (step === "context_usage") return "Context usage";
   if (step === "learn_cards") return "Learn cards";
-  if (step === "spelling_production") return "Spelling";
   return "Round";
 }

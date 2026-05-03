@@ -527,12 +527,6 @@ export default async function WordDetailPage({
             <div className="bento col-12">
               <table className="word-table">
                 <tbody>
-                  <StateRow label="meaningMastery" value={detail.state.meaningMastery.toFixed(3)} />
-                  <StateRow label="usageMastery" value={detail.state.usageMastery.toFixed(3)} />
-                  <StateRow
-                    label="spellingMastery (ignored by colour)"
-                    value={detail.state.spellingMastery.toFixed(3)}
-                  />
                   <StateRow label="stabilityDays" value={detail.state.stabilityDays.toFixed(2)} />
                   <StateRow
                     label="averageHintLevelUsed"

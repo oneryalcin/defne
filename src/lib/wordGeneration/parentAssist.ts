@@ -1,7 +1,6 @@
-import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
+import sharp from "sharp";
 import {
   generateExampleVisualCue,
   stablePromptDigest,
@@ -9,7 +8,6 @@ import {
 } from "@/lib/imageGeneration/exampleVisualCues";
 import { deterministicWordId, normalizeWord } from "@/lib/db/seed";
 
-const execFileAsync = promisify(execFile);
 const GEMINI_TEXT_MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const DRAFT_IMAGE_DIR = "public/assets/example-cues/drafts";
@@ -257,19 +255,11 @@ function extensionForMime(mimeType: string): string {
 }
 
 async function optimiseImageForApp(filePath: string, resizeMax: number, jpegQuality: number): Promise<void> {
-  await execFileAsync("sips", [
-    "-Z",
-    String(resizeMax),
-    "--setProperty",
-    "format",
-    "jpeg",
-    "--setProperty",
-    "formatOptions",
-    String(jpegQuality),
-    filePath,
-    "--out",
-    filePath
-  ]);
+  const optimized = await sharp(filePath)
+    .resize({ width: resizeMax, height: resizeMax, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: jpegQuality, mozjpeg: true })
+    .toBuffer();
+  await writeFile(filePath, optimized);
 }
 
 interface GeminiTextResponse {

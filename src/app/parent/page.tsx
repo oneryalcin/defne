@@ -144,10 +144,6 @@ export default async function ParentDashboardPage({
               <Plus size={18} aria-hidden="true" />
               Add word
             </Link>
-            <Link className="ribbon ribbon--ghost" href="/parent/import">
-              <ListChecks size={18} aria-hidden="true" />
-              Paste batch
-            </Link>
           </div>
         </header>
 

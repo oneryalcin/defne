@@ -20,9 +20,6 @@ export default function WordsPage() {
           <Plus size={18} />
           Add word
         </Link>
-        <Link className="button-secondary" href="/parent/import">
-          Paste batch
-        </Link>
       </div>
 
       <section className="word-grid">

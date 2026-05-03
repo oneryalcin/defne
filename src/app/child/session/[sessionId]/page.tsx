@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { recordCardViewAction, startMeaningRecognitionAction } from "@/app/actions";
-import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView } from "@/lib/db/repository";
+import { getAttemptReview, getSessionView, type AttemptReview, type RoundLearnCardView, type RoundSessionView, type VisualCue } from "@/lib/db/repository";
 import { QuestionForm } from "@/components/QuestionForm";
 
 export const dynamic = "force-dynamic";
@@ -29,19 +29,22 @@ export default async function SessionPage({
 
     return (
       <main className="spread">
-        <article className="book-page book-page--ruled practice-spread">
-          <div className="practice-progress-row">
-            <div
-              className="progress-track progress-track-compact"
-              aria-label={`Progress ${review.questionNumber} of ${review.totalQuestions}`}
-            >
-              <div className="progress-fill" style={{ width: `${percent}%` }} />
+        <article className={`book-page book-page--ruled practice-spread${review.visualCue ? " practice-spread--visual" : ""}`}>
+          {review.visualCue ? <VisualCuePanel cue={review.visualCue} /> : null}
+          <div className="practice-flow">
+            <div className="practice-progress-row">
+              <div
+                className="progress-track progress-track-compact"
+                aria-label={`Progress ${review.questionNumber} of ${review.totalQuestions}`}
+              >
+                <div className="progress-fill" style={{ width: `${percent}%` }} />
+              </div>
+              <span className="practice-progress-count">
+                {review.questionNumber}/{review.totalQuestions}
+              </span>
             </div>
-            <span className="practice-progress-count">
-              {review.questionNumber}/{review.totalQuestions}
-            </span>
+            <ReviewPanel review={review} />
           </div>
-          <ReviewPanel review={review} />
         </article>
       </main>
     );
@@ -94,18 +97,31 @@ export default async function SessionPage({
 
   return (
     <main className="spread">
-      <article className="book-page book-page--ruled practice-spread">
-        <div className="practice-progress-row">
-          <div className="progress-track progress-track-compact" aria-label={`Progress ${view.questionNumber} of ${view.totalQuestions}`}>
-            <div className="progress-fill" style={{ width: `${percent}%` }} />
+      <article className={`book-page book-page--ruled practice-spread${view.visualCue ? " practice-spread--visual" : ""}`}>
+        {view.visualCue ? <VisualCuePanel cue={view.visualCue} /> : null}
+        <div className="practice-flow">
+          <div className="practice-progress-row">
+            <div className="progress-track progress-track-compact" aria-label={`Progress ${view.questionNumber} of ${view.totalQuestions}`}>
+              <div className="progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+            <span className="practice-progress-count">
+              {view.questionNumber}/{view.totalQuestions}
+            </span>
           </div>
-          <span className="practice-progress-count">
-            {view.questionNumber}/{view.totalQuestions}
-          </span>
+          <QuestionForm sessionId={sessionId} question={view.question} />
         </div>
-        <QuestionForm sessionId={sessionId} question={view.question} />
       </article>
     </main>
+  );
+}
+
+function VisualCuePanel({ cue }: { cue: VisualCue }) {
+  return (
+    <aside className="visual-cue-panel" aria-label="Visual memory cue">
+      <figure className="visual-cue-frame">
+        <img src={cue.src} alt={cue.alt} />
+      </figure>
+    </aside>
   );
 }
 
@@ -180,47 +196,55 @@ function LearnCardsPanel({ sessionId, round, card }: { sessionId: string; round:
         />
       </div>
 
-      <div className="learn-card">
-        <div className="learn-card-header">
-          <div className="learn-card-title-row">
-            <h1>
-              {card.selectionReason ? (
-                <ReasonWord
-                  word={card.word}
-                  reason={card.selectionReason}
-                  history={card.history}
-                  colour={card.history.masteryColour}
-                />
-              ) : (
-                card.word
-              )}
-            </h1>
+      <div className={`learn-card${card.visualCue ? " learn-card--visual" : ""}`}>
+        {card.visualCue ? (
+          <figure className="learn-card-visual-cue">
+            <img src={card.visualCue.src} alt={card.visualCue.alt} />
+          </figure>
+        ) : null}
+
+        <div className="learn-card-body">
+          <div className="learn-card-header">
+            <div className="learn-card-title-row">
+              <h1>
+                {card.selectionReason ? (
+                  <ReasonWord
+                    word={card.word}
+                    reason={card.selectionReason}
+                    history={card.history}
+                    colour={card.history.masteryColour}
+                  />
+                ) : (
+                  card.word
+                )}
+              </h1>
+            </div>
+            <p className="learn-card__meaning">
+              <em>{card.definition}</em>
+            </p>
           </div>
-          <p className="learn-card__meaning">
-            <em>{card.definition}</em>
-          </p>
-        </div>
 
-        <CardSupport card={card} />
+          <CardSupport card={card} />
 
-        <div className="learn-card-actions">
-          {round.canUnlockMeaning ? (
-            <form action={startMeaningRecognitionAction}>
-              <input type="hidden" name="sessionId" value={sessionId} />
-              <button className="ribbon" type="submit">
-                Start matching <ArrowRight size={18} aria-hidden="true" />
-              </button>
-            </form>
-          ) : cardIsReady && nextUnreadyCard ? (
-            <Link
-              className="ribbon"
-              href={`/child/session/${sessionId}?card=${nextUnreadyCard.id}`}
-            >
-              Next card <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-          ) : (
-            <CardViewForm sessionId={sessionId} wordId={card.id} returnToWordId={returnToWordId} />
-          )}
+          <div className="learn-card-actions">
+            {round.canUnlockMeaning ? (
+              <form action={startMeaningRecognitionAction}>
+                <input type="hidden" name="sessionId" value={sessionId} />
+                <button className="ribbon" type="submit">
+                  Start matching <ArrowRight size={18} aria-hidden="true" />
+                </button>
+              </form>
+            ) : cardIsReady && nextUnreadyCard ? (
+              <Link
+                className="ribbon"
+                href={`/child/session/${sessionId}?card=${nextUnreadyCard.id}`}
+              >
+                Next card <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+            ) : (
+              <CardViewForm sessionId={sessionId} wordId={card.id} returnToWordId={returnToWordId} />
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -72,15 +72,8 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
      VALUES (?, ?, ?, NULL, 1, ?, ?)`
   ).run(`definition_${wordId}`, wordId, entry.definition.trim(), now, now);
 
-  replaceRows(db, "word_examples", wordId);
   const examples = uniqueTexts([...(entry.examples ?? []), entry.example ?? ""]);
-  for (const [index, example] of examples.entries()) {
-    db.prepare(
-      `INSERT INTO word_examples
-        (id, word_id, sentence, source, status, created_at, updated_at)
-       VALUES (?, ?, ?, 'canonical', 'approved', ?, ?)`
-    ).run(`example_${wordId}_${index}`, wordId, example, now, now);
-  }
+  reconcileSeedExamples(db, wordId, examples, now);
 
   replaceRows(db, "word_synonyms", wordId);
   for (const [index, synonym] of (entry.synonyms ?? []).entries()) {
@@ -123,6 +116,43 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
 
 function replaceRows(db: DatabaseSync, table: string, wordId: string): void {
   db.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
+}
+
+function reconcileSeedExamples(db: DatabaseSync, wordId: string, examples: string[], now: string): void {
+  const intendedIds = examples.map((_, index) => `example_${wordId}_${index}`);
+  if (intendedIds.length > 0) {
+    const placeholders = intendedIds.map(() => "?").join(", ");
+    db.prepare(`DELETE FROM word_examples WHERE word_id = ? AND source = 'canonical' AND id NOT IN (${placeholders})`).run(
+      wordId,
+      ...intendedIds
+    );
+  } else {
+    db.prepare("DELETE FROM word_examples WHERE word_id = ? AND source = 'canonical'").run(wordId);
+  }
+
+  for (const [index, example] of examples.entries()) {
+    const exampleId = `example_${wordId}_${index}`;
+    const existing = db.prepare("SELECT sentence FROM word_examples WHERE id = ?").get(exampleId) as
+      | { sentence: string }
+      | undefined;
+    if (existing && existing.sentence !== example) {
+      db.prepare(
+        `UPDATE example_visual_cues
+         SET status = 'disabled', updated_at = ?
+         WHERE example_id = ? AND status IN ('draft', 'approved')`
+      ).run(now, exampleId);
+    }
+    db.prepare(
+      `INSERT INTO word_examples
+        (id, word_id, sentence, source, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'canonical', 'approved', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         sentence = excluded.sentence,
+         source = excluded.source,
+         status = excluded.status,
+         updated_at = excluded.updated_at`
+    ).run(exampleId, wordId, example, now, now);
+  }
 }
 
 function uniqueTexts(values: string[]): string[] {

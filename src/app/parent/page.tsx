@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ListChecks, Plus } from "lucide-react";
+import { setVisualCuesAction } from "@/app/actions";
 import {
   getMissionPreview,
   getParentDashboard,
@@ -419,6 +420,55 @@ export default async function ParentDashboardPage({
                   Open queue
                 </Link>
               </div>
+            </div>
+
+            <div className="bento col-4">
+              <span className="bento__eyebrow">Question visuals</span>
+              <h3>Image cues</h3>
+              <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.55, color: "var(--steel-secondary)" }}>
+                Choose where approved example images appear. Steps without images stay text-only.
+              </p>
+              <form action={setVisualCuesAction} className="visual-toggle-form">
+                <label className="visual-placement">
+                  <input
+                    type="checkbox"
+                    name="visualCueLearnCards"
+                    defaultChecked={dashboard.visualCuePreferences.learnCards}
+                  />
+                  <span>
+                    <strong>Step 1 · learn cards</strong>
+                    <small>Show images while the child studies the word and examples.</small>
+                  </span>
+                </label>
+                <label className="visual-placement">
+                  <input
+                    type="checkbox"
+                    name="visualCueMeaningQuestions"
+                    defaultChecked={dashboard.visualCuePreferences.meaningQuestions}
+                  />
+                  <span>
+                    <strong>Step 2 · meaning choices</strong>
+                    <small>Show images beside “what does this word mean?” questions.</small>
+                  </span>
+                </label>
+                <label className="visual-placement">
+                  <input
+                    type="checkbox"
+                    name="visualCueContextQuestions"
+                    defaultChecked={dashboard.visualCuePreferences.contextQuestions}
+                  />
+                  <span>
+                    <strong>Step 3 · fill the sentence</strong>
+                    <small>Show images beside sentence-completion practice.</small>
+                  </span>
+                </label>
+                <p className="visual-toggle-summary">
+                  {dashboard.visualCuesEnabled ? "Images are enabled for selected steps." : "Images are off for child practice."}
+                </p>
+                <button className="ribbon ribbon--ghost" type="submit">
+                  Save setting
+                </button>
+              </form>
             </div>
           </div>
         </section>

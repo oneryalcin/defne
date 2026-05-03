@@ -38,6 +38,19 @@ import type {
 import { getDb } from "./index";
 import { defaultLearnerId, deterministicWordId, normalizeWord } from "./seed";
 
+export interface VisualCue {
+  src: string;
+  alt: string;
+  exampleId: string;
+}
+
+export interface VisualCuePreferences {
+  enabled: boolean;
+  learnCards: boolean;
+  meaningQuestions: boolean;
+  contextQuestions: boolean;
+}
+
 interface WordRow {
   id: string;
   word: string;
@@ -137,6 +150,9 @@ export interface SessionView {
   totalQuestions: number;
   question: PracticeQuestion | null;
   word: PracticeWord | null;
+  visualCuesEnabled: boolean;
+  visualCuePreferences: VisualCuePreferences;
+  visualCue: VisualCue | null;
   round: RoundSessionView | null;
 }
 
@@ -169,6 +185,7 @@ export interface RoundLearnCardView {
   confusables: string[];
   spellingNote: string | null;
   viewCount: number;
+  visualCue: VisualCue | null;
   supportMode: LearnCardSupportMode;
   activeRecallPrompt: string;
   selectionReason: RoundSelectionReason | null;
@@ -191,6 +208,9 @@ export interface AttemptReview {
   instruction: string;
   choices: string[];
   targetWord: string;
+  visualCuesEnabled: boolean;
+  visualCuePreferences: VisualCuePreferences;
+  visualCue: VisualCue | null;
   submittedAnswer: string;
   canonicalAnswer: string;
   targetDefinition: string | null;
@@ -242,6 +262,8 @@ export interface ParentWordListItem {
 export interface ParentDashboard {
   totalWords: number;
   completeWords: number;
+  visualCuesEnabled: boolean;
+  visualCuePreferences: VisualCuePreferences;
   latestSession: {
     startedAt: string;
     actualQuestionCount: number;
@@ -283,6 +305,31 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
     | { display_name: string }
     | undefined;
   return { wordCount, completeWordCount, learnerName: learner?.display_name ?? "Learner" };
+}
+
+export function getVisualCuePreference(): VisualCuePreferences {
+  return getVisualCuePreferenceFromDb(getDb());
+}
+
+export function setVisualCuePreference(preferences: Pick<VisualCuePreferences, "learnCards" | "meaningQuestions" | "contextQuestions">): void {
+  const db = getDb();
+  const enabled = preferences.learnCards || preferences.meaningQuestions || preferences.contextQuestions;
+  db.prepare(
+    `UPDATE learner_profiles
+     SET visual_cues_enabled = ?,
+         visual_cues_on_learn_cards = ?,
+         visual_cues_on_meaning_questions = ?,
+         visual_cues_on_context_questions = ?,
+         updated_at = ?
+     WHERE learner_id = ?`
+  ).run(
+    enabled ? 1 : 0,
+    preferences.learnCards ? 1 : 0,
+    preferences.meaningQuestions ? 1 : 0,
+    preferences.contextQuestions ? 1 : 0,
+    new Date().toISOString(),
+    defaultLearnerId()
+  );
 }
 
 export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
@@ -546,8 +593,9 @@ export function getSessionView(sessionId: string, selectedCardId?: string): Sess
   const db = getDb();
   const session = getSessionRow(db, sessionId);
   const round = getRoundRowForSession(db, sessionId);
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
   if (round) {
-    return getRoundSessionView(db, session, round, selectedCardId);
+    return getRoundSessionView(db, session, round, selectedCardId, visualCuePreferences);
   }
 
   const plan = readSessionPlan(session);
@@ -563,6 +611,9 @@ export function getSessionView(sessionId: string, selectedCardId?: string): Sess
       totalQuestions: plan.length,
       question: null,
       word: null,
+      visualCuesEnabled: visualCuePreferences.enabled,
+      visualCuePreferences,
+      visualCue: null,
       mode: "daily_mission",
       round: null
     };
@@ -571,14 +622,18 @@ export function getSessionView(sessionId: string, selectedCardId?: string): Sess
   const current = plan[attempts];
   const word = wordMap.get(current.wordId);
   if (!word) throw new Error(`Session word ${current.wordId} is not available.`);
+  const question = generateQuestion(current.questionType, word, words);
 
   return {
     sessionId,
     status: session.status,
     questionNumber: attempts + 1,
     totalQuestions: plan.length,
-    question: generateQuestion(current.questionType, word, words),
+    question,
     word,
+    visualCuesEnabled: visualCuePreferences.enabled,
+    visualCuePreferences,
+    visualCue: shouldShowVisualCueForQuestion(question, visualCuePreferences) ? getVisualCueForQuestion(db, question, word.word) : null,
     mode: "daily_mission",
     round: null
   };
@@ -639,7 +694,8 @@ export function submitSessionAnswer(input: {
       instruction: question.instruction,
       choices: question.choices,
       hints: question.hints,
-      targetWord: question.targetWord
+      targetWord: question.targetWord,
+      selectedExampleId: question.selectedExampleId
     }),
     JSON.stringify({ expectedAnswers: question.expectedAnswers, canonicalAnswer: question.canonicalAnswer }),
     input.submittedAnswer,
@@ -726,6 +782,7 @@ export function startRoundMeaningRecognition(sessionId: string): void {
 export function getAttemptReview(sessionId: string, attemptId: string): AttemptReview {
   const db = getDb();
   const session = getSessionRow(db, sessionId);
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
   const plan = readSessionPlan(session);
   const row = db
     .prepare(
@@ -780,6 +837,7 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     choices?: string[];
     hints?: string[];
     targetWord?: string;
+    selectedExampleId?: string | null;
   };
   const expected = JSON.parse(row.expected_answer_json) as {
     canonicalAnswer?: string;
@@ -808,6 +866,11 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     instruction: prompt.instruction ?? "",
     choices: prompt.choices ?? [],
     targetWord: prompt.targetWord ?? row.word,
+    visualCuesEnabled: visualCuePreferences.enabled,
+    visualCuePreferences,
+    visualCue: shouldShowVisualCueForAttempt(row.question_type, row.round_step, visualCuePreferences)
+      ? getVisualCueForExample(db, prompt.selectedExampleId ?? null, row.word)
+      : null,
     submittedAnswer: row.submitted_answer ?? "",
     canonicalAnswer: expected.canonicalAnswer ?? row.word,
     targetDefinition: row.definition,
@@ -836,6 +899,7 @@ export function getSessionSummary(sessionId: string): SessionSummary {
 export function getParentDashboard(): ParentDashboard {
   const db = getDb();
   const words = getParentWords();
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
   const totalWords = words.length;
   const completeWords = words.filter((word) => word.isComplete).length;
   const redOrangeWords = words.filter((word) => word.masteryColour === "red" || word.masteryColour === "orange").slice(0, 12);
@@ -890,6 +954,8 @@ export function getParentDashboard(): ParentDashboard {
   return {
     totalWords,
     completeWords,
+    visualCuesEnabled: visualCuePreferences.enabled,
+    visualCuePreferences,
     latestSession: latest
       ? {
           startedAt: latest.started_at,
@@ -1202,6 +1268,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
       definition: wordRow.definition ?? "",
       example: wordRow.example ?? "",
       examples: getExamples(db, wordRow.id),
+      exampleRefs: getExampleRows(db, wordRow.id),
       synonyms: synonyms.map((s) => s.lemma),
       antonyms: antonyms.map((s) => s.lemma),
       confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
@@ -1500,7 +1567,8 @@ function getRoundSessionView(
   db: DatabaseSync,
   session: SessionRow,
   round: PracticeRoundRow,
-  selectedCardId?: string
+  selectedCardId: string | undefined,
+  visualCuePreferences: VisualCuePreferences
 ): SessionView {
   const wordIds = readRoundWordIds(round);
   const cardViewCounts = readCardViewCounts(round);
@@ -1515,7 +1583,9 @@ function getRoundSessionView(
   const selectionReasons = new Map((roundSummary.round?.selectionReasons ?? []).map((reason) => [reason.wordId, reason]));
   const attempts = getRoundStepAttempts(db, round.id);
   const attemptCount = getSessionAttemptCount(db, session.id);
-  const cards = roundWords.map((word) => toRoundLearnCardView(word, cardViewCounts[word.id] ?? 0, selectionReasons.get(word.id) ?? null));
+  const cards = roundWords.map((word) =>
+    toRoundLearnCardView(db, word, cardViewCounts[word.id] ?? 0, selectionReasons.get(word.id) ?? null, visualCuePreferences)
+  );
   const selectedCard =
     (selectedCardId ? cards.find((card) => card.id === selectedCardId) : null) ??
     cards.find((card) => card.viewCount < 2) ??
@@ -1556,6 +1626,12 @@ function getRoundSessionView(
     totalQuestions: Math.max(session.target_question_count, attemptCount + remainingInPass),
     question,
     word,
+    visualCuesEnabled: visualCuePreferences.enabled,
+    visualCuePreferences,
+    visualCue:
+      question && word && shouldShowVisualCueForRoundStep(round.current_step, visualCuePreferences)
+        ? getVisualCueForQuestion(db, question, word.word)
+        : null,
     round: {
       roundId: round.id,
       status: round.status,
@@ -1643,7 +1719,8 @@ function submitRoundAnswer(
       instruction: question.instruction,
       choices: question.choices,
       hints: question.hints,
-      targetWord: question.targetWord
+      targetWord: question.targetWord,
+      selectedExampleId: question.selectedExampleId
     }),
     JSON.stringify({ expectedAnswers: question.expectedAnswers, canonicalAnswer: question.canonicalAnswer }),
     input.submittedAnswer,
@@ -1866,22 +1943,30 @@ function getRoundStepAttempts(db: DatabaseSync, roundId: string): RoundStepAttem
 }
 
 function toRoundLearnCardView(
+  db: DatabaseSync,
   word: PracticeWord,
   viewCount: number,
-  selectionReason: RoundSelectionReason | null
+  selectionReason: RoundSelectionReason | null,
+  visualCuePreferences: VisualCuePreferences
 ): RoundLearnCardView {
+  const selectedExample = selectLearnCardExample(word, viewCount);
+  const cardWord = { ...word, example: selectedExample.sentence };
   return {
     id: word.id,
     word: word.word,
     definition: word.definition,
-    example: word.example,
+    example: selectedExample.sentence,
     synonyms: word.synonyms,
     antonyms: word.antonyms,
     confusables: word.confusables,
     spellingNote: word.spellingNote,
     viewCount,
+    visualCue:
+      visualCuePreferences.enabled && visualCuePreferences.learnCards
+        ? getVisualCueForExample(db, selectedExample.id, word.word)
+        : null,
     supportMode: learnCardSupportMode(viewCount),
-    activeRecallPrompt: activeRecallPrompt(word),
+    activeRecallPrompt: activeRecallPrompt(cardWord),
     selectionReason,
     history: {
       attemptCount: word.state.attemptCount,
@@ -1891,6 +1976,25 @@ function toRoundLearnCardView(
         word.state.attemptCount === 0 ? null : masteryColourForState(word.state)
     }
   };
+}
+
+function selectLearnCardExample(word: PracticeWord, viewCount: number): { id: string | null; sentence: string } {
+  const refs =
+    word.exampleRefs && word.exampleRefs.length > 0
+      ? word.exampleRefs
+      : (word.examples.length > 0 ? word.examples : [word.example]).map((sentence) => ({
+          id: null,
+          sentence
+        }));
+  const examples = refs
+    .map((example) => ({
+      id: example.id,
+      sentence: example.sentence.trim()
+    }))
+    .filter((example) => Boolean(example.sentence));
+  if (examples.length === 0) return { id: null, sentence: word.example };
+  const index = Math.min(Math.max(0, viewCount), examples.length - 1);
+  return examples[index];
 }
 
 function activeRecallPrompt(word: PracticeWord): string {
@@ -1940,7 +2044,8 @@ function getPracticeWords(): PracticeWord[] {
 
   return rows.map((row) => {
     const state = getStateForWord(db, row.id);
-    const examples = getExamples(db, row.id);
+    const exampleRefs = getExampleRows(db, row.id);
+    const examples = exampleRefs.map((example) => example.sentence);
     return {
       id: row.id,
       word: row.word,
@@ -1949,6 +2054,7 @@ function getPracticeWords(): PracticeWord[] {
       definition: row.definition ?? "",
       example: examples[0] ?? "",
       examples,
+      exampleRefs,
       synonyms: getTextList(db, "word_synonyms", "synonym", row.id),
       antonyms: getTextList(db, "word_antonyms", "antonym", row.id),
       confusables: getTextList(db, "word_confusables", "confusable_text", row.id),
@@ -2306,15 +2412,108 @@ function getTextList(db: DatabaseSync, table: string, column: string, wordId: st
 }
 
 function getExamples(db: DatabaseSync, wordId: string): string[] {
+  return getExampleRows(db, wordId).map((row) => row.sentence);
+}
+
+function getExampleRows(db: DatabaseSync, wordId: string): Array<{ id: string; sentence: string }> {
   const rows = db
     .prepare(
-      `SELECT sentence
+      `SELECT id, sentence
        FROM word_examples
        WHERE word_id = ? AND status = 'approved'
        ORDER BY id ASC`
     )
-    .all(wordId) as Array<{ sentence: string }>;
-  return rows.map((row) => row.sentence).filter(Boolean);
+    .all(wordId) as Array<{ id: string; sentence: string }>;
+  return rows.filter((row) => Boolean(row.sentence));
+}
+
+function getVisualCuePreferenceFromDb(db: DatabaseSync): VisualCuePreferences {
+  const row = db
+    .prepare(
+      `SELECT visual_cues_enabled,
+              visual_cues_on_learn_cards,
+              visual_cues_on_meaning_questions,
+              visual_cues_on_context_questions
+       FROM learner_profiles
+       WHERE learner_id = ?`
+    )
+    .get(defaultLearnerId()) as
+    | {
+        visual_cues_enabled: number;
+        visual_cues_on_learn_cards: number;
+        visual_cues_on_meaning_questions: number;
+        visual_cues_on_context_questions: number;
+      }
+    | undefined;
+  const enabled = row ? row.visual_cues_enabled !== 0 : true;
+  return {
+    enabled,
+    learnCards: enabled && (row ? row.visual_cues_on_learn_cards === 1 : true),
+    meaningQuestions: enabled && (row ? row.visual_cues_on_meaning_questions === 1 : false),
+    contextQuestions: enabled && (row ? row.visual_cues_on_context_questions === 1 : false)
+  };
+}
+
+function getVisualCueForQuestion(db: DatabaseSync, question: PracticeQuestion, word: string): VisualCue | null {
+  return getVisualCueForExample(db, question.selectedExampleId, word);
+}
+
+function shouldShowVisualCueForRoundStep(step: RoundLearningStep, preferences: VisualCuePreferences): boolean {
+  if (!preferences.enabled) return false;
+  if (step === "meaning_recognition") return preferences.meaningQuestions;
+  if (step === "context_usage") return preferences.contextQuestions;
+  return false;
+}
+
+function shouldShowVisualCueForAttempt(
+  questionType: QuestionType,
+  roundStep: RoundLearningStep | null,
+  preferences: VisualCuePreferences
+): boolean {
+  if (roundStep) return shouldShowVisualCueForRoundStep(roundStep, preferences);
+  return shouldShowVisualCueForQuestionType(questionType, preferences);
+}
+
+function shouldShowVisualCueForQuestion(question: PracticeQuestion, preferences: VisualCuePreferences): boolean {
+  return shouldShowVisualCueForQuestionType(question.questionType, preferences);
+}
+
+function shouldShowVisualCueForQuestionType(questionType: QuestionType, preferences: VisualCuePreferences): boolean {
+  if (!preferences.enabled) return false;
+  if (questionType === "definition_choice" || questionType === "synonym_choice" || questionType === "antonym_choice") {
+    return preferences.meaningQuestions;
+  }
+  if (questionType === "fill_sentence" || questionType === "sentence_usage_choice") {
+    return preferences.contextQuestions;
+  }
+  return false;
+}
+
+function getVisualCueForExample(db: DatabaseSync, exampleId: string | null, word: string): VisualCue | null {
+  if (!exampleId) return null;
+  const row = db
+    .prepare(
+      `SELECT image_path, image_url
+       FROM example_visual_cues
+       WHERE example_id = ?
+         AND status = 'approved'
+         AND (image_path IS NOT NULL OR image_url IS NOT NULL)
+       ORDER BY reviewed_at DESC, created_at DESC, id ASC
+       LIMIT 1`
+    )
+    .get(exampleId) as { image_path: string | null; image_url: string | null } | undefined;
+  const rawSrc = row?.image_path ?? row?.image_url ?? null;
+  if (!rawSrc) return null;
+  return {
+    src: normaliseCueSrc(rawSrc),
+    alt: `Visual cue for ${word}`,
+    exampleId
+  };
+}
+
+function normaliseCueSrc(src: string): string {
+  if (src.startsWith("/") || src.startsWith("http://") || src.startsWith("https://")) return src;
+  return `/${src.replace(/^public\//, "")}`;
 }
 
 function getSpellingNote(db: DatabaseSync, wordId: string): string | null {

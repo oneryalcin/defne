@@ -1697,6 +1697,93 @@ button, input, textarea, select { font: inherit; }
 
 .form-grid .wide { grid-column: 1 / -1; }
 
+.parent-word-builder {
+  display: grid;
+  gap: 24px;
+}
+
+.parent-word-builder__assist,
+.parent-word-builder__editor {
+  display: grid;
+  gap: 22px;
+}
+
+.parent-word-builder__word-field,
+.parent-word-builder__examples label {
+  display: grid;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--steel-secondary);
+}
+
+.parent-word-builder__generate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.parent-word-builder__status.is-error {
+  border-color: rgba(186, 58, 75, 0.28);
+  background: rgba(186, 58, 75, 0.05);
+  color: #7b1f2d;
+}
+
+.parent-word-builder__examples {
+  display: grid;
+  gap: 16px;
+}
+
+.parent-word-builder__definition-text {
+  min-height: 96px;
+}
+
+.parent-word-builder__section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--steel-secondary);
+}
+
+.parent-word-builder__example-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.parent-word-builder__example-row.has-preview {
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 160px);
+}
+
+.parent-word-builder__example-text {
+  min-height: 116px;
+}
+
+.parent-word-builder__inline-preview {
+  position: relative;
+  align-self: end;
+  margin: 0;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  background: #fbf6e9;
+}
+
+.parent-word-builder__inline-preview img {
+  object-fit: cover;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 .empty-state {
   border: 1.5px dashed rgba(31, 41, 55, 0.22);
   border-radius: var(--radius-input);
@@ -1890,6 +1977,8 @@ button, input, textarea, select { font: inherit; }
   .round-explainer,
   .word-grid,
   .form-grid,
+  .parent-word-builder__generate-row,
+  .parent-word-builder__example-row.has-preview,
   .mission-strip {
     grid-template-columns: 1fr;
   }
@@ -1930,6 +2019,16 @@ button, input, textarea, select { font: inherit; }
   .word-cluster-header {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }
 

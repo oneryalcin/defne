@@ -280,11 +280,24 @@ export interface WordFormInput {
   word: string;
   definition?: string;
   example?: string;
+  examples?: string[];
   synonym?: string;
+  synonyms?: string[];
   antonym?: string;
+  antonyms?: string[];
   spellingNote?: string;
   confusable?: string;
+  confusables?: string[];
   difficultyLevel?: number;
+}
+
+export interface ParentExampleVisualCueInput {
+  exampleIndex: number;
+  provider: string;
+  model: string;
+  promptVersion: string;
+  prompt: string;
+  imagePath: string;
 }
 
 export function getHomeStatus(): { wordCount: number; completeWordCount: number; learnerName: string } {
@@ -1470,6 +1483,55 @@ export function createOrUpdateParentWord(input: WordFormInput): string {
   return wordId;
 }
 
+export function findActiveWordByText(word: string): { id: string; word: string } | null {
+  const normalized = normalizeWord(word);
+  if (!normalized) return null;
+  const row = getDb()
+    .prepare("SELECT id, word FROM words WHERE normalized_word = ? AND status = 'active' LIMIT 1")
+    .get(normalized) as { id: string; word: string } | undefined;
+  return row ?? null;
+}
+
+export function upsertParentExampleVisualCues(wordId: string, cues: ParentExampleVisualCueInput[]): void {
+  if (cues.length === 0) return;
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  for (const cue of cues) {
+    const exampleId = `example_${wordId}_${cue.exampleIndex}`;
+    const exampleExists = db.prepare("SELECT id FROM word_examples WHERE id = ?").get(exampleId) as { id: string } | undefined;
+    if (!exampleExists) continue;
+
+    db.prepare(
+      `INSERT INTO example_visual_cues
+        (id, example_id, word_id, provider, model, prompt_version, prompt, image_path, image_url, status, reviewed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'approved', ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         provider = excluded.provider,
+         model = excluded.model,
+         prompt_version = excluded.prompt_version,
+         prompt = excluded.prompt,
+         image_path = excluded.image_path,
+         image_url = NULL,
+         status = 'approved',
+         reviewed_at = excluded.reviewed_at,
+         updated_at = excluded.updated_at`
+    ).run(
+      `cue_${exampleId}`,
+      exampleId,
+      wordId,
+      cue.provider,
+      cue.model,
+      cue.promptVersion,
+      cue.prompt,
+      cue.imagePath.replace(/^\//, "public/"),
+      now,
+      now,
+      now
+    );
+  }
+}
+
 function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now: string): void {
   db.prepare(
     `UPDATE learner_word_state
@@ -2064,6 +2126,20 @@ function getPracticeWords(): PracticeWord[] {
   });
 }
 
+function uniqueTexts(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const clean = value.trim();
+    if (!clean) continue;
+    const key = clean.toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(clean);
+  }
+  return result;
+}
+
 function replaceOptionalWordRows(db: DatabaseSync, wordId: string, input: WordFormInput, now: string): void {
   if (input.definition !== undefined) {
     db.prepare("DELETE FROM word_definitions WHERE word_id = ?").run(wordId);
@@ -2076,28 +2152,29 @@ function replaceOptionalWordRows(db: DatabaseSync, wordId: string, input: WordFo
     }
   }
 
-  if (input.example !== undefined) {
+  if (input.example !== undefined || input.examples !== undefined) {
     db.prepare("DELETE FROM word_examples WHERE word_id = ?").run(wordId);
-    if (input.example.trim()) {
+    const examples = uniqueTexts(input.examples ?? [input.example ?? ""]);
+    for (const [index, example] of examples.entries()) {
       db.prepare(
         `INSERT INTO word_examples
           (id, word_id, sentence, source, status, created_at, updated_at)
          VALUES (?, ?, ?, 'parent', 'approved', ?, ?)`
-      ).run(`example_${wordId}`, wordId, input.example.trim(), now, now);
+      ).run(`example_${wordId}_${index}`, wordId, example, now, now);
     }
   }
 
-  replaceSingleListValue(db, "word_synonyms", "synonym", wordId, input.synonym, now);
-  replaceSingleListValue(db, "word_antonyms", "antonym", wordId, input.antonym, now);
+  replaceListValues(db, "word_synonyms", "synonym", wordId, input.synonyms ?? [input.synonym ?? ""], now);
+  replaceListValues(db, "word_antonyms", "antonym", wordId, input.antonyms ?? [input.antonym ?? ""], now);
 
-  if (input.confusable !== undefined) {
+  if (input.confusable !== undefined || input.confusables !== undefined) {
     db.prepare("DELETE FROM word_confusables WHERE word_id = ?").run(wordId);
-    if (input.confusable.trim()) {
+    for (const [index, confusable] of uniqueTexts(input.confusables ?? [input.confusable ?? ""]).entries()) {
       db.prepare(
         `INSERT INTO word_confusables
           (id, word_id, confusable_text, explanation, created_at, updated_at)
          VALUES (?, ?, ?, NULL, ?, ?)`
-      ).run(`confusable_${wordId}_0`, wordId, input.confusable.trim(), now, now);
+      ).run(`confusable_${wordId}_${index}`, wordId, confusable, now, now);
     }
   }
 
@@ -2113,23 +2190,23 @@ function replaceOptionalWordRows(db: DatabaseSync, wordId: string, input: WordFo
   }
 }
 
-function replaceSingleListValue(
+function replaceListValues(
   db: DatabaseSync,
   table: "word_synonyms" | "word_antonyms",
   column: "synonym" | "antonym",
   wordId: string,
-  value: string | undefined,
+  values: string[],
   now: string
 ): void {
-  if (value === undefined) return;
   db.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
-  if (!value.trim()) return;
-  db.prepare(`INSERT INTO ${table} (id, word_id, ${column}, created_at) VALUES (?, ?, ?, ?)`).run(
-    `${column}_${wordId}_0`,
-    wordId,
-    value.trim(),
-    now
-  );
+  for (const [index, value] of uniqueTexts(values).entries()) {
+    db.prepare(`INSERT INTO ${table} (id, word_id, ${column}, created_at) VALUES (?, ?, ?, ?)`).run(
+      `${column}_${wordId}_${index}`,
+      wordId,
+      value,
+      now
+    );
+  }
 }
 
 function completeSession(db: DatabaseSync, sessionId: string): void {

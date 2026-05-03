@@ -5,13 +5,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
 import {
   createOrUpdateParentWord,
+  findActiveWordByText,
   getMissionPreview,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
   startRoundMeaningRecognition,
   startRoundMission,
-  submitSessionAnswer
+  submitSessionAnswer,
+  upsertParentExampleVisualCues
 } from "./repository";
 
 let tempDir: string | null = null;
@@ -413,6 +415,87 @@ describe("round repository orchestration", () => {
     expect(row.attempt_count).toBe(0);
     expect(row.correct_count).toBe(0);
     expect(row.last_clean_retrieval_at).toBeNull();
+  });
+
+  it("stores multiple parent examples and example-linked visual cues", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "reluctant",
+      difficultyLevel: 2,
+      definition: "Not willing or not keen to do something straight away.",
+      examples: [
+        "Mina felt reluctant to step onto the diving board, so she watched three others jump before edging forward herself.",
+        "The puppy was reluctant to leave the blanket by the radiator until the room had warmed up again.",
+        "After the argument, he was reluctant to knock on the neighbour's door, even though he knew he should apologise."
+      ],
+      synonyms: ["hesitant", "unwilling"],
+      antonyms: ["eager", "keen"],
+      confusables: ["reticent", "hesitant"],
+      spellingNote: "Ends with -ant, not -ent."
+    });
+
+    upsertParentExampleVisualCues(wordId, [
+      {
+        exampleIndex: 0,
+        provider: "gemini",
+        model: "gemini-3.1-flash-image-preview",
+        promptVersion: "example-cue-sketch-v1",
+        prompt: "prompt one",
+        imagePath: "/assets/example-cues/drafts/word_reluctant/draft_example_0-test.jpg"
+      },
+      {
+        exampleIndex: 2,
+        provider: "gemini",
+        model: "gemini-3.1-flash-image-preview",
+        promptVersion: "example-cue-sketch-v1",
+        prompt: "prompt three",
+        imagePath: "/assets/example-cues/drafts/word_reluctant/draft_example_2-test.jpg"
+      }
+    ]);
+
+    const db = getDb();
+    const examples = db
+      .prepare("SELECT id FROM word_examples WHERE word_id = ? ORDER BY id ASC")
+      .all(wordId) as Array<{ id: string }>;
+    const synonyms = db.prepare("SELECT synonym FROM word_synonyms WHERE word_id = ? ORDER BY id ASC").all(wordId) as Array<{
+      synonym: string;
+    }>;
+    const antonyms = db.prepare("SELECT antonym FROM word_antonyms WHERE word_id = ? ORDER BY id ASC").all(wordId) as Array<{
+      antonym: string;
+    }>;
+    const confusables = db
+      .prepare("SELECT confusable_text FROM word_confusables WHERE word_id = ? ORDER BY id ASC")
+      .all(wordId) as Array<{ confusable_text: string }>;
+    const cues = db
+      .prepare("SELECT example_id, image_path, status FROM example_visual_cues WHERE word_id = ? ORDER BY example_id ASC")
+      .all(wordId) as Array<{ example_id: string; image_path: string; status: string }>;
+
+    expect(examples.map((row) => row.id)).toEqual([`example_${wordId}_0`, `example_${wordId}_1`, `example_${wordId}_2`]);
+    expect(synonyms.map((row) => row.synonym)).toEqual(["hesitant", "unwilling"]);
+    expect(antonyms.map((row) => row.antonym)).toEqual(["eager", "keen"]);
+    expect(confusables.map((row) => row.confusable_text)).toEqual(["reticent", "hesitant"]);
+    expect(cues).toEqual([
+      {
+        example_id: `example_${wordId}_0`,
+        image_path: "public/assets/example-cues/drafts/word_reluctant/draft_example_0-test.jpg",
+        status: "approved"
+      },
+      {
+        example_id: `example_${wordId}_2`,
+        image_path: "public/assets/example-cues/drafts/word_reluctant/draft_example_2-test.jpg",
+        status: "approved"
+      }
+    ]);
+  });
+
+  it("finds active words by normalized text before generation", () => {
+    createOrUpdateParentWord({
+      word: "Brisk",
+      definition: "Quick and energetic.",
+      example: "Mina walked at a brisk pace and reached the gate before the bell."
+    });
+
+    expect(findActiveWordByText("  brisk  ")?.word).toBe("Brisk");
+    expect(findActiveWordByText("briskly")).toBeNull();
   });
 });
 

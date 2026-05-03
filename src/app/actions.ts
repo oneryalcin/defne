@@ -9,7 +9,8 @@ import {
   setVisualCuePreference,
   startRoundMeaningRecognition,
   startRoundMission,
-  submitSessionAnswer
+  submitSessionAnswer,
+  upsertParentExampleVisualCues
 } from "@/lib/db/repository";
 import {
   PILOT_SESSION_COOKIE,
@@ -20,6 +21,7 @@ import {
   roleHomePath,
   serializePilotSession
 } from "@/lib/pilotAuth";
+import type { ParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
 
 async function setPilotCookie(accessCode: string, role: "child" | "parent"): Promise<void> {
   const jar = await cookies();
@@ -144,16 +146,44 @@ export async function submitAnswerAction(formData: FormData): Promise<void> {
 
 export async function saveWordAction(formData: FormData): Promise<void> {
   await requireRole("parent");
-  createOrUpdateParentWord({
-    word: String(formData.get("word") ?? ""),
+  const submittedWord = String(formData.get("word") ?? "");
+  const examples = formData
+    .getAll("examples")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  const synonyms = splitCommaList(String(formData.get("synonyms") ?? ""));
+  const antonyms = splitCommaList(String(formData.get("antonyms") ?? ""));
+
+  const wordId = createOrUpdateParentWord({
+    word: submittedWord,
     definition: String(formData.get("definition") ?? ""),
-    example: String(formData.get("example") ?? ""),
-    synonym: String(formData.get("synonym") ?? ""),
-    antonym: String(formData.get("antonym") ?? ""),
-    spellingNote: String(formData.get("spellingNote") ?? ""),
-    confusable: String(formData.get("confusable") ?? ""),
-    difficultyLevel: Number(formData.get("difficultyLevel") ?? 2)
+    examples,
+    synonyms,
+    antonyms,
+    difficultyLevel: 2
   });
+
+  const draftPayload = String(formData.get("assistDraft") ?? "");
+  if (draftPayload) {
+    const draft = parseAssistDraft(draftPayload);
+    if (draft && normalizeAssistWord(draft.word) === normalizeAssistWord(submittedWord)) {
+      const cues = draft.examples.flatMap((example: ParentWordAssistDraft["examples"][number], index: number) => {
+        if (example.sentence.trim() !== (examples[index] ?? "").trim()) return [];
+        if (!example.visualCue) return [];
+        return [
+          {
+            exampleIndex: index,
+            provider: example.visualCue.provider,
+            model: example.visualCue.model,
+            promptVersion: example.visualCue.promptVersion,
+            prompt: example.visualCue.prompt,
+            imagePath: example.visualCue.imagePath
+          }
+        ];
+      });
+      upsertParentExampleVisualCues(wordId, cues);
+    }
+  }
   redirect("/parent/words");
 }
 
@@ -161,4 +191,58 @@ export async function importWordsAction(formData: FormData): Promise<void> {
   await requireRole("parent");
   importWordShells(String(formData.get("words") ?? ""));
   redirect("/parent/words");
+}
+
+function splitCommaList(value: string): string[] {
+  const seen = new Set<string>();
+  const results: string[] = [];
+  for (const entry of value.split(",")) {
+    const clean = entry.trim();
+    if (!clean) continue;
+    const key = clean.toLocaleLowerCase("en-GB");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    results.push(clean);
+  }
+  return results;
+}
+
+function parseAssistDraft(payload: string): ParentWordAssistDraft | null {
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (!isAssistDraft(parsed)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAssistWord(word: string): string {
+  return word.trim().toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
+}
+
+function isAssistDraft(value: unknown): value is ParentWordAssistDraft {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Partial<ParentWordAssistDraft>;
+  return typeof draft.word === "string" && Array.isArray(draft.examples) && draft.examples.every(isAssistExample);
+}
+
+function isAssistExample(value: unknown): value is ParentWordAssistDraft["examples"][number] {
+  if (!value || typeof value !== "object") return false;
+  const example = value as Partial<ParentWordAssistDraft["examples"][number]>;
+  return typeof example.sentence === "string" && (example.visualCue === null || isAssistVisualCue(example.visualCue));
+}
+
+function isAssistVisualCue(value: unknown): value is NonNullable<ParentWordAssistDraft["examples"][number]["visualCue"]> {
+  if (!value || typeof value !== "object") return false;
+  const cue = value as Partial<NonNullable<ParentWordAssistDraft["examples"][number]["visualCue"]>>;
+  return (
+    cue.provider === "gemini" &&
+    typeof cue.model === "string" &&
+    typeof cue.promptVersion === "string" &&
+    typeof cue.prompt === "string" &&
+    typeof cue.imagePath === "string"
+  );
 }

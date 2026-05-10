@@ -1,0 +1,158 @@
+{
+  "entries": [
+    {
+      "target": "advice",
+      "difficulty": 4,
+      "studyGroup": "advice_advise",
+      "usageLabel": "noun",
+      "teachingNote": "Advice is a noun. It means the helpful idea or guidance someone gives.",
+      "sentences": [
+        "The teacher gave useful advice before the class began its project.",
+        "Mina followed her uncle's advice and checked the map twice."
+      ]
+    },
+    {
+      "target": "advise",
+      "difficulty": 4,
+      "studyGroup": "advice_advise",
+      "usageLabel": "verb",
+      "teachingNote": "Advise is a verb. It means to give someone advice.",
+      "sentences": [
+        "The coach will advise the team before the final race.",
+        "Teachers advise pupils to check their work slowly."
+      ]
+    },
+    {
+      "target": "affect",
+      "difficulty": 4,
+      "studyGroup": "affect_effect",
+      "usageLabel": "verb",
+      "teachingNote": "Affect is usually a verb. It means to change or influence something.",
+      "sentences": [
+        "A sudden storm can affect the timing of an outdoor match.",
+        "Kind words can affect how brave someone feels."
+      ]
+    },
+    {
+      "target": "effect",
+      "difficulty": 4,
+      "studyGroup": "affect_effect",
+      "usageLabel": "noun",
+      "teachingNote": "Effect is usually a noun. It means the result of a change.",
+      "sentences": [
+        "The new rule had a calming effect on the noisy lunch queue.",
+        "The bright poster had a cheerful effect on the classroom."
+      ]
+    },
+    {
+      "target": "pray",
+      "difficulty": 2,
+      "studyGroup": "pray_prey",
+      "usageLabel": "verb",
+      "teachingNote": "Pray is a verb. It means to speak to God or ask hopefully for something.",
+      "sentences": [
+        "Some families pray quietly before dinner.",
+        "The team did not pray for luck; they practised until they felt ready."
+      ]
+    },
+    {
+      "target": "prey",
+      "difficulty": 2,
+      "studyGroup": "pray_prey",
+      "usageLabel": "noun",
+      "teachingNote": "Prey is a noun. It means an animal hunted by another animal.",
+      "sentences": [
+        "The owl watched its prey from the branch before swooping silently.",
+        "Tiny fish can become prey for herons near the shallow river."
+      ]
+    },
+    {
+      "target": "horse",
+      "difficulty": 2,
+      "studyGroup": "horse_hoarse",
+      "usageLabel": "noun",
+      "teachingNote": "Horse is a noun. It names the animal.",
+      "sentences": [
+        "The horse trotted across the field after breakfast.",
+        "A gentle horse waited beside the wooden gate."
+      ]
+    },
+    {
+      "target": "hoarse",
+      "difficulty": 2,
+      "studyGroup": "horse_hoarse",
+      "usageLabel": "adjective",
+      "teachingNote": "Hoarse is an adjective. It describes a rough or croaky voice.",
+      "sentences": [
+        "After cheering all afternoon, Mira's voice sounded hoarse.",
+        "The singer drank warm water because his throat felt hoarse."
+      ]
+    },
+    {
+      "target": "seize",
+      "difficulty": 3,
+      "studyGroup": "seize",
+      "usageLabel": "verb",
+      "teachingNote": "Seize is a verb. It means to grab, take, or use a chance quickly.",
+      "sentences": [
+        "The goalkeeper tried to seize the ball before it crossed the line.",
+        "Rafi decided to seize the chance to ask his question."
+      ]
+    },
+    {
+      "target": "waist",
+      "difficulty": 2,
+      "studyGroup": "waist",
+      "usageLabel": "noun",
+      "teachingNote": "Waist is a noun. It names the part of the body between the ribs and hips.",
+      "sentences": [
+        "The belt sat loosely around the puppet's waist.",
+        "She tied the apron around her waist before painting."
+      ]
+    },
+    {
+      "target": "thyme",
+      "difficulty": 3,
+      "studyGroup": "thyme",
+      "usageLabel": "noun",
+      "teachingNote": "Thyme is a noun. It names a herb used in cooking.",
+      "sentences": [
+        "Dad sprinkled thyme over the potatoes before roasting them.",
+        "The garden pot smelled of thyme after the rain."
+      ]
+    },
+    {
+      "target": "hare",
+      "difficulty": 2,
+      "studyGroup": "hare",
+      "usageLabel": "noun",
+      "teachingNote": "Hare is a noun. It names an animal like a large, fast rabbit.",
+      "sentences": [
+        "A brown hare darted across the field at sunrise.",
+        "The hare paused by the hedge, then vanished into the grass."
+      ]
+    },
+    {
+      "target": "forty",
+      "difficulty": 2,
+      "studyGroup": "forty",
+      "usageLabel": "number word",
+      "teachingNote": "Forty is a number word. It tells how many.",
+      "sentences": [
+        "The class counted forty shells on the science table.",
+        "There were forty pages left in the adventure book."
+      ]
+    },
+    {
+      "target": "weary",
+      "difficulty": 3,
+      "studyGroup": "weary",
+      "usageLabel": "adjective",
+      "teachingNote": "Weary is an adjective. It means very tired.",
+      "sentences": [
+        "The weary hikers rested beside the gate after the long climb.",
+        "By bedtime, the puppy looked weary but happy."
+      ]
+    }
+  ]
+}

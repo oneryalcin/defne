@@ -19,6 +19,19 @@ interface SeedPack {
   entries: SeedEntry[];
 }
 
+interface SpellingSeedEntry {
+  target: string;
+  difficulty: number;
+  studyGroup?: string;
+  usageLabel?: string;
+  teachingNote?: string;
+  sentences: string[];
+}
+
+interface SpellingSeedPack {
+  entries: SpellingSeedEntry[];
+}
+
 export function seedInitialData(db: DatabaseSync): void {
   const now = new Date().toISOString();
   db.prepare(
@@ -35,6 +48,11 @@ export function seedInitialData(db: DatabaseSync): void {
   const seedPack = readSeedPack();
   for (const entry of seedPack.entries) {
     upsertSeedWord(db, entry, now);
+  }
+
+  const spellingSeedPack = readSpellingSeedPack();
+  for (const entry of spellingSeedPack.entries) {
+    upsertSeedSpellingItem(db, entry, now);
   }
 
   const wordRows = db.prepare("SELECT id FROM words WHERE status = 'active'").all() as Array<{ id: string }>;
@@ -104,6 +122,62 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
   }
 }
 
+function upsertSeedSpellingItem(db: DatabaseSync, entry: SpellingSeedEntry, now: string): void {
+  const normalized = normalizeWord(entry.target);
+  const itemId = deterministicSpellingItemId(normalized);
+
+  db.prepare(
+    `INSERT INTO spelling_items
+      (id, target_word, normalized_target, difficulty_level, source, status, teaching_note, study_group, usage_label, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'seed', 'active', ?, ?, ?, ?, ?)
+     ON CONFLICT(normalized_target) DO UPDATE SET
+       target_word = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.target_word ELSE excluded.target_word END,
+       difficulty_level = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.difficulty_level ELSE excluded.difficulty_level END,
+       teaching_note = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.teaching_note ELSE excluded.teaching_note END,
+       study_group = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.study_group ELSE excluded.study_group END,
+       usage_label = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.usage_label ELSE excluded.usage_label END,
+       status = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.status ELSE excluded.status END,
+       updated_at = excluded.updated_at`
+  ).run(
+    itemId,
+    entry.target.trim(),
+    normalized,
+    clampDifficulty(entry.difficulty),
+    (entry.teachingNote ?? "").trim(),
+    (entry.studyGroup ?? normalized).trim(),
+    (entry.usageLabel ?? "").trim(),
+    now,
+    now
+  );
+
+  const owner = db.prepare("SELECT source FROM spelling_items WHERE id = ?").get(itemId) as { source: string } | undefined;
+  if (owner?.source === "parent") return;
+
+  const sentences = uniqueTexts(entry.sentences);
+  const intendedIds = sentences.map((_, index) => `spelling_prompt_${itemId}_${index}`);
+  if (intendedIds.length > 0) {
+    const placeholders = intendedIds.map(() => "?").join(", ");
+    db.prepare(`DELETE FROM spelling_prompts WHERE item_id = ? AND source = 'canonical' AND id NOT IN (${placeholders})`).run(
+      itemId,
+      ...intendedIds
+    );
+  } else {
+    db.prepare("DELETE FROM spelling_prompts WHERE item_id = ? AND source = 'canonical'").run(itemId);
+  }
+
+  for (const [index, sentence] of sentences.entries()) {
+    db.prepare(
+      `INSERT INTO spelling_prompts
+        (id, item_id, sentence, source, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'canonical', 'approved', ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         sentence = excluded.sentence,
+         status = excluded.status,
+         updated_at = excluded.updated_at`
+    ).run(`spelling_prompt_${itemId}_${index}`, itemId, sentence, now, now);
+  }
+}
+
 function replaceRows(db: DatabaseSync, table: string, wordId: string): void {
   db.prepare(`DELETE FROM ${table} WHERE word_id = ?`).run(wordId);
 }
@@ -164,12 +238,21 @@ function readSeedPack(): SeedPack {
   return JSON.parse(readFileSync(seedPath, "utf8")) as SeedPack;
 }
 
+function readSpellingSeedPack(): SpellingSeedPack {
+  const seedPath = path.join(process.cwd(), "data", "vocabulary", "spelling-seed.json");
+  return JSON.parse(readFileSync(seedPath, "utf8")) as SpellingSeedPack;
+}
+
 export function normalizeWord(word: string): string {
   return word.trim().toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
 }
 
 export function deterministicWordId(normalizedWord: string): string {
   return `word_${normalizedWord.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}`;
+}
+
+function deterministicSpellingItemId(normalizedTarget: string): string {
+  return `spelling_${normalizedTarget.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}`;
 }
 
 function clampDifficulty(value: number): number {

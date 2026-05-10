@@ -13,6 +13,12 @@ import {
   upsertParentExampleVisualCues
 } from "@/lib/db/repository";
 import {
+  createOrUpdateParentSpellingItem,
+  startSpellingPractice,
+  startSpellingMission,
+  submitSpellingAnswer
+} from "@/lib/db/spellingRepository";
+import {
   PILOT_SESSION_COOKIE,
   getSessionTtlSeconds,
   parsePilotSession,
@@ -76,6 +82,19 @@ export async function startMissionAction(): Promise<void> {
   await requireRole("child");
   const sessionId = startRoundMission(12);
   redirect(`/child/session/${sessionId}`);
+}
+
+export async function startSpellingMissionAction(): Promise<void> {
+  await requireRole("child");
+  const sessionId = startSpellingMission(8);
+  redirect(`/child/spelling/session/${sessionId}`);
+}
+
+export async function startSpellingPracticeAction(formData: FormData): Promise<void> {
+  await requireRole("child");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  startSpellingPractice(sessionId);
+  redirect(`/child/spelling/session/${sessionId}`);
 }
 
 export async function recordCardViewAction(formData: FormData): Promise<void> {
@@ -144,6 +163,33 @@ export async function submitAnswerAction(formData: FormData): Promise<void> {
   );
 }
 
+export async function submitSpellingAnswerAction(formData: FormData): Promise<void> {
+  await requireRole("child");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const submittedAnswer = String(formData.get("answer") ?? "");
+  const responseTimeMs = Number(formData.get("responseTimeMs") ?? 0);
+
+  const result = submitSpellingAnswer({
+    sessionId,
+    submittedAnswer,
+    responseTimeMs: Number.isFinite(responseTimeMs) ? responseTimeMs : 0
+  });
+
+  if (result.completed) {
+    redirect(
+      result.attemptId
+        ? `/child/spelling/session/${sessionId}?attemptId=${result.attemptId}`
+        : `/child/spelling/session/${sessionId}`
+    );
+  }
+
+  redirect(
+    result.attemptId
+      ? `/child/spelling/session/${sessionId}?attemptId=${result.attemptId}`
+      : `/child/spelling/session/${sessionId}`
+  );
+}
+
 export async function saveWordAction(formData: FormData): Promise<void> {
   await requireRole("parent");
   const submittedWord = String(formData.get("word") ?? "");
@@ -185,6 +231,29 @@ export async function saveWordAction(formData: FormData): Promise<void> {
     }
   }
   redirect("/parent/words");
+}
+
+export async function saveSpellingItemAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const target = String(formData.get("target") ?? "");
+  const pairedTarget = String(formData.get("pairedTarget") ?? "");
+  const usageLabel = String(formData.get("usageLabel") ?? "");
+  const teachingNote = String(formData.get("teachingNote") ?? "");
+  const sentences = formData
+    .getAll("sentences")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  createOrUpdateParentSpellingItem({
+    target,
+    pairedTarget,
+    usageLabel,
+    teachingNote,
+    sentences,
+    difficultyLevel: 2
+  });
+
+  redirect("/parent/spelling");
 }
 
 export async function importWordsAction(formData: FormData): Promise<void> {

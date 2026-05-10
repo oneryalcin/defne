@@ -18,6 +18,7 @@ import {
 } from "./repository";
 import {
   createOrUpdateParentSpellingItem,
+  getChildSpellingWords,
   getParentSpellingItemForEdit,
   getParentSpellingItems,
   getSpellingPreview,
@@ -530,7 +531,7 @@ describe("spelling repository orchestration", () => {
       promptCount: 0
     });
 
-    const preview = getSpellingPreview(20);
+    const preview = getSpellingPreview(400);
     expect(preview.items.some((item) => item.target === "practise")).toBe(true);
     expect(preview.items.some((item) => item.target === "practice")).toBe(false);
   });
@@ -576,6 +577,71 @@ describe("spelling repository orchestration", () => {
     expect(practice.question?.target).toBe(preview.items[0].target);
     expect(practice.question?.tokens.length).toBeGreaterThan(0);
     expect(practice.question?.displayedSentence).toContain(preview.items[0].target);
+  });
+
+  it("mixes equally new spelling words instead of falling back to alphabetical order", () => {
+    const preview = getSpellingPreview(12);
+    const targets = preview.items.map((item) => item.target);
+
+    expect(targets).not.toEqual([...targets].sort((a, b) => a.localeCompare(b)));
+  });
+
+  it("prioritizes spelling words with unresolved mistake debt", () => {
+    insertSpellingAttemptHistory("spelling_advice", [false, false, true]);
+
+    const preview = getSpellingPreview(1);
+
+    expect(preview.items[0].target).toBe("advice");
+  });
+
+  it("does not immediately repeat remediated spelling misses above untouched words", () => {
+    insertSpellingAttemptHistory("spelling_advice", [false, false, false, false, true, true, true, true, true]);
+    const recent = new Date(Date.now() - 30 * 60_000).toISOString();
+    getDb().prepare("UPDATE spelling_attempts SET created_at = ? WHERE item_id = 'spelling_advice'").run(recent);
+    getDb()
+      .prepare(
+        `UPDATE spelling_learner_state
+         SET last_seen_at = ?,
+             last_correct_at = ?,
+             last_practiced_at = ?,
+             last_clean_retrieval_at = ?
+         WHERE item_id = 'spelling_advice'`
+      )
+      .run(recent, recent, recent, recent);
+
+    const preview = getSpellingPreview(12);
+
+    expect(preview.items.map((item) => item.target)).not.toContain("advice");
+  });
+
+  it("builds a child spelling word wall from active spelling prompts and attempts", () => {
+    const initial = getChildSpellingWords();
+    expect(initial.length).toBeGreaterThan(100);
+    expect(initial[0]).toMatchObject({
+      promptCount: expect.any(Number),
+      attemptCount: 0,
+      correctCount: 0,
+      wrongCount: 0
+    });
+
+    const sessionId = startSpellingMission(1);
+    startSpellingPractice(sessionId);
+    const view = getSpellingSessionView(sessionId);
+    const target = view.question?.target;
+    if (!target) throw new Error("Expected a spelling target");
+
+    submitSpellingAnswer({
+      sessionId,
+      submittedAnswer: view.question?.expectedSelection === "all_correct" ? "word:0" : "all_correct",
+      responseTimeMs: 700
+    });
+
+    const updated = getChildSpellingWords().find((word) => word.target === target);
+    expect(updated).toMatchObject({
+      attemptCount: 1,
+      correctCount: 0,
+      wrongCount: 1
+    });
   });
 
   it("logs wrong spelling selections without advancing until the child finds the answer", () => {
@@ -650,6 +716,87 @@ function completeLearnCards(sessionId: string): void {
     recordRoundCardView(sessionId, card.id);
     recordRoundCardView(sessionId, card.id);
   }
+}
+
+function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void {
+  const db = getDb();
+  const prompt = db.prepare("SELECT id FROM spelling_prompts WHERE item_id = ? ORDER BY id ASC LIMIT 1").get(itemId) as
+    | { id: string }
+    | undefined;
+  if (!prompt) throw new Error(`Expected a spelling prompt for ${itemId}`);
+
+  const sessionId = `test_spelling_session_${itemId}_${outcomes.length}`;
+  const now = "2026-05-10T10:00:00.000Z";
+  db.prepare(
+    `INSERT INTO spelling_sessions
+      (id, learner_id, status, target_item_count, actual_question_count, item_ids_json, started_at, ended_at, summary_json, created_at, updated_at)
+     VALUES (?, 'learner_defne', 'completed', 1, 1, ?, ?, ?, '{}', ?, ?)`
+  ).run(sessionId, JSON.stringify([itemId]), now, now, now, now);
+
+  outcomes.forEach((isCorrect, index) => {
+    const createdAt = `2026-05-10T10:${String(index).padStart(2, "0")}:00.000Z`;
+    db.prepare(
+      `INSERT INTO spelling_attempts
+        (id, session_id, learner_id, item_id, prompt_id, prompt_json, expected_answer_json, submitted_answer, is_correct, response_time_ms, created_at)
+       VALUES (?, ?, 'learner_defne', ?, ?, '{}', '{}', ?, ?, 900, ?)`
+    ).run(
+      `test_spelling_attempt_${itemId}_${index}`,
+      sessionId,
+      itemId,
+      prompt.id,
+      isCorrect ? "all_correct" : "word:0",
+      isCorrect ? 1 : 0,
+      createdAt
+    );
+  });
+
+  const correctCount = outcomes.filter(Boolean).length;
+  const wrongCount = outcomes.length - correctCount;
+  const lastCorrectIndex = outcomes.map((value, index) => (value ? index : -1)).filter((index) => index >= 0).at(-1);
+  const lastWrongIndex = outcomes.map((value, index) => (!value ? index : -1)).filter((index) => index >= 0).at(-1);
+  const lastAttemptAt = `2026-05-10T10:${String(outcomes.length - 1).padStart(2, "0")}:00.000Z`;
+  const lastCorrectAt =
+    lastCorrectIndex === undefined ? null : `2026-05-10T10:${String(lastCorrectIndex).padStart(2, "0")}:00.000Z`;
+  const lastWrongAt =
+    lastWrongIndex === undefined ? null : `2026-05-10T10:${String(lastWrongIndex).padStart(2, "0")}:00.000Z`;
+
+  db.prepare(
+    `INSERT INTO spelling_learner_state
+      (id, learner_id, item_id, attempt_count, correct_count, wrong_count,
+       last_seen_at, last_correct_at, last_wrong_at, last_practiced_at,
+       last_clean_retrieval_at, recovery_debt, last_practiced_session_id,
+       last_practiced_interaction_index, created_at, updated_at)
+     VALUES (?, 'learner_defne', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(learner_id, item_id) DO UPDATE SET
+       attempt_count = excluded.attempt_count,
+       correct_count = excluded.correct_count,
+       wrong_count = excluded.wrong_count,
+       last_seen_at = excluded.last_seen_at,
+       last_correct_at = excluded.last_correct_at,
+       last_wrong_at = excluded.last_wrong_at,
+       last_practiced_at = excluded.last_practiced_at,
+       last_clean_retrieval_at = excluded.last_clean_retrieval_at,
+       recovery_debt = excluded.recovery_debt,
+       last_practiced_session_id = excluded.last_practiced_session_id,
+       last_practiced_interaction_index = excluded.last_practiced_interaction_index,
+       updated_at = excluded.updated_at`
+  ).run(
+    `test_spelling_state_${itemId}`,
+    itemId,
+    outcomes.length,
+    correctCount,
+    wrongCount,
+    lastAttemptAt,
+    lastCorrectAt,
+    lastWrongAt,
+    lastAttemptAt,
+    lastCorrectAt,
+    Math.max(0, wrongCount - correctCount),
+    sessionId,
+    outcomes.length,
+    "2026-05-10T10:00:00.000Z",
+    lastAttemptAt
+  );
 }
 
 function answerCurrentStepCorrectly(sessionId: string, step: "meaning_recognition" | "context_usage"): void {

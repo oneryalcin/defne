@@ -72,6 +72,27 @@ describe("spelling practice", () => {
     expect(question.issueKind).toBe("misspelling");
   });
 
+  it("uses reviewed seed misspellings when provided", () => {
+    const calendar = {
+      id: "spelling_calendar",
+      target: "calendar",
+      teachingNote: "Calendar is a commonly misspelled word.",
+      studyGroup: "calendar",
+      usageLabel: "noun",
+      commonMisspelling: "calender",
+      prompts: [
+        {
+          id: "prompt_calendar_1",
+          sentence: "Mina marked the trip date on the classroom calendar."
+        }
+      ]
+    };
+    const question = buildSpellingQuestion(calendar, 2, [calendar]);
+
+    expect(question.displayedSentence).toBe("Mina marked the trip date on the classroom calender.");
+    expect(question.issueKind).toBe("misspelling");
+  });
+
   it("assesses sentence selections", () => {
     const cleanQuestion = buildSpellingQuestion(item, 0, [item, peer]);
     const mistakeQuestion = buildSpellingQuestion(item, 1, [item, peer]);

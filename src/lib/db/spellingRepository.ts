@@ -6,6 +6,9 @@ import {
   type SpellingPracticeItem,
   type SpellingQuestion
 } from "../learning/spelling";
+import { applyPracticeEventToSelectionState, updateStateAfterAttempt } from "../learning/mastery";
+import { selectRoundWords } from "../learning/roundSelection";
+import type { FailureType, LearnerWordState, PracticeAttemptOutcome, PracticeWord } from "../types";
 import { getDb } from "./index";
 import { defaultLearnerId, normalizeWord } from "./seed";
 
@@ -22,6 +25,37 @@ interface SpellingSessionRow {
   summary_json: string;
   created_at: string;
   updated_at: string;
+}
+
+interface SpellingStateRow {
+  id: string;
+  learner_id: string;
+  item_id: string;
+  stability_days: number;
+  mastery_colour: LearnerWordState["masteryColour"];
+  last_seen_at: string | null;
+  last_correct_at: string | null;
+  last_wrong_at: string | null;
+  next_review_at: string | null;
+  attempt_count: number;
+  correct_count: number;
+  wrong_count: number;
+  last_hint_level_used: number | null;
+  average_hint_level_used: number;
+  average_response_time_ms: number;
+  failure_types_json: string;
+  confused_with_word_ids_json: string;
+  near_review: number;
+  eligible_questions_since_last_mistake: number;
+  recovery_debt: number;
+  last_practiced_at: string | null;
+  last_clean_retrieval_at: string | null;
+  last_supported_success_at: string | null;
+  last_revealed_at: string | null;
+  last_exposed_at: string | null;
+  last_practiced_session_id: string | null;
+  last_practiced_interaction_index: number | null;
+  learner_state_content_version: number;
 }
 
 export interface SpellingPreview {
@@ -55,6 +89,20 @@ export interface ParentSpellingListItem {
   promptCount: number;
   attemptCount: number;
   wrongCount: number;
+}
+
+export interface ChildSpellingListItem {
+  id: string;
+  target: string;
+  usageLabel: string;
+  teachingNote: string;
+  studyGroup: string;
+  commonMisspelling: string | null;
+  promptCount: number;
+  attemptCount: number;
+  correctCount: number;
+  wrongCount: number;
+  lastAttemptAt: string | null;
 }
 
 export interface ParentSpellingEditItem {
@@ -104,6 +152,73 @@ export type SubmitSpellingAnswerResult = {
   attemptId: string | null;
 };
 
+export function getChildSpellingWords(): ChildSpellingListItem[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT i.id,
+              i.target_word,
+              i.usage_label,
+              i.teaching_note,
+              i.study_group,
+              i.common_misspelling,
+              prompts.prompt_count,
+              COALESCE(stats.attempt_count, 0) AS attempt_count,
+              COALESCE(stats.correct_count, 0) AS correct_count,
+              COALESCE(stats.wrong_count, 0) AS wrong_count,
+              stats.last_attempt_at
+       FROM spelling_items i
+       JOIN (
+         SELECT item_id, COUNT(*) AS prompt_count
+         FROM spelling_prompts
+         WHERE status = 'approved'
+         GROUP BY item_id
+       ) prompts ON prompts.item_id = i.id
+       LEFT JOIN (
+         SELECT item_id,
+                COUNT(*) AS attempt_count,
+                SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS correct_count,
+                SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) AS wrong_count,
+                MAX(created_at) AS last_attempt_at
+         FROM spelling_attempts
+         WHERE learner_id = ?
+         GROUP BY item_id
+       ) stats ON stats.item_id = i.id
+       WHERE i.status = 'active'
+       ORDER BY COALESCE(stats.wrong_count, 0) DESC,
+                COALESCE(stats.attempt_count, 0) ASC,
+                i.study_group ASC,
+                i.target_word ASC`
+    )
+    .all(defaultLearnerId()) as unknown as Array<{
+    id: string;
+    target_word: string;
+    usage_label: string;
+    teaching_note: string;
+    study_group: string;
+    common_misspelling: string | null;
+    prompt_count: number;
+    attempt_count: number;
+    correct_count: number | null;
+    wrong_count: number | null;
+    last_attempt_at: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    target: row.target_word,
+    usageLabel: row.usage_label,
+    teachingNote: row.teaching_note,
+    studyGroup: row.study_group,
+    commonMisspelling: row.common_misspelling,
+    promptCount: row.prompt_count,
+    attemptCount: row.attempt_count,
+    correctCount: row.correct_count ?? 0,
+    wrongCount: row.wrong_count ?? 0,
+    lastAttemptAt: row.last_attempt_at
+  }));
+}
+
 export function getSpellingPreview(targetItemCount = 8): SpellingPreview {
   const db = getDb();
   const existing = getLatestInProgressSpellingSession(db);
@@ -148,7 +263,7 @@ export function getParentSpellingItems(): ParentSpellingListItem[] {
        GROUP BY i.id
        ORDER BY i.study_group ASC, i.target_word ASC`
     )
-    .all(defaultLearnerId()) as Array<{
+    .all(defaultLearnerId()) as unknown as Array<{
     id: string;
     target_word: string;
     usage_label: string;
@@ -314,6 +429,17 @@ export function startSpellingPractice(sessionId: string): void {
   const session = getSpellingSessionRow(db, sessionId);
   if (session.status !== "in_progress" || session.intro_completed_at) return;
   const now = new Date().toISOString();
+  const itemIds = readJsonStringArray(session.item_ids_json);
+  itemIds.forEach((itemId, index) => {
+    const state = getSpellingStateForItem(db, itemId, now);
+    saveSpellingLearnerState(db, {
+      ...state,
+      lastExposedAt: now,
+      lastPracticedAt: now,
+      lastPracticedSessionId: session.id,
+      lastPracticedInteractionIndex: index + 1
+    });
+  });
   db.prepare("UPDATE spelling_sessions SET intro_completed_at = ?, updated_at = ? WHERE id = ?").run(now, now, sessionId);
 }
 
@@ -345,6 +471,11 @@ export function submitSpellingAnswer(input: {
   const assessment = assessSpellingAnswer(question, input.submittedAnswer);
   const now = new Date().toISOString();
   const attemptId = randomUUID();
+  const priorItemAttemptsInSession = (
+    db
+      .prepare("SELECT COUNT(*) AS count FROM spelling_attempts WHERE session_id = ? AND item_id = ?")
+      .get(session.id, item.id) as { count: number }
+  ).count;
 
   db.prepare(
     `INSERT INTO spelling_attempts
@@ -368,6 +499,29 @@ export function submitSpellingAnswer(input: {
     assessment.isCorrect ? 1 : 0,
     Number.isFinite(input.responseTimeMs) ? input.responseTimeMs : 0,
     now
+  );
+
+  const previousState = getSpellingStateForItem(db, item.id, now);
+  const outcome: PracticeAttemptOutcome = {
+    questionType: "spelling_choice",
+    isCorrect: assessment.isCorrect,
+    hintLevelUsed: 0,
+    maxHintLevelAvailable: 0,
+    responseTimeMs: Number.isFinite(input.responseTimeMs) ? input.responseTimeMs : 0,
+    failureType: assessment.isCorrect ? "none" : "spelling_error",
+    answeredAt: now
+  };
+  saveSpellingLearnerState(
+    db,
+    applyPracticeEventToSelectionState(updateStateAfterAttempt(previousState, outcome), previousState, {
+      answeredAt: now,
+      isCorrect: assessment.isCorrect,
+      hintLevelUsed: 0,
+      revealAndMoveOn: false,
+      firstAttemptCorrect: assessment.isCorrect && priorItemAttemptsInSession === 0,
+      sessionId: session.id,
+      interactionIndex: getSpellingSessionAttemptCount(db, session.id)
+    })
   );
 
   const actualCount = assessment.isCorrect ? resolvedQuestions + 1 : resolvedQuestions;
@@ -462,33 +616,62 @@ function spellingSessionPhase(session: SpellingSessionRow): SpellingSessionView[
 }
 
 function selectSpellingItems(db: DatabaseSync, limit: number): SpellingPracticeItem[] {
+  const nowIso = new Date().toISOString();
+  const words = loadSpellingPracticeWordsForSelection(db, nowIso);
+  if (limit > 12) return getSpellingItemsByIds(db, words.map((word) => word.id).slice(0, limit));
+
+  const selection = selectRoundWords(words, nowIso, Math.max(6, limit), {
+    revealAndMoveOnWordIds: [],
+    eventuallyCorrectNotFirstAttemptWordIds: []
+  });
+  return getSpellingItemsByIds(db, selection.wordIds.slice(0, limit));
+}
+
+function loadSpellingPracticeWordsForSelection(db: DatabaseSync, now: string): PracticeWord[] {
+  ensureSpellingLearnerStates(db, now);
   const rows = db
     .prepare(
-      `SELECT i.id
+      `SELECT i.id AS item_id_for_selection,
+              i.target_word,
+              i.normalized_target,
+              i.difficulty_level,
+              i.teaching_note,
+              i.study_group,
+              s.*
        FROM spelling_items i
-       LEFT JOIN (
-         SELECT item_id,
-                COUNT(*) AS attempts,
-                SUM(CASE WHEN is_correct = 0 THEN 1 ELSE 0 END) AS wrong,
-                MAX(created_at) AS last_attempt_at
-         FROM spelling_attempts
-         WHERE learner_id = ?
-         GROUP BY item_id
-       ) stats ON stats.item_id = i.id
+       JOIN spelling_learner_state s ON s.item_id = i.id AND s.learner_id = ?
        WHERE i.status = 'active'
          AND EXISTS (
            SELECT 1 FROM spelling_prompts p
            WHERE p.item_id = i.id AND p.status = 'approved'
-         )
-       ORDER BY COALESCE(stats.wrong, 0) DESC,
-                COALESCE(stats.attempts, 0) ASC,
-                COALESCE(stats.last_attempt_at, '') ASC,
-                i.study_group ASC,
-                i.target_word ASC
-       LIMIT ?`
+         )`
     )
-    .all(defaultLearnerId(), limit) as Array<{ id: string }>;
-  return getSpellingItemsByIds(db, rows.map((row) => row.id));
+    .all(defaultLearnerId()) as unknown as Array<{
+    item_id_for_selection: string;
+    target_word: string;
+    normalized_target: string;
+    difficulty_level: number;
+    teaching_note: string;
+    study_group: string;
+  } & SpellingStateRow>;
+
+  return rows.map((row) => {
+    const itemId = row.item_id_for_selection;
+    const prompts = getSpellingPrompts(db, itemId);
+    return {
+      id: itemId,
+      word: row.target_word,
+      normalizedWord: row.normalized_target,
+      difficultyLevel: row.difficulty_level,
+      definition: row.teaching_note,
+      example: prompts[0]?.sentence ?? "",
+      examples: prompts.map((prompt) => prompt.sentence),
+      synonyms: [],
+      antonyms: [],
+      confusables: getSpellingConfusables(db, row.study_group || itemId, itemId),
+      state: mapSpellingState(row)
+    };
+  });
 }
 
 function getSpellingItemsByIds(db: DatabaseSync, itemIds: string[]): SpellingPracticeItem[] {
@@ -496,7 +679,7 @@ function getSpellingItemsByIds(db: DatabaseSync, itemIds: string[]): SpellingPra
   const placeholders = itemIds.map(() => "?").join(", ");
   const rows = db
     .prepare(
-      `SELECT id, target_word, teaching_note, study_group, usage_label
+      `SELECT id, target_word, teaching_note, study_group, usage_label, common_misspelling
        FROM spelling_items
        WHERE id IN (${placeholders}) AND status = 'active'`
     )
@@ -506,6 +689,7 @@ function getSpellingItemsByIds(db: DatabaseSync, itemIds: string[]): SpellingPra
       teaching_note: string;
       study_group: string;
       usage_label: string;
+      common_misspelling: string | null;
     }>;
   const byId = new Map(rows.map((row) => [row.id, row]));
   return itemIds.flatMap((itemId) => {
@@ -518,11 +702,143 @@ function getSpellingItemsByIds(db: DatabaseSync, itemIds: string[]): SpellingPra
         teachingNote: row.teaching_note,
         studyGroup: row.study_group || row.id,
         usageLabel: row.usage_label,
+        commonMisspelling: row.common_misspelling,
         confusables: getSpellingConfusables(db, row.study_group || row.id, row.id),
         prompts: getSpellingPrompts(db, row.id)
       }
     ];
   });
+}
+
+function ensureSpellingLearnerStates(db: DatabaseSync, now: string): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO spelling_learner_state
+      (id, learner_id, item_id, created_at, updated_at)
+     SELECT 'spelling_state_' || ? || '_' || i.id, ?, i.id, ?, ?
+     FROM spelling_items i
+     WHERE i.status = 'active'
+       AND EXISTS (
+         SELECT 1 FROM spelling_prompts p
+         WHERE p.item_id = i.id AND p.status = 'approved'
+       )`
+  ).run(defaultLearnerId(), defaultLearnerId(), now, now);
+}
+
+function getSpellingStateForItem(db: DatabaseSync, itemId: string, now: string): LearnerWordState {
+  ensureSpellingLearnerStateForItem(db, itemId, now);
+  const row = db
+    .prepare("SELECT * FROM spelling_learner_state WHERE learner_id = ? AND item_id = ?")
+    .get(defaultLearnerId(), itemId) as SpellingStateRow | undefined;
+  if (!row) throw new Error(`Spelling learner state missing for ${itemId}`);
+  return mapSpellingState(row);
+}
+
+function ensureSpellingLearnerStateForItem(db: DatabaseSync, itemId: string, now: string): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO spelling_learner_state
+      (id, learner_id, item_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(`spelling_state_${defaultLearnerId()}_${itemId}`, defaultLearnerId(), itemId, now, now);
+}
+
+function saveSpellingLearnerState(db: DatabaseSync, state: LearnerWordState): void {
+  db.prepare(
+    `UPDATE spelling_learner_state SET
+       stability_days = ?,
+       mastery_colour = ?,
+       last_seen_at = ?,
+       last_correct_at = ?,
+       last_wrong_at = ?,
+       next_review_at = ?,
+       attempt_count = ?,
+       correct_count = ?,
+       wrong_count = ?,
+       last_hint_level_used = ?,
+       average_hint_level_used = ?,
+       average_response_time_ms = ?,
+       failure_types_json = ?,
+       confused_with_word_ids_json = ?,
+       near_review = ?,
+       eligible_questions_since_last_mistake = ?,
+       recovery_debt = ?,
+       last_practiced_at = ?,
+       last_clean_retrieval_at = ?,
+       last_supported_success_at = ?,
+       last_revealed_at = ?,
+       last_exposed_at = ?,
+       last_practiced_session_id = ?,
+       last_practiced_interaction_index = ?,
+       learner_state_content_version = ?,
+       updated_at = ?
+     WHERE id = ?`
+  ).run(
+    state.stabilityDays,
+    state.masteryColour,
+    state.lastSeenAt,
+    state.lastCorrectAt,
+    state.lastWrongAt,
+    state.nextReviewAt,
+    state.attemptCount,
+    state.correctCount,
+    state.wrongCount,
+    state.lastHintLevelUsed,
+    state.averageHintLevelUsed,
+    state.averageResponseTimeMs,
+    JSON.stringify(state.failureTypes),
+    JSON.stringify(state.confusedWithWordIds),
+    state.nearReview ? 1 : 0,
+    state.eligibleQuestionsSinceLastMistake,
+    state.recoveryDebt,
+    state.lastPracticedAt,
+    state.lastCleanRetrievalAt,
+    state.lastSupportedSuccessAt,
+    state.lastRevealedAt,
+    state.lastExposedAt,
+    state.lastPracticedSessionId,
+    state.lastPracticedInteractionIndex,
+    state.learnerStateContentVersion,
+    new Date().toISOString(),
+    state.id
+  );
+}
+
+function mapSpellingState(row: SpellingStateRow): LearnerWordState {
+  return {
+    id: row.id,
+    learnerId: row.learner_id,
+    wordId: row.item_id,
+    stabilityDays: row.stability_days,
+    masteryColour: row.mastery_colour,
+    lastSeenAt: row.last_seen_at,
+    lastCorrectAt: row.last_correct_at,
+    lastWrongAt: row.last_wrong_at,
+    nextReviewAt: row.next_review_at,
+    attemptCount: row.attempt_count,
+    correctCount: row.correct_count,
+    wrongCount: row.wrong_count,
+    lastHintLevelUsed: row.last_hint_level_used,
+    averageHintLevelUsed: row.average_hint_level_used,
+    averageResponseTimeMs: row.average_response_time_ms,
+    failureTypes: JSON.parse(row.failure_types_json) as FailureType[],
+    confusedWithWordIds: JSON.parse(row.confused_with_word_ids_json) as string[],
+    nearReview: row.near_review === 1,
+    eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake,
+    recoveryDebt: row.recovery_debt,
+    lastPracticedAt: row.last_practiced_at,
+    lastCleanRetrievalAt: row.last_clean_retrieval_at,
+    lastSupportedSuccessAt: row.last_supported_success_at,
+    lastRevealedAt: row.last_revealed_at,
+    lastExposedAt: row.last_exposed_at,
+    lastPracticedSessionId: row.last_practiced_session_id,
+    lastPracticedInteractionIndex: row.last_practiced_interaction_index,
+    learnerStateContentVersion: row.learner_state_content_version
+  };
+}
+
+function getSpellingSessionAttemptCount(db: DatabaseSync, sessionId: string): number {
+  return (
+    db.prepare("SELECT COUNT(*) AS count FROM spelling_attempts WHERE session_id = ?").get(sessionId) as { count: number }
+  ).count;
 }
 
 function groupSpellingStudyItems(items: SpellingPracticeItem[]): SpellingSessionView["studyGroups"] {

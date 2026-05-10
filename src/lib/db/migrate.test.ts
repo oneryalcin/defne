@@ -27,12 +27,16 @@ describe("SQLite setup", () => {
     const examples = db.prepare("SELECT COUNT(*) AS count FROM word_examples WHERE status = 'approved'").get() as {
       count: number;
     };
+    const visualCues = db.prepare("SELECT COUNT(*) AS count FROM example_visual_cues WHERE status = 'approved'").get() as {
+      count: number;
+    };
 
-    expect(migrations.count).toBe(11);
+    expect(migrations.count).toBe(14);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
     expect(examples.count).toBeGreaterThanOrEqual(words.count * 3);
+    expect(visualCues.count).toBeGreaterThanOrEqual(words.count * 3);
 
     const roundsTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'practice_rounds'").get();
     const roundIdColumn = db.prepare("PRAGMA table_info(practice_attempts)").all() as Array<{ name: string }>;
@@ -50,6 +54,15 @@ describe("SQLite setup", () => {
 
     const spellingNotesTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'spelling_notes'").get();
     expect(spellingNotesTable).toBeFalsy();
+    const spellingStateTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'spelling_learner_state'")
+      .get();
+    expect(spellingStateTable).toBeTruthy();
+    const spellingItemColumns = db.prepare("PRAGMA table_info(spelling_items)").all() as Array<{ name: string }>;
+    expect(spellingItemColumns.some((column) => column.name === "content_version")).toBe(true);
+    const spellingStateColumns = db.prepare("PRAGMA table_info(spelling_learner_state)").all() as Array<{ name: string }>;
+    expect(spellingStateColumns.some((column) => column.name === "recovery_debt")).toBe(true);
+    expect(spellingStateColumns.some((column) => column.name === "last_clean_retrieval_at")).toBe(true);
 
     const wordColumns = db.prepare("PRAGMA table_info(words)").all() as Array<{ name: string }>;
     expect(wordColumns.some((column) => column.name === "content_version")).toBe(true);
@@ -97,6 +110,7 @@ describe("SQLite setup", () => {
     expect(spellingColumns.some((column) => column.name === "teaching_note")).toBe(true);
     expect(spellingColumns.some((column) => column.name === "study_group")).toBe(true);
     expect(spellingColumns.some((column) => column.name === "usage_label")).toBe(true);
+    expect(spellingColumns.some((column) => column.name === "common_misspelling")).toBe(true);
     expect(spellingSessionColumns.some((column) => column.name === "intro_completed_at")).toBe(true);
   });
 
@@ -130,6 +144,30 @@ describe("SQLite setup", () => {
       | { status: string }
       | undefined;
     expect(cue?.status).toBe("approved");
+  });
+
+  it("registers committed example cue assets as approved visual cues", () => {
+    db = new DatabaseSync(":memory:");
+    db.exec("PRAGMA foreign_keys = ON;");
+
+    runMigrations(db);
+    seedInitialData(db);
+
+    const cue = db
+      .prepare(
+        `SELECT c.image_path, c.status
+         FROM example_visual_cues c
+         JOIN word_examples e ON e.id = c.example_id
+         JOIN words w ON w.id = e.word_id
+         WHERE w.normalized_word = 'conceal'
+         ORDER BY c.example_id ASC
+         LIMIT 1`
+      )
+      .get() as { image_path: string; status: string } | undefined;
+
+    expect(cue).toBeTruthy();
+    expect(cue?.status).toBe("approved");
+    expect(cue?.image_path).toMatch(/^public\/assets\/example-cues\/word_conceal\/example_word_conceal_/);
   });
 
   it("enforces foreign keys", () => {

@@ -25,7 +25,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     ? session.role === "child"
       ? [
         { href: "/child", label: "Child" },
-        { href: "/child/words", label: "Words" }
+        { href: "/child/words", label: "Words" },
+        { href: "/child/spelling/words", label: "Spellings" }
         ]
       : [
         { href: "/parent", label: "Parent" },

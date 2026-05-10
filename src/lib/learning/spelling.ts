@@ -4,6 +4,7 @@ export interface SpellingPracticeItem {
   teachingNote: string;
   studyGroup: string;
   usageLabel: string;
+  commonMisspelling?: string | null;
   confusables?: string[];
   prompts: Array<{
     id: string;
@@ -68,7 +69,7 @@ export function buildSpellingQuestion(
       ? null
       : issueKind === "confusable"
         ? confusable
-        : misspellWord(item.target);
+        : misspellWord(item);
   const displayedSentence = displayedWord
     ? replaceTargetInSentence(prompt.sentence, item.target, displayedWord)
     : prompt.sentence;
@@ -136,10 +137,16 @@ function selectIssueKind(
 ): SpellingQuestion["issueKind"] {
   if (questionIndex % 4 === 0) return "none";
   if (confusable && questionIndex % 2 === 1) return "confusable";
-  return misspellWord(item.target) === item.target ? "none" : "misspelling";
+  return misspellWord(item) === item.target ? "none" : "misspelling";
 }
 
-function misspellWord(word: string): string {
+function misspellWord(item: SpellingPracticeItem): string {
+  const word = item.target;
+  const configured = item.commonMisspelling?.trim();
+  if (configured && normalizeSpellingAnswer(configured) !== normalizeSpellingAnswer(word)) {
+    return preserveCapitalization(word, configured);
+  }
+
   const normalized = normalizeSpellingAnswer(word);
   const known = COMMON_MISSPELLINGS.get(normalized);
   if (known && known !== normalized) return preserveCapitalization(word, known);

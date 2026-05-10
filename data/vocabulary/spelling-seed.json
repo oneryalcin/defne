@@ -1,33 +1,3519 @@
 {
   "entries": [
     {
-      "target": "advice",
+      "target": "acceptable",
       "difficulty": 4,
+      "studyGroup": "acceptable",
+      "usageLabel": "adjective",
+      "teachingNote": "Acceptable has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "acceptible",
+      "sentences": [
+        "The repaired model was acceptable once Mina glued the loose roof back on."
+      ]
+    },
+    {
+      "target": "accidentally",
+      "difficulty": 5,
+      "studyGroup": "accidentally",
+      "usageLabel": "adverb",
+      "teachingNote": "Accidentally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "accidently",
+      "sentences": [
+        "Rafi accidentally dropped the paintbrush into the water pot."
+      ]
+    },
+    {
+      "target": "accommodate",
+      "difficulty": 5,
+      "studyGroup": "accommodate",
+      "usageLabel": "verb",
+      "teachingNote": "Accommodate has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "acommodate",
+      "sentences": [
+        "The hall can accommodate every class during the winter concert."
+      ]
+    },
+    {
+      "target": "acquire",
+      "difficulty": 3,
+      "studyGroup": "acquire",
+      "usageLabel": "verb",
+      "teachingNote": "Acquire is a commonly misspelled word. Practise the exact letter order: acquire.",
+      "commonMisspelling": "aquire",
+      "sentences": [
+        "Mina hoped to acquire enough badges to sew onto her camp blanket."
+      ]
+    },
+    {
+      "target": "acquit",
+      "difficulty": 3,
+      "studyGroup": "acquit",
+      "usageLabel": "verb",
+      "teachingNote": "Acquit is a commonly misspelled word. Practise the exact letter order: acquit.",
+      "commonMisspelling": "aquit",
+      "sentences": [
+        "The jury had to acquit the cyclist when the video proved he was not guilty."
+      ]
+    },
+    {
+      "target": "a lot",
+      "difficulty": 2,
+      "studyGroup": "a_lot",
+      "usageLabel": "spelling word",
+      "teachingNote": "A lot is written as two words, not one.",
+      "commonMisspelling": "alot",
+      "sentences": [
+        "The class learned a lot during the visit to the science museum."
+      ]
+    },
+    {
+      "target": "amateur",
+      "difficulty": 3,
+      "studyGroup": "amateur",
+      "usageLabel": "adjective",
+      "teachingNote": "Amateur is a commonly misspelled word. Practise the exact letter order: amateur.",
+      "commonMisspelling": "amature",
+      "sentences": [
+        "The amateur actor forgot one line but kept smiling on stage."
+      ]
+    },
+    {
+      "target": "apparent",
+      "difficulty": 4,
+      "studyGroup": "apparent",
+      "usageLabel": "adjective",
+      "teachingNote": "Apparent has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "aparent",
+      "sentences": [
+        "It became apparent that the shortcut was blocked by fallen branches."
+      ]
+    },
+    {
+      "target": "argument",
+      "difficulty": 4,
+      "studyGroup": "argument",
+      "usageLabel": "noun",
+      "teachingNote": "Argument is a commonly misspelled word. Practise the exact letter order: argument.",
+      "commonMisspelling": "arguement",
+      "sentences": [
+        "The argument ended when both pupils listened carefully."
+      ]
+    },
+    {
+      "target": "atheist",
+      "difficulty": 3,
+      "studyGroup": "atheist",
+      "usageLabel": "spelling word",
+      "teachingNote": "Atheist has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "athiest",
+      "sentences": [
+        "The book explained that an atheist does not believe in any god."
+      ]
+    },
+    {
+      "target": "believe",
+      "difficulty": 3,
+      "studyGroup": "believe",
+      "usageLabel": "verb",
+      "teachingNote": "Believe has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "beleive",
+      "sentences": [
+        "Mina wanted to believe the lost bracelet would be found."
+      ]
+    },
+    {
+      "target": "calendar",
+      "difficulty": 4,
+      "studyGroup": "calendar",
+      "usageLabel": "noun",
+      "teachingNote": "Calendar is a commonly misspelled word. Practise the exact letter order: calendar.",
+      "commonMisspelling": "calender",
+      "sentences": [
+        "Mina marked the trip date on the classroom calendar."
+      ]
+    },
+    {
+      "target": "category",
+      "difficulty": 4,
+      "studyGroup": "category",
+      "usageLabel": "noun",
+      "teachingNote": "Category is a commonly misspelled word. Practise the exact letter order: category.",
+      "commonMisspelling": "catagory",
+      "sentences": [
+        "Each animal card belonged in a different category."
+      ]
+    },
+    {
+      "target": "cemetery",
+      "difficulty": 4,
+      "studyGroup": "cemetery",
+      "usageLabel": "noun",
+      "teachingNote": "Cemetery is a commonly misspelled word. Practise the exact letter order: cemetery.",
+      "commonMisspelling": "cemetary",
+      "sentences": [
+        "The old cemetery stood quietly behind the stone church."
+      ]
+    },
+    {
+      "target": "changeable",
+      "difficulty": 4,
+      "studyGroup": "changeable",
+      "usageLabel": "adjective",
+      "teachingNote": "Changeable ends with -able.",
+      "commonMisspelling": "changable",
+      "sentences": [
+        "The changeable weather made everyone carry both sunglasses and coats."
+      ]
+    },
+    {
+      "target": "collectible",
+      "difficulty": 5,
+      "studyGroup": "collectible",
+      "usageLabel": "adjective",
+      "teachingNote": "Collectible has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "colectible",
+      "sentences": [
+        "Grandad kept a collectible coin in a small blue case."
+      ]
+    },
+    {
+      "target": "committed",
+      "difficulty": 4,
+      "studyGroup": "committed",
+      "usageLabel": "spelling word",
+      "teachingNote": "Committed has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "commited",
+      "sentences": [
+        "The committed team stayed after school to finish the garden."
+      ]
+    },
+    {
+      "target": "conscience",
+      "difficulty": 4,
+      "studyGroup": "conscience",
+      "usageLabel": "noun",
+      "teachingNote": "Conscience has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "conscence",
+      "sentences": [
+        "His conscience bothered him until he admitted breaking the ruler."
+      ]
+    },
+    {
+      "target": "conscientious",
+      "difficulty": 5,
+      "studyGroup": "conscientious",
+      "usageLabel": "adjective",
+      "teachingNote": "Conscientious has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "conscientous",
+      "sentences": [
+        "The conscientious pupil checked every answer before handing in the test."
+      ]
+    },
+    {
+      "target": "conscious",
+      "difficulty": 4,
+      "studyGroup": "conscious",
+      "usageLabel": "adjective",
+      "teachingNote": "Conscious is a commonly misspelled word. Practise the exact letter order: conscious.",
+      "commonMisspelling": "concious",
+      "sentences": [
+        "Mina was conscious of the time as the bell got closer."
+      ]
+    },
+    {
+      "target": "definite",
+      "difficulty": 4,
+      "studyGroup": "definite",
+      "usageLabel": "adjective",
+      "teachingNote": "Definite is a commonly misspelled word. Practise the exact letter order: definite.",
+      "commonMisspelling": "definate",
+      "sentences": [
+        "The coach gave a definite answer about Saturday practice."
+      ]
+    },
+    {
+      "target": "definitely",
+      "difficulty": 4,
+      "studyGroup": "definitely",
+      "usageLabel": "adverb",
+      "teachingNote": "Definitely is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "definately",
+      "sentences": [
+        "Rafi definitely remembered to return the library book."
+      ]
+    },
+    {
+      "target": "disappear",
+      "difficulty": 4,
+      "studyGroup": "disappear",
+      "usageLabel": "verb",
+      "teachingNote": "Disappear has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "dissapear",
+      "sentences": [
+        "The magician made the red scarf disappear inside an empty box."
+      ]
+    },
+    {
+      "target": "discipline",
+      "difficulty": 4,
+      "studyGroup": "discipline",
+      "usageLabel": "noun",
+      "teachingNote": "Discipline is a commonly misspelled word. Practise the exact letter order: discipline.",
+      "commonMisspelling": "disipline",
+      "sentences": [
+        "Daily piano practice takes discipline even when the tune is difficult."
+      ]
+    },
+    {
+      "target": "drunkenness",
+      "difficulty": 5,
+      "studyGroup": "drunkenness",
+      "usageLabel": "noun",
+      "teachingNote": "Drunkenness has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "drunkeness",
+      "sentences": [
+        "The warning poster explained why drunkenness can make roads unsafe."
+      ]
+    },
+    {
+      "target": "embarrass",
+      "difficulty": 4,
+      "studyGroup": "embarrass",
+      "usageLabel": "spelling word",
+      "teachingNote": "Embarrass has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "embarass",
+      "sentences": [
+        "Mina did not want to embarrass her brother in front of his friends."
+      ]
+    },
+    {
+      "target": "equipment",
+      "difficulty": 4,
+      "studyGroup": "equipment",
+      "usageLabel": "noun",
+      "teachingNote": "Equipment is a commonly misspelled word. Practise the exact letter order: equipment.",
+      "commonMisspelling": "equiptment",
+      "sentences": [
+        "The science equipment was cleaned and put back after the experiment."
+      ]
+    },
+    {
+      "target": "exhilarate",
+      "difficulty": 4,
+      "studyGroup": "exhilarate",
+      "usageLabel": "verb",
+      "teachingNote": "Exhilarate is a commonly misspelled word. Practise the exact letter order: exhilarate.",
+      "commonMisspelling": "exilerate",
+      "sentences": [
+        "The fast ride seemed to exhilarate everyone on the front row."
+      ]
+    },
+    {
+      "target": "exceed",
+      "difficulty": 3,
+      "studyGroup": "exceed",
+      "usageLabel": "verb",
+      "teachingNote": "Exceed has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "excede",
+      "sentences": [
+        "The charity total began to exceed the target by lunchtime."
+      ]
+    },
+    {
+      "target": "existence",
+      "difficulty": 4,
+      "studyGroup": "existence",
+      "usageLabel": "noun",
+      "teachingNote": "Existence ends with -ence.",
+      "commonMisspelling": "existance",
+      "sentences": [
+        "The fossil proved the existence of tiny sea creatures long ago."
+      ]
+    },
+    {
+      "target": "experience",
+      "difficulty": 4,
+      "studyGroup": "experience",
+      "usageLabel": "noun",
+      "teachingNote": "Experience has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "experiance",
+      "sentences": [
+        "The camping trip was a new experience for the whole class."
+      ]
+    },
+    {
+      "target": "fiery",
+      "difficulty": 2,
+      "studyGroup": "fiery",
+      "usageLabel": "adjective",
+      "teachingNote": "Fiery has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "firey",
+      "sentences": [
+        "The chef served a fiery curry with cool yoghurt on the side."
+      ]
+    },
+    {
+      "target": "foreign",
+      "difficulty": 3,
+      "studyGroup": "foreign",
+      "usageLabel": "adjective",
+      "teachingNote": "Foreign has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "foriegn",
+      "sentences": [
+        "The postcard had a foreign stamp from a city across the sea."
+      ]
+    },
+    {
+      "target": "fourth",
+      "difficulty": 3,
+      "studyGroup": "fourth",
+      "usageLabel": "adjective",
+      "teachingNote": "Fourth is a commonly misspelled word. Practise the exact letter order: fourth.",
+      "commonMisspelling": "forth",
+      "sentences": [
+        "Mina came fourth in the race and still beat her personal best."
+      ]
+    },
+    {
+      "target": "gauge",
+      "difficulty": 2,
+      "studyGroup": "gauge",
+      "usageLabel": "spelling word",
+      "teachingNote": "Gauge is a commonly misspelled word. Practise the exact letter order: gauge.",
+      "commonMisspelling": "guage",
+      "sentences": [
+        "The mechanic checked the pressure gauge before pumping the tyre."
+      ]
+    },
+    {
+      "target": "generally",
+      "difficulty": 4,
+      "studyGroup": "generally",
+      "usageLabel": "adverb",
+      "teachingNote": "Generally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "generaly",
+      "sentences": [
+        "The younger pupils generally arrive before the older ones."
+      ]
+    },
+    {
+      "target": "grammar",
+      "difficulty": 3,
+      "studyGroup": "grammar",
+      "usageLabel": "spelling word",
+      "teachingNote": "Grammar has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "grammer",
+      "sentences": [
+        "The grammar lesson helped the class fix each sentence."
+      ]
+    },
+    {
+      "target": "grateful",
+      "difficulty": 4,
+      "studyGroup": "grateful",
+      "usageLabel": "adjective",
+      "teachingNote": "Grateful is a commonly misspelled word. Practise the exact letter order: grateful.",
+      "commonMisspelling": "greatful",
+      "sentences": [
+        "The hikers were grateful for warm soup after the rain."
+      ]
+    },
+    {
+      "target": "guarantee",
+      "difficulty": 4,
+      "studyGroup": "guarantee",
+      "usageLabel": "spelling word",
+      "teachingNote": "Guarantee has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "garantee",
+      "sentences": [
+        "The shop offered a guarantee in case the backpack zip broke."
+      ]
+    },
+    {
+      "target": "harass",
+      "difficulty": 3,
+      "studyGroup": "harass",
+      "usageLabel": "verb",
+      "teachingNote": "Harass has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "harrass",
+      "sentences": [
+        "The rules say nobody may harass another pupil online or in school."
+      ]
+    },
+    {
+      "target": "height",
+      "difficulty": 3,
+      "studyGroup": "height",
+      "usageLabel": "noun",
+      "teachingNote": "Height has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "hieght",
+      "sentences": [
+        "The height of the tower made everyone look up."
+      ]
+    },
+    {
+      "target": "hierarchy",
+      "difficulty": 4,
+      "studyGroup": "hierarchy",
+      "usageLabel": "noun",
+      "teachingNote": "Hierarchy has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "heirarchy",
+      "sentences": [
+        "The chart showed the hierarchy of jobs in the newspaper office."
+      ]
+    },
+    {
+      "target": "ignorance",
+      "difficulty": 4,
+      "studyGroup": "ignorance",
+      "usageLabel": "noun",
+      "teachingNote": "Ignorance ends with -ance.",
+      "commonMisspelling": "ignorence",
+      "sentences": [
+        "Ignorance of the rule did not make the broken window safe."
+      ]
+    },
+    {
+      "target": "immediate",
+      "difficulty": 4,
+      "studyGroup": "immediate",
+      "usageLabel": "adjective",
+      "teachingNote": "Immediate has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "imediate",
+      "sentences": [
+        "The nurse gave immediate help when the runner fell."
+      ]
+    },
+    {
+      "target": "independent",
+      "difficulty": 5,
+      "studyGroup": "independent",
+      "usageLabel": "adjective",
+      "teachingNote": "Independent is a commonly misspelled word. Practise the exact letter order: independent.",
+      "commonMisspelling": "independant",
+      "sentences": [
+        "Mina became more independent after learning the bus route."
+      ]
+    },
+    {
+      "target": "indispensable",
+      "difficulty": 5,
+      "studyGroup": "indispensable",
+      "usageLabel": "adjective",
+      "teachingNote": "Indispensable ends with -able.",
+      "commonMisspelling": "indispensible",
+      "sentences": [
+        "A sharp pencil is indispensable for a neat geometry drawing."
+      ]
+    },
+    {
+      "target": "intelligence",
+      "difficulty": 5,
+      "studyGroup": "intelligence",
+      "usageLabel": "noun",
+      "teachingNote": "Intelligence has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "inteligence",
+      "sentences": [
+        "The puzzle tested memory, patience, and intelligence."
+      ]
+    },
+    {
+      "target": "its",
+      "difficulty": 3,
+      "studyGroup": "its_it_s",
+      "usageLabel": "possessive determiner",
+      "teachingNote": "Its shows that something belongs to it. There is no apostrophe.",
+      "commonMisspelling": "it's",
+      "sentences": [
+        "The dog wagged its tail when the gate opened.",
+        "The old clock lost its minute hand during the move."
+      ]
+    },
+    {
+      "target": "it's",
+      "difficulty": 3,
+      "studyGroup": "its_it_s",
+      "usageLabel": "contraction",
+      "teachingNote": "It's is short for it is or it has. The apostrophe shows missing letters.",
+      "commonMisspelling": "its",
+      "sentences": [
+        "It's raining, so the class moved the game inside.",
+        "It's been a long day, but the project is finished."
+      ]
+    },
+    {
+      "target": "judgement",
+      "difficulty": 4,
+      "studyGroup": "judgement",
+      "usageLabel": "noun",
+      "teachingNote": "Judgement is a commonly misspelled word. Practise the exact letter order: judgement.",
+      "commonMisspelling": "judgemnt",
+      "sentences": [
+        "The referee used careful judgement before giving the penalty."
+      ]
+    },
+    {
+      "target": "knowledge",
+      "difficulty": 4,
+      "studyGroup": "knowledge",
+      "usageLabel": "noun",
+      "teachingNote": "Knowledge is a commonly misspelled word. Practise the exact letter order: knowledge.",
+      "commonMisspelling": "knowlege",
+      "sentences": [
+        "The guide shared knowledge about the ancient harbour."
+      ]
+    },
+    {
+      "target": "leisure",
+      "difficulty": 3,
+      "studyGroup": "leisure",
+      "usageLabel": "spelling word",
+      "teachingNote": "Leisure has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "liesure",
+      "sentences": [
+        "In her leisure time, Aisha liked drawing maps."
+      ]
+    },
+    {
+      "target": "library",
+      "difficulty": 3,
+      "studyGroup": "library",
+      "usageLabel": "noun",
+      "teachingNote": "Library is a commonly misspelled word. Practise the exact letter order: library.",
+      "commonMisspelling": "libary",
+      "sentences": [
+        "The library opened early so pupils could change their books."
+      ]
+    },
+    {
+      "target": "lightning",
+      "difficulty": 4,
+      "studyGroup": "lightning",
+      "usageLabel": "noun",
+      "teachingNote": "Lightning is a commonly misspelled word. Practise the exact letter order: lightning.",
+      "commonMisspelling": "lightening",
+      "sentences": [
+        "Lightning flashed over the hills before the thunder arrived."
+      ]
+    },
+    {
+      "target": "maintenance",
+      "difficulty": 5,
+      "studyGroup": "maintenance",
+      "usageLabel": "noun",
+      "teachingNote": "Maintenance ends with -ance.",
+      "commonMisspelling": "maintainance",
+      "sentences": [
+        "The caretaker planned maintenance for the broken climbing frame."
+      ]
+    },
+    {
+      "target": "manoeuvre",
+      "difficulty": 4,
+      "studyGroup": "manoeuvre",
+      "usageLabel": "noun",
+      "teachingNote": "Manoeuvre is a commonly misspelled word. Practise the exact letter order: manoeuvre.",
+      "commonMisspelling": "maneouvre",
+      "sentences": [
+        "The driver had to manoeuvre carefully around the parked van."
+      ]
+    },
+    {
+      "target": "memento",
+      "difficulty": 3,
+      "studyGroup": "memento",
+      "usageLabel": "noun",
+      "teachingNote": "Memento is a commonly misspelled word. Practise the exact letter order: memento.",
+      "commonMisspelling": "momento",
+      "sentences": [
+        "Mina kept the ticket as a memento of her first theatre visit."
+      ]
+    },
+    {
+      "target": "millennium",
+      "difficulty": 4,
+      "studyGroup": "millennium",
+      "usageLabel": "noun",
+      "teachingNote": "Millennium has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "millenium",
+      "sentences": [
+        "The museum displayed photographs from the start of the new millennium."
+      ]
+    },
+    {
+      "target": "miniature",
+      "difficulty": 4,
+      "studyGroup": "miniature",
+      "usageLabel": "noun",
+      "teachingNote": "Miniature is a commonly misspelled word. Practise the exact letter order: miniature.",
+      "commonMisspelling": "miniture",
+      "sentences": [
+        "The miniature castle fitted inside a glass case."
+      ]
+    },
+    {
+      "target": "mischievous",
+      "difficulty": 5,
+      "studyGroup": "mischievous",
+      "usageLabel": "adjective",
+      "teachingNote": "Mischievous has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "mischevious",
+      "sentences": [
+        "The mischievous puppy stole a sock and hid under the table."
+      ]
+    },
+    {
+      "target": "noticeable",
+      "difficulty": 4,
+      "studyGroup": "noticeable",
+      "usageLabel": "adjective",
+      "teachingNote": "Noticeable ends with -able.",
+      "commonMisspelling": "noticable",
+      "sentences": [
+        "The paint mark was noticeable on the white door."
+      ]
+    },
+    {
+      "target": "occasion",
+      "difficulty": 4,
+      "studyGroup": "occasion",
+      "usageLabel": "noun",
+      "teachingNote": "Occasion has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "ocassion",
+      "sentences": [
+        "The school concert was a special occasion for the whole family."
+      ]
+    },
+    {
+      "target": "occasionally",
+      "difficulty": 5,
+      "studyGroup": "occasionally",
+      "usageLabel": "adverb",
+      "teachingNote": "Occasionally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "ocassionally",
+      "sentences": [
+        "Dad occasionally cycled to work when the weather was dry."
+      ]
+    },
+    {
+      "target": "occur",
+      "difficulty": 2,
+      "studyGroup": "occur",
+      "usageLabel": "verb",
+      "teachingNote": "Occur has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "ocur",
+      "sentences": [
+        "A small error can occur when numbers are copied too quickly."
+      ]
+    },
+    {
+      "target": "occurred",
+      "difficulty": 4,
+      "studyGroup": "occurred",
+      "usageLabel": "spelling word",
+      "teachingNote": "Occurred has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "occured",
+      "sentences": [
+        "The accident occurred just before the traffic lights changed."
+      ]
+    },
+    {
+      "target": "occurrence",
+      "difficulty": 4,
+      "studyGroup": "occurrence",
+      "usageLabel": "noun",
+      "teachingNote": "Occurrence has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "occurance",
+      "sentences": [
+        "A power cut was a rare occurrence at the new school."
+      ]
+    },
+    {
+      "target": "official",
+      "difficulty": 4,
+      "studyGroup": "official",
+      "usageLabel": "adjective",
+      "teachingNote": "Official has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "oficial",
+      "sentences": [
+        "The official letter arrived in a brown envelope."
+      ]
+    },
+    {
+      "target": "parallel",
+      "difficulty": 4,
+      "studyGroup": "parallel",
+      "usageLabel": "adjective",
+      "teachingNote": "Parallel has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "paralell",
+      "sentences": [
+        "The two railway tracks ran parallel across the bridge."
+      ]
+    },
+    {
+      "target": "parliament",
+      "difficulty": 4,
+      "studyGroup": "parliament",
+      "usageLabel": "noun",
+      "teachingNote": "Parliament is a commonly misspelled word. Practise the exact letter order: parliament.",
+      "commonMisspelling": "parliment",
+      "sentences": [
+        "The class visited parliament during their history trip."
+      ]
+    },
+    {
+      "target": "pastime",
+      "difficulty": 3,
+      "studyGroup": "pastime",
+      "usageLabel": "noun",
+      "teachingNote": "Pastime is a commonly misspelled word. Practise the exact letter order: pastime.",
+      "commonMisspelling": "passtime",
+      "sentences": [
+        "Reading detective stories became Mina's favourite pastime."
+      ]
+    },
+    {
+      "target": "pigeon",
+      "difficulty": 3,
+      "studyGroup": "pigeon",
+      "usageLabel": "noun",
+      "teachingNote": "Pigeon is a commonly misspelled word. Practise the exact letter order: pigeon.",
+      "commonMisspelling": "pidgeon",
+      "sentences": [
+        "A pigeon strutted across the platform looking for crumbs."
+      ]
+    },
+    {
+      "target": "possession",
+      "difficulty": 4,
+      "studyGroup": "possession",
+      "usageLabel": "noun",
+      "teachingNote": "Possession has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "posession",
+      "sentences": [
+        "The medal was her favourite possession."
+      ]
+    },
+    {
+      "target": "preferable",
+      "difficulty": 4,
+      "studyGroup": "preferable",
+      "usageLabel": "adjective",
+      "teachingNote": "Preferable ends with -able.",
+      "commonMisspelling": "preferible",
+      "sentences": [
+        "A quiet table was preferable for careful drawing."
+      ]
+    },
+    {
+      "target": "principal",
+      "difficulty": 4,
+      "studyGroup": "principal_principle",
+      "usageLabel": "noun or adjective",
+      "teachingNote": "Principal can mean the main person or the most important thing.",
+      "commonMisspelling": "principle",
+      "sentences": [
+        "The principal reason for the delay was the broken gate.",
+        "The principal thanked the pupils during assembly."
+      ]
+    },
+    {
+      "target": "principle",
+      "difficulty": 4,
+      "studyGroup": "principal_principle",
+      "usageLabel": "noun",
+      "teachingNote": "A principle is an important rule or belief.",
+      "commonMisspelling": "principal",
+      "sentences": [
+        "Fairness was the main principle behind the new classroom rule.",
+        "Mina followed the principle of listening before disagreeing."
+      ]
+    },
+    {
+      "target": "privilege",
+      "difficulty": 4,
+      "studyGroup": "privilege",
+      "usageLabel": "noun",
+      "teachingNote": "Privilege is a commonly misspelled word. Practise the exact letter order: privilege.",
+      "commonMisspelling": "privelege",
+      "sentences": [
+        "It was a privilege to meet the visiting author."
+      ]
+    },
+    {
+      "target": "questionnaire",
+      "difficulty": 5,
+      "studyGroup": "questionnaire",
+      "usageLabel": "noun",
+      "teachingNote": "Questionnaire has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "questionaire",
+      "sentences": [
+        "The club sent a questionnaire about Friday activities."
+      ]
+    },
+    {
+      "target": "receive",
+      "difficulty": 3,
+      "studyGroup": "receive",
+      "usageLabel": "verb",
+      "teachingNote": "Receive has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "recieve",
+      "sentences": [
+        "Mina hoped to receive a reply before the weekend."
+      ]
+    },
+    {
+      "target": "recommend",
+      "difficulty": 4,
+      "studyGroup": "recommend",
+      "usageLabel": "verb",
+      "teachingNote": "Recommend has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "reccomend",
+      "sentences": [
+        "The librarian can recommend a mystery story."
+      ]
+    },
+    {
+      "target": "referred",
+      "difficulty": 4,
+      "studyGroup": "referred",
+      "usageLabel": "spelling word",
+      "teachingNote": "Referred has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "refered",
+      "sentences": [
+        "The coach referred to the rule book before deciding."
+      ]
+    },
+    {
+      "target": "reference",
+      "difficulty": 4,
+      "studyGroup": "reference",
+      "usageLabel": "noun",
+      "teachingNote": "Reference ends with -ence.",
+      "commonMisspelling": "referance",
+      "sentences": [
+        "The atlas was useful as a reference during geography."
+      ]
+    },
+    {
+      "target": "relevant",
+      "difficulty": 4,
+      "studyGroup": "relevant",
+      "usageLabel": "adjective",
+      "teachingNote": "Relevant is a commonly misspelled word. Practise the exact letter order: relevant.",
+      "commonMisspelling": "relevent",
+      "sentences": [
+        "Only the relevant facts belonged in the report."
+      ]
+    },
+    {
+      "target": "religious",
+      "difficulty": 4,
+      "studyGroup": "religious",
+      "usageLabel": "adjective",
+      "teachingNote": "Religious is a commonly misspelled word. Practise the exact letter order: religious.",
+      "commonMisspelling": "religous",
+      "sentences": [
+        "The museum had religious paintings from many centuries ago."
+      ]
+    },
+    {
+      "target": "restaurant",
+      "difficulty": 4,
+      "studyGroup": "restaurant",
+      "usageLabel": "noun",
+      "teachingNote": "Restaurant is a commonly misspelled word. Practise the exact letter order: restaurant.",
+      "commonMisspelling": "restaraunt",
+      "sentences": [
+        "The restaurant served hot soup and fresh bread."
+      ]
+    },
+    {
+      "target": "ridiculous",
+      "difficulty": 4,
+      "studyGroup": "ridiculous",
+      "usageLabel": "adjective",
+      "teachingNote": "Ridiculous is a commonly misspelled word. Practise the exact letter order: ridiculous.",
+      "commonMisspelling": "rediculous",
+      "sentences": [
+        "The excuse sounded ridiculous even to Rafi."
+      ]
+    },
+    {
+      "target": "rhythm",
+      "difficulty": 3,
+      "studyGroup": "rhythm",
+      "usageLabel": "noun",
+      "teachingNote": "Rhythm is a commonly misspelled word. Practise the exact letter order: rhythm.",
+      "commonMisspelling": "rythm",
+      "sentences": [
+        "The drummer kept a steady rhythm during the parade."
+      ]
+    },
+    {
+      "target": "sandal",
+      "difficulty": 3,
+      "studyGroup": "sandal",
+      "usageLabel": "noun",
+      "teachingNote": "Sandal is a commonly misspelled word. Practise the exact letter order: sandal.",
+      "commonMisspelling": "sandle",
+      "sentences": [
+        "One sandal was left beside the paddling pool."
+      ]
+    },
+    {
+      "target": "schedule",
+      "difficulty": 4,
+      "studyGroup": "schedule",
+      "usageLabel": "noun",
+      "teachingNote": "Schedule is a commonly misspelled word. Practise the exact letter order: schedule.",
+      "commonMisspelling": "schedual",
+      "sentences": [
+        "The schedule showed rehearsals after lunch."
+      ]
+    },
+    {
+      "target": "scissors",
+      "difficulty": 4,
+      "studyGroup": "scissors",
+      "usageLabel": "noun",
+      "teachingNote": "Scissors has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "scisors",
+      "sentences": [
+        "Mina used scissors to cut the silver paper neatly."
+      ]
+    },
+    {
+      "target": "sensible",
+      "difficulty": 4,
+      "studyGroup": "sensible",
+      "usageLabel": "adjective",
+      "teachingNote": "Sensible ends with -ible.",
+      "commonMisspelling": "sensable",
+      "sentences": [
+        "A sensible plan kept everyone dry in the rain."
+      ]
+    },
+    {
+      "target": "separate",
+      "difficulty": 4,
+      "studyGroup": "separate",
+      "usageLabel": "adjective",
+      "teachingNote": "Separate is a commonly misspelled word. Practise the exact letter order: separate.",
+      "commonMisspelling": "seperate",
+      "sentences": [
+        "Please keep the clean brushes separate from the muddy ones."
+      ]
+    },
+    {
+      "target": "special",
+      "difficulty": 3,
+      "studyGroup": "special",
+      "usageLabel": "adjective",
+      "teachingNote": "Special is a commonly misspelled word. Practise the exact letter order: special.",
+      "commonMisspelling": "speical",
+      "sentences": [
+        "The class saved a special seat for Grandma."
+      ]
+    },
+    {
+      "target": "success",
+      "difficulty": 3,
+      "studyGroup": "success",
+      "usageLabel": "noun",
+      "teachingNote": "Success has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "sucess",
+      "sentences": [
+        "The team's success came from planning and practice."
+      ]
+    },
+    {
+      "target": "to",
+      "difficulty": 3,
+      "studyGroup": "to_too_two",
+      "usageLabel": "preposition",
+      "teachingNote": "To often shows direction or links to a verb.",
+      "commonMisspelling": "too",
+      "sentences": [
+        "Mina walked to the library after lunch.",
+        "The class planned to finish the model before Friday."
+      ]
+    },
+    {
+      "target": "too",
+      "difficulty": 3,
+      "studyGroup": "to_too_two",
+      "usageLabel": "adverb",
+      "teachingNote": "Too means also, or more than needed.",
+      "commonMisspelling": "to",
+      "sentences": [
+        "Rafi wanted to join the game too.",
+        "The soup was too hot to eat straight away."
+      ]
+    },
+    {
+      "target": "two",
+      "difficulty": 3,
+      "studyGroup": "to_too_two",
+      "usageLabel": "number word",
+      "teachingNote": "Two is the number word for 2.",
+      "commonMisspelling": "too",
+      "sentences": [
+        "Two pupils carried the heavy box together.",
+        "The recipe needed two eggs and a cup of milk."
+      ]
+    },
+    {
+      "target": "tomorrow",
+      "difficulty": 4,
+      "studyGroup": "tomorrow",
+      "usageLabel": "spelling word",
+      "teachingNote": "Tomorrow has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "tommorow",
+      "sentences": [
+        "The class will finish the mural tomorrow after lunch."
+      ]
+    },
+    {
+      "target": "their",
+      "difficulty": 3,
+      "studyGroup": "their_there_they_re",
+      "usageLabel": "possessive determiner",
+      "teachingNote": "Their shows that something belongs to a group of people.",
+      "commonMisspelling": "there",
+      "sentences": [
+        "The pupils packed their bags before the bell rang.",
+        "The team wore their green shirts for the match."
+      ]
+    },
+    {
+      "target": "they're",
+      "difficulty": 3,
+      "studyGroup": "their_there_they_re",
+      "usageLabel": "contraction",
+      "teachingNote": "They're is short for they are. The apostrophe shows missing letters.",
+      "commonMisspelling": "their",
+      "sentences": [
+        "They're waiting by the gate for the coach.",
+        "They're proud of the poster they made together."
+      ]
+    },
+    {
+      "target": "there",
+      "difficulty": 3,
+      "studyGroup": "their_there_they_re",
+      "usageLabel": "adverb",
+      "teachingNote": "There points to a place or introduces that something exists.",
+      "commonMisspelling": "their",
+      "sentences": [
+        "The missing book was there beside the window.",
+        "There were three pencils under the desk."
+      ]
+    },
+    {
+      "target": "twelfth",
+      "difficulty": 3,
+      "studyGroup": "twelfth",
+      "usageLabel": "number word",
+      "teachingNote": "Twelfth is a commonly misspelled word. Practise the exact letter order: twelfth.",
+      "commonMisspelling": "twelth",
+      "sentences": [
+        "The twelfth chapter finally solved the mystery."
+      ]
+    },
+    {
+      "target": "tyranny",
+      "difficulty": 3,
+      "studyGroup": "tyranny",
+      "usageLabel": "noun",
+      "teachingNote": "Tyranny has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "tyrany",
+      "sentences": [
+        "The story showed how tyranny made the villagers afraid."
+      ]
+    },
+    {
+      "target": "until",
+      "difficulty": 2,
+      "studyGroup": "until",
+      "usageLabel": "preposition",
+      "teachingNote": "Until is a commonly misspelled word. Practise the exact letter order: until.",
+      "commonMisspelling": "untill",
+      "sentences": [
+        "We waited until the rain stopped before crossing."
+      ]
+    },
+    {
+      "target": "vacuum",
+      "difficulty": 3,
+      "studyGroup": "vacuum",
+      "usageLabel": "noun",
+      "teachingNote": "Vacuum has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "vaccuum",
+      "sentences": [
+        "The vacuum cleaner roared under the sofa."
+      ]
+    },
+    {
+      "target": "vicious",
+      "difficulty": 3,
+      "studyGroup": "vicious",
+      "usageLabel": "adjective",
+      "teachingNote": "Vicious is a commonly misspelled word. Practise the exact letter order: vicious.",
+      "commonMisspelling": "viscious",
+      "sentences": [
+        "The vicious storm tore branches from the trees."
+      ]
+    },
+    {
+      "target": "weather",
+      "difficulty": 3,
+      "studyGroup": "weather_whether",
+      "usageLabel": "noun",
+      "teachingNote": "Weather means the rain, sun, wind, and temperature outside.",
+      "commonMisspelling": "whether",
+      "sentences": [
+        "The weather changed quickly before the picnic.",
+        "We checked the weather before choosing our coats."
+      ]
+    },
+    {
+      "target": "weird",
+      "difficulty": 2,
+      "studyGroup": "weird",
+      "usageLabel": "adjective",
+      "teachingNote": "Weird has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "wierd",
+      "sentences": [
+        "The weird noise came from the old radiator."
+      ]
+    },
+    {
+      "target": "you're",
+      "difficulty": 3,
+      "studyGroup": "your_you_re",
+      "usageLabel": "contraction",
+      "teachingNote": "You're is short for you are. The apostrophe shows missing letters.",
+      "commonMisspelling": "your",
+      "sentences": [
+        "You're ready to read your story aloud.",
+        "You're going to need a ruler for this drawing."
+      ]
+    },
+    {
+      "target": "your",
+      "difficulty": 3,
+      "studyGroup": "your_you_re",
+      "usageLabel": "possessive determiner",
+      "teachingNote": "Your shows that something belongs to the person you are speaking to.",
+      "commonMisspelling": "you're",
+      "sentences": [
+        "Please put your coat on the peg.",
+        "Your answer is clearer after the second draft."
+      ]
+    },
+    {
+      "target": "absence",
+      "difficulty": 3,
+      "studyGroup": "absence",
+      "usageLabel": "noun",
+      "teachingNote": "Absence ends with -ence.",
+      "commonMisspelling": "absense",
+      "sentences": [
+        "Mina's absence was marked in the register."
+      ]
+    },
+    {
+      "target": "achieve",
+      "difficulty": 3,
+      "studyGroup": "achieve",
+      "usageLabel": "verb",
+      "teachingNote": "Achieve has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "acheive",
+      "sentences": [
+        "The team worked hard to achieve its target."
+      ]
+    },
+    {
+      "target": "address",
+      "difficulty": 3,
+      "studyGroup": "address",
+      "usageLabel": "noun",
+      "teachingNote": "Address has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "adress",
+      "sentences": [
+        "Rafi wrote the correct address on the envelope."
+      ]
+    },
+    {
+      "target": "advertise",
+      "difficulty": 4,
+      "studyGroup": "advertise",
+      "usageLabel": "verb",
+      "teachingNote": "Advertise is a commonly misspelled word. Practise the exact letter order: advertise.",
+      "commonMisspelling": "advertize",
+      "sentences": [
+        "The drama club will advertise the play on the noticeboard."
+      ]
+    },
+    {
+      "target": "advice",
+      "difficulty": 3,
       "studyGroup": "advice_advise",
       "usageLabel": "noun",
       "teachingNote": "Advice is a noun. It means the helpful idea or guidance someone gives.",
+      "commonMisspelling": "advise",
       "sentences": [
         "The teacher gave useful advice before the class began its project.",
         "Mina followed her uncle's advice and checked the map twice."
       ]
     },
     {
-      "target": "advise",
-      "difficulty": 4,
-      "studyGroup": "advice_advise",
-      "usageLabel": "verb",
-      "teachingNote": "Advise is a verb. It means to give someone advice.",
+      "target": "animals",
+      "difficulty": 3,
+      "studyGroup": "animals",
+      "usageLabel": "noun",
+      "teachingNote": "Animals is a commonly misspelled word. Practise the exact letter order: animals.",
+      "commonMisspelling": "animuls",
       "sentences": [
-        "The coach will advise the team before the final race.",
-        "Teachers advise pupils to check their work slowly."
+        "The animals in the rescue centre needed clean water."
+      ]
+    },
+    {
+      "target": "another",
+      "difficulty": 3,
+      "studyGroup": "another",
+      "usageLabel": "spelling word",
+      "teachingNote": "Another is a commonly misspelled word. Practise the exact letter order: another.",
+      "commonMisspelling": "anouther",
+      "sentences": [
+        "Mina asked for another sheet of paper."
+      ]
+    },
+    {
+      "target": "arctic",
+      "difficulty": 3,
+      "studyGroup": "arctic",
+      "usageLabel": "adjective",
+      "teachingNote": "Arctic is a commonly misspelled word. Practise the exact letter order: arctic.",
+      "commonMisspelling": "artic",
+      "sentences": [
+        "The arctic wind made everyone pull up their hoods."
+      ]
+    },
+    {
+      "target": "around",
+      "difficulty": 3,
+      "studyGroup": "around",
+      "usageLabel": "preposition",
+      "teachingNote": "Around is a commonly misspelled word. Practise the exact letter order: around.",
+      "commonMisspelling": "arround",
+      "sentences": [
+        "The children walked around the pond."
+      ]
+    },
+    {
+      "target": "athlete",
+      "difficulty": 3,
+      "studyGroup": "athlete",
+      "usageLabel": "noun",
+      "teachingNote": "Athlete is a commonly misspelled word. Practise the exact letter order: athlete.",
+      "commonMisspelling": "athalete",
+      "sentences": [
+        "The athlete stretched before the final race."
+      ]
+    },
+    {
+      "target": "awful",
+      "difficulty": 2,
+      "studyGroup": "awful",
+      "usageLabel": "adjective",
+      "teachingNote": "Awful is a commonly misspelled word. Practise the exact letter order: awful.",
+      "commonMisspelling": "aweful",
+      "sentences": [
+        "The soup tasted awful after too much salt fell in."
+      ]
+    },
+    {
+      "target": "babies",
+      "difficulty": 3,
+      "studyGroup": "babies",
+      "usageLabel": "noun",
+      "teachingNote": "Babies has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "babys",
+      "sentences": [
+        "The babies slept while the older children played."
+      ]
+    },
+    {
+      "target": "balance",
+      "difficulty": 3,
+      "studyGroup": "balance",
+      "usageLabel": "noun",
+      "teachingNote": "Balance ends with -ance.",
+      "commonMisspelling": "balence",
+      "sentences": [
+        "Rafi tried to balance the books on one hand."
+      ]
+    },
+    {
+      "target": "basically",
+      "difficulty": 4,
+      "studyGroup": "basically",
+      "usageLabel": "adverb",
+      "teachingNote": "Basically has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "basicly",
+      "sentences": [
+        "The machine basically sorts paper from plastic."
+      ]
+    },
+    {
+      "target": "beautiful",
+      "difficulty": 4,
+      "studyGroup": "beautiful",
+      "usageLabel": "adjective",
+      "teachingNote": "Beautiful is a commonly misspelled word. Practise the exact letter order: beautiful.",
+      "commonMisspelling": "beatiful",
+      "sentences": [
+        "A beautiful rainbow appeared over the playground."
+      ]
+    },
+    {
+      "target": "because",
+      "difficulty": 3,
+      "studyGroup": "because",
+      "usageLabel": "conjunction",
+      "teachingNote": "Because is a commonly misspelled word. Practise the exact letter order: because.",
+      "commonMisspelling": "becuase",
+      "sentences": [
+        "Mina stayed inside because the path was icy."
+      ]
+    },
+    {
+      "target": "becoming",
+      "difficulty": 4,
+      "studyGroup": "becoming",
+      "usageLabel": "spelling word",
+      "teachingNote": "Becoming is a commonly misspelled word. Practise the exact letter order: becoming.",
+      "commonMisspelling": "becomming",
+      "sentences": [
+        "The sky was becoming darker before the storm."
+      ]
+    },
+    {
+      "target": "before",
+      "difficulty": 3,
+      "studyGroup": "before",
+      "usageLabel": "preposition",
+      "teachingNote": "Before is a commonly misspelled word. Practise the exact letter order: before.",
+      "commonMisspelling": "befor",
+      "sentences": [
+        "Wash your hands before eating lunch."
+      ]
+    },
+    {
+      "target": "beginning",
+      "difficulty": 4,
+      "studyGroup": "beginning",
+      "usageLabel": "noun",
+      "teachingNote": "Beginning has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "begining",
+      "sentences": [
+        "The beginning of the story introduced a lost map."
+      ]
+    },
+    {
+      "target": "benefit",
+      "difficulty": 3,
+      "studyGroup": "benefit",
+      "usageLabel": "noun",
+      "teachingNote": "Benefit is a commonly misspelled word. Practise the exact letter order: benefit.",
+      "commonMisspelling": "benifit",
+      "sentences": [
+        "A warm-up can benefit every runner."
+      ]
+    },
+    {
+      "target": "bicycle",
+      "difficulty": 3,
+      "studyGroup": "bicycle",
+      "usageLabel": "noun",
+      "teachingNote": "Bicycle is a commonly misspelled word. Practise the exact letter order: bicycle.",
+      "commonMisspelling": "bycycle",
+      "sentences": [
+        "The red bicycle leaned against the shed."
+      ]
+    },
+    {
+      "target": "bought",
+      "difficulty": 3,
+      "studyGroup": "bought",
+      "usageLabel": "verb",
+      "teachingNote": "Bought is a commonly misspelled word. Practise the exact letter order: bought.",
+      "commonMisspelling": "bougt",
+      "sentences": [
+        "Dad bought fresh bread on the way home."
+      ]
+    },
+    {
+      "target": "breathe",
+      "difficulty": 3,
+      "studyGroup": "breathe",
+      "usageLabel": "verb",
+      "teachingNote": "Breathe is a commonly misspelled word. Practise the exact letter order: breathe.",
+      "commonMisspelling": "breath",
+      "sentences": [
+        "The swimmer paused to breathe at the end of the lane."
+      ]
+    },
+    {
+      "target": "brilliant",
+      "difficulty": 4,
+      "studyGroup": "brilliant",
+      "usageLabel": "adjective",
+      "teachingNote": "Brilliant has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "briliant",
+      "sentences": [
+        "The brilliant idea solved the problem at once."
+      ]
+    },
+    {
+      "target": "broccoli",
+      "difficulty": 4,
+      "studyGroup": "broccoli",
+      "usageLabel": "noun",
+      "teachingNote": "Broccoli has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "brocoli",
+      "sentences": [
+        "Mina added broccoli to the pasta sauce."
+      ]
+    },
+    {
+      "target": "bureau",
+      "difficulty": 3,
+      "studyGroup": "bureau",
+      "usageLabel": "noun",
+      "teachingNote": "Bureau is a commonly misspelled word. Practise the exact letter order: bureau.",
+      "commonMisspelling": "bureu",
+      "sentences": [
+        "The old bureau had tiny drawers for letters."
+      ]
+    },
+    {
+      "target": "business",
+      "difficulty": 4,
+      "studyGroup": "business",
+      "usageLabel": "noun",
+      "teachingNote": "Business has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "buisness",
+      "sentences": [
+        "The family business sold fruit at the market."
+      ]
+    },
+    {
+      "target": "careful",
+      "difficulty": 3,
+      "studyGroup": "careful",
+      "usageLabel": "adjective",
+      "teachingNote": "Careful is a commonly misspelled word. Practise the exact letter order: careful.",
+      "commonMisspelling": "carefull",
+      "sentences": [
+        "A careful driver slowed down near the school gate."
+      ]
+    },
+    {
+      "target": "caught",
+      "difficulty": 3,
+      "studyGroup": "caught",
+      "usageLabel": "verb",
+      "teachingNote": "Caught is a commonly misspelled word. Practise the exact letter order: caught.",
+      "commonMisspelling": "cought",
+      "sentences": [
+        "The goalkeeper caught the ball with both hands."
+      ]
+    },
+    {
+      "target": "ceiling",
+      "difficulty": 3,
+      "studyGroup": "ceiling",
+      "usageLabel": "noun",
+      "teachingNote": "Ceiling has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "ceilling",
+      "sentences": [
+        "A paper star hung from the classroom ceiling."
+      ]
+    },
+    {
+      "target": "certain",
+      "difficulty": 3,
+      "studyGroup": "certain",
+      "usageLabel": "adjective",
+      "teachingNote": "Certain is a commonly misspelled word. Practise the exact letter order: certain.",
+      "commonMisspelling": "certin",
+      "sentences": [
+        "Mina was certain she had packed her homework."
+      ]
+    },
+    {
+      "target": "chief",
+      "difficulty": 2,
+      "studyGroup": "chief",
+      "usageLabel": "spelling word",
+      "teachingNote": "Chief has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "cheif",
+      "sentences": [
+        "The chief engineer checked the bridge design."
+      ]
+    },
+    {
+      "target": "children",
+      "difficulty": 4,
+      "studyGroup": "children",
+      "usageLabel": "spelling word",
+      "teachingNote": "Children is a commonly misspelled word. Practise the exact letter order: children.",
+      "commonMisspelling": "childrens",
+      "sentences": [
+        "The children lined up quietly after assembly."
+      ]
+    },
+    {
+      "target": "citizen",
+      "difficulty": 3,
+      "studyGroup": "citizen",
+      "usageLabel": "noun",
+      "teachingNote": "Citizen is a commonly misspelled word. Practise the exact letter order: citizen.",
+      "commonMisspelling": "citizan",
+      "sentences": [
+        "Every citizen has rules to follow and rights to protect."
+      ]
+    },
+    {
+      "target": "clothes",
+      "difficulty": 3,
+      "studyGroup": "clothes",
+      "usageLabel": "noun",
+      "teachingNote": "Clothes is a commonly misspelled word. Practise the exact letter order: clothes.",
+      "commonMisspelling": "cloths",
+      "sentences": [
+        "The wet clothes dried beside the radiator."
+      ]
+    },
+    {
+      "target": "coming",
+      "difficulty": 3,
+      "studyGroup": "coming",
+      "usageLabel": "verb",
+      "teachingNote": "Coming is a commonly misspelled word. Practise the exact letter order: coming.",
+      "commonMisspelling": "comming",
+      "sentences": [
+        "The bus was coming around the corner."
+      ]
+    },
+    {
+      "target": "committee",
+      "difficulty": 4,
+      "studyGroup": "committee",
+      "usageLabel": "noun",
+      "teachingNote": "Committee has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "comittee",
+      "sentences": [
+        "The school committee chose a theme for the fair."
+      ]
+    },
+    {
+      "target": "competition",
+      "difficulty": 5,
+      "studyGroup": "competition",
+      "usageLabel": "noun",
+      "teachingNote": "Competition is a commonly misspelled word. Practise the exact letter order: competition.",
+      "commonMisspelling": "competion",
+      "sentences": [
+        "The art competition filled the hall with posters."
+      ]
+    },
+    {
+      "target": "convenience",
+      "difficulty": 5,
+      "studyGroup": "convenience",
+      "usageLabel": "noun",
+      "teachingNote": "Convenience has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "convienience",
+      "sentences": [
+        "The new timetable was arranged for everyone's convenience."
+      ]
+    },
+    {
+      "target": "course",
+      "difficulty": 3,
+      "studyGroup": "course",
+      "usageLabel": "noun",
+      "teachingNote": "Course is a commonly misspelled word. Practise the exact letter order: course.",
+      "commonMisspelling": "corse",
+      "sentences": [
+        "The obstacle course wound around cones and benches."
+      ]
+    },
+    {
+      "target": "cousin",
+      "difficulty": 3,
+      "studyGroup": "cousin",
+      "usageLabel": "noun",
+      "teachingNote": "Cousin is a commonly misspelled word. Practise the exact letter order: cousin.",
+      "commonMisspelling": "cousen",
+      "sentences": [
+        "My cousin sent a postcard from Edinburgh."
+      ]
+    },
+    {
+      "target": "criticise",
+      "difficulty": 4,
+      "studyGroup": "criticise",
+      "usageLabel": "verb",
+      "teachingNote": "Criticise is a commonly misspelled word. Practise the exact letter order: criticise.",
+      "commonMisspelling": "critisise",
+      "sentences": [
+        "It is kinder to criticise the work, not the person."
+      ]
+    },
+    {
+      "target": "decease",
+      "difficulty": 3,
+      "studyGroup": "decease",
+      "usageLabel": "noun",
+      "teachingNote": "Decease is a commonly misspelled word. Practise the exact letter order: decease.",
+      "commonMisspelling": "deceese",
+      "sentences": [
+        "The document recorded the date of his decease."
+      ]
+    },
+    {
+      "target": "deceive",
+      "difficulty": 3,
+      "studyGroup": "deceive",
+      "usageLabel": "verb",
+      "teachingNote": "Deceive has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "decieve",
+      "sentences": [
+        "The fake sign was meant to deceive visitors."
+      ]
+    },
+    {
+      "target": "decide",
+      "difficulty": 3,
+      "studyGroup": "decide",
+      "usageLabel": "verb",
+      "teachingNote": "Decide is a commonly misspelled word. Practise the exact letter order: decide.",
+      "commonMisspelling": "deside",
+      "sentences": [
+        "The group must decide which route to take."
+      ]
+    },
+    {
+      "target": "decided",
+      "difficulty": 3,
+      "studyGroup": "decided",
+      "usageLabel": "verb",
+      "teachingNote": "Decided is a commonly misspelled word. Practise the exact letter order: decided.",
+      "commonMisspelling": "decieded",
+      "sentences": [
+        "Mina decided to rewrite the final paragraph."
+      ]
+    },
+    {
+      "target": "deposit",
+      "difficulty": 3,
+      "studyGroup": "deposit",
+      "usageLabel": "noun",
+      "teachingNote": "Deposit is a commonly misspelled word. Practise the exact letter order: deposit.",
+      "commonMisspelling": "deposite",
+      "sentences": [
+        "Rafi paid a small deposit for the school trip."
+      ]
+    },
+    {
+      "target": "descent",
+      "difficulty": 3,
+      "studyGroup": "descent",
+      "usageLabel": "noun",
+      "teachingNote": "Descent is a commonly misspelled word. Practise the exact letter order: descent.",
+      "commonMisspelling": "decent",
+      "sentences": [
+        "The steep descent was slippery after the rain."
+      ]
+    },
+    {
+      "target": "describe",
+      "difficulty": 4,
+      "studyGroup": "describe",
+      "usageLabel": "verb",
+      "teachingNote": "Describe is a commonly misspelled word. Practise the exact letter order: describe.",
+      "commonMisspelling": "discribe",
+      "sentences": [
+        "Mina tried to describe the smell of fresh bread."
+      ]
+    },
+    {
+      "target": "desperate",
+      "difficulty": 4,
+      "studyGroup": "desperate",
+      "usageLabel": "adjective",
+      "teachingNote": "Desperate is a commonly misspelled word. Practise the exact letter order: desperate.",
+      "commonMisspelling": "desparate",
+      "sentences": [
+        "The thirsty runner was desperate for a drink."
+      ]
+    },
+    {
+      "target": "develop",
+      "difficulty": 3,
+      "studyGroup": "develop",
+      "usageLabel": "verb",
+      "teachingNote": "Develop is a commonly misspelled word. Practise the exact letter order: develop.",
+      "commonMisspelling": "develope",
+      "sentences": [
+        "The seedlings will develop stronger roots in sunlight."
+      ]
+    },
+    {
+      "target": "device",
+      "difficulty": 3,
+      "studyGroup": "device",
+      "usageLabel": "noun",
+      "teachingNote": "Device is a commonly misspelled word. Practise the exact letter order: device.",
+      "commonMisspelling": "devise",
+      "sentences": [
+        "The small device measured the room temperature."
+      ]
+    },
+    {
+      "target": "didn't",
+      "difficulty": 5,
+      "studyGroup": "didn_t",
+      "usageLabel": "contraction",
+      "teachingNote": "Didn't is a contraction. Watch the apostrophe and the missing letters.",
+      "commonMisspelling": "didnt",
+      "sentences": [
+        "Mina didn't forget her packed lunch this time."
+      ]
+    },
+    {
+      "target": "difference",
+      "difficulty": 4,
+      "studyGroup": "difference",
+      "usageLabel": "noun",
+      "teachingNote": "Difference has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "diference",
+      "sentences": [
+        "One small difference changed the answer completely."
+      ]
+    },
+    {
+      "target": "different",
+      "difficulty": 4,
+      "studyGroup": "different",
+      "usageLabel": "adjective",
+      "teachingNote": "Different has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "diffrent",
+      "sentences": [
+        "The twins chose different books from the shelf."
+      ]
+    },
+    {
+      "target": "dilemma",
+      "difficulty": 3,
+      "studyGroup": "dilemma",
+      "usageLabel": "noun",
+      "teachingNote": "Dilemma has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "dilemna",
+      "sentences": [
+        "The captain faced a dilemma before the penalty."
+      ]
+    },
+    {
+      "target": "disappoint",
+      "difficulty": 4,
+      "studyGroup": "disappoint",
+      "usageLabel": "verb",
+      "teachingNote": "Disappoint has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "disapoint",
+      "sentences": [
+        "Rafi did not want to disappoint his team."
+      ]
+    },
+    {
+      "target": "disastrous",
+      "difficulty": 4,
+      "studyGroup": "disastrous",
+      "usageLabel": "adjective",
+      "teachingNote": "Disastrous is a commonly misspelled word. Practise the exact letter order: disastrous.",
+      "commonMisspelling": "disasterous",
+      "sentences": [
+        "Leaving the window open during the storm was disastrous."
+      ]
+    },
+    {
+      "target": "does",
+      "difficulty": 2,
+      "studyGroup": "does",
+      "usageLabel": "spelling word",
+      "teachingNote": "Does is a commonly misspelled word. Practise the exact letter order: does.",
+      "commonMisspelling": "dose",
+      "sentences": [
+        "The robot does a little dance when the code works."
+      ]
+    },
+    {
+      "target": "during",
+      "difficulty": 3,
+      "studyGroup": "during",
+      "usageLabel": "preposition",
+      "teachingNote": "During is a commonly misspelled word. Practise the exact letter order: during.",
+      "commonMisspelling": "durring",
+      "sentences": [
+        "The lights flickered during the thunderstorm."
+      ]
+    },
+    {
+      "target": "easily",
+      "difficulty": 3,
+      "studyGroup": "easily",
+      "usageLabel": "adverb",
+      "teachingNote": "Easily is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "easyly",
+      "sentences": [
+        "The lid opened easily after Mina loosened it."
+      ]
+    },
+    {
+      "target": "ecstasy",
+      "difficulty": 3,
+      "studyGroup": "ecstasy",
+      "usageLabel": "noun",
+      "teachingNote": "Ecstasy is a commonly misspelled word. Practise the exact letter order: ecstasy.",
+      "commonMisspelling": "ecstacy",
+      "sentences": [
+        "The fans shouted in ecstasy when the final goal went in."
+      ]
+    },
+    {
+      "target": "eight",
+      "difficulty": 2,
+      "studyGroup": "eight",
+      "usageLabel": "number word",
+      "teachingNote": "Eight has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "eigth",
+      "sentences": [
+        "Eight chairs were stacked beside the door."
+      ]
+    },
+    {
+      "target": "either",
+      "difficulty": 3,
+      "studyGroup": "either",
+      "usageLabel": "conjunction",
+      "teachingNote": "Either has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "eather",
+      "sentences": [
+        "Either route will take us to the museum."
+      ]
+    },
+    {
+      "target": "environment",
+      "difficulty": 5,
+      "studyGroup": "environment",
+      "usageLabel": "spelling word",
+      "teachingNote": "Environment is a commonly misspelled word. Practise the exact letter order: environment.",
+      "commonMisspelling": "enviroment",
+      "sentences": [
+        "The club planted trees to protect the environment."
+      ]
+    },
+    {
+      "target": "equipped",
+      "difficulty": 4,
+      "studyGroup": "equipped",
+      "usageLabel": "verb",
+      "teachingNote": "Equipped has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "equiped",
+      "sentences": [
+        "The kitchen was equipped with safe tools."
+      ]
+    },
+    {
+      "target": "exaggerate",
+      "difficulty": 4,
+      "studyGroup": "exaggerate",
+      "usageLabel": "spelling word",
+      "teachingNote": "Exaggerate has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "exagerate",
+      "sentences": [
+        "Rafi liked to exaggerate how enormous the spider was."
+      ]
+    },
+    {
+      "target": "excellent",
+      "difficulty": 4,
+      "studyGroup": "excellent",
+      "usageLabel": "adjective",
+      "teachingNote": "Excellent has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "excellant",
+      "sentences": [
+        "The choir gave an excellent performance."
+      ]
+    },
+    {
+      "target": "except",
+      "difficulty": 3,
+      "studyGroup": "except",
+      "usageLabel": "conjunction",
+      "teachingNote": "Except is a commonly misspelled word. Practise the exact letter order: except.",
+      "commonMisspelling": "accept",
+      "sentences": [
+        "Everyone remembered their coat except Sam."
+      ]
+    },
+    {
+      "target": "exercise",
+      "difficulty": 4,
+      "studyGroup": "exercise",
+      "usageLabel": "spelling word",
+      "teachingNote": "Exercise is a commonly misspelled word. Practise the exact letter order: exercise.",
+      "commonMisspelling": "exersize",
+      "sentences": [
+        "Daily exercise helped the puppy sleep well."
+      ]
+    },
+    {
+      "target": "expect",
+      "difficulty": 3,
+      "studyGroup": "expect",
+      "usageLabel": "verb",
+      "teachingNote": "Expect is a commonly misspelled word. Practise the exact letter order: expect.",
+      "commonMisspelling": "excpect",
+      "sentences": [
+        "We expect the parcel to arrive after lunch."
+      ]
+    },
+    {
+      "target": "experiment",
+      "difficulty": 4,
+      "studyGroup": "experiment",
+      "usageLabel": "spelling word",
+      "teachingNote": "Experiment is a commonly misspelled word. Practise the exact letter order: experiment.",
+      "commonMisspelling": "experament",
+      "sentences": [
+        "The experiment showed how shadows change."
+      ]
+    },
+    {
+      "target": "explanation",
+      "difficulty": 5,
+      "studyGroup": "explanation",
+      "usageLabel": "noun",
+      "teachingNote": "Explanation is a commonly misspelled word. Practise the exact letter order: explanation.",
+      "commonMisspelling": "explaination",
+      "sentences": [
+        "The teacher gave a clear explanation."
+      ]
+    },
+    {
+      "target": "familiar",
+      "difficulty": 4,
+      "studyGroup": "familiar",
+      "usageLabel": "adjective",
+      "teachingNote": "Familiar is a commonly misspelled word. Practise the exact letter order: familiar.",
+      "commonMisspelling": "familar",
+      "sentences": [
+        "The tune sounded familiar to Mina."
+      ]
+    },
+    {
+      "target": "fascinate",
+      "difficulty": 4,
+      "studyGroup": "fascinate",
+      "usageLabel": "verb",
+      "teachingNote": "Fascinate is a commonly misspelled word. Practise the exact letter order: fascinate.",
+      "commonMisspelling": "fasinate",
+      "sentences": [
+        "Old maps fascinate Rafi."
+      ]
+    },
+    {
+      "target": "fascinating",
+      "difficulty": 5,
+      "studyGroup": "fascinating",
+      "usageLabel": "adjective",
+      "teachingNote": "Fascinating is a commonly misspelled word. Practise the exact letter order: fascinating.",
+      "commonMisspelling": "fasinating",
+      "sentences": [
+        "The fossil display was fascinating."
+      ]
+    },
+    {
+      "target": "February",
+      "difficulty": 4,
+      "studyGroup": "february",
+      "usageLabel": "spelling word",
+      "teachingNote": "February is a commonly misspelled word. Practise the exact letter order: February.",
+      "commonMisspelling": "Febuary",
+      "sentences": [
+        "February was colder than everyone expected."
+      ]
+    },
+    {
+      "target": "finally",
+      "difficulty": 3,
+      "studyGroup": "finally",
+      "usageLabel": "adverb",
+      "teachingNote": "Finally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "finaly",
+      "sentences": [
+        "The bus finally arrived after the rain stopped."
+      ]
+    },
+    {
+      "target": "fluorescent",
+      "difficulty": 5,
+      "studyGroup": "fluorescent",
+      "usageLabel": "adjective",
+      "teachingNote": "Fluorescent is a commonly misspelled word. Practise the exact letter order: fluorescent.",
+      "commonMisspelling": "florescent",
+      "sentences": [
+        "A fluorescent jacket helped the cyclist stay visible."
+      ]
+    },
+    {
+      "target": "forty",
+      "difficulty": 2,
+      "studyGroup": "forty",
+      "usageLabel": "number word",
+      "teachingNote": "Forty is a commonly misspelled word. Practise the exact letter order: forty.",
+      "commonMisspelling": "fourty",
+      "sentences": [
+        "The class counted forty shells on the science table."
+      ]
+    },
+    {
+      "target": "forward",
+      "difficulty": 3,
+      "studyGroup": "forward",
+      "usageLabel": "spelling word",
+      "teachingNote": "Forward is a commonly misspelled word. Practise the exact letter order: forward.",
+      "commonMisspelling": "forword",
+      "sentences": [
+        "Mina stepped forward to read her poem."
+      ]
+    },
+    {
+      "target": "friend",
+      "difficulty": 3,
+      "studyGroup": "friend",
+      "usageLabel": "spelling word",
+      "teachingNote": "Friend has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "freind",
+      "sentences": [
+        "Her friend saved a seat beside the window."
+      ]
+    },
+    {
+      "target": "fundamental",
+      "difficulty": 5,
+      "studyGroup": "fundamental",
+      "usageLabel": "adjective",
+      "teachingNote": "Fundamental is a commonly misspelled word. Practise the exact letter order: fundamental.",
+      "commonMisspelling": "fundemental",
+      "sentences": [
+        "Clean water is fundamental to good health."
+      ]
+    },
+    {
+      "target": "government",
+      "difficulty": 4,
+      "studyGroup": "government",
+      "usageLabel": "spelling word",
+      "teachingNote": "Government is a commonly misspelled word. Practise the exact letter order: government.",
+      "commonMisspelling": "goverment",
+      "sentences": [
+        "The government announced new recycling rules."
+      ]
+    },
+    {
+      "target": "guidance",
+      "difficulty": 4,
+      "studyGroup": "guidance",
+      "usageLabel": "noun",
+      "teachingNote": "Guidance ends with -ance.",
+      "commonMisspelling": "guidence",
+      "sentences": [
+        "The instructor gave guidance before climbing."
+      ]
+    },
+    {
+      "target": "happiness",
+      "difficulty": 4,
+      "studyGroup": "happiness",
+      "usageLabel": "noun",
+      "teachingNote": "Happiness has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "happyness",
+      "sentences": [
+        "The surprise visit brought happiness to the family."
+      ]
+    },
+    {
+      "target": "heroes",
+      "difficulty": 3,
+      "studyGroup": "heroes",
+      "usageLabel": "noun",
+      "teachingNote": "Heroes is a commonly misspelled word. Practise the exact letter order: heroes.",
+      "commonMisspelling": "heros",
+      "sentences": [
+        "The firefighters were treated as heroes."
+      ]
+    },
+    {
+      "target": "humorous",
+      "difficulty": 4,
+      "studyGroup": "humorous",
+      "usageLabel": "adjective",
+      "teachingNote": "Humorous is a commonly misspelled word. Practise the exact letter order: humorous.",
+      "commonMisspelling": "humorus",
+      "sentences": [
+        "The humorous story made the class laugh."
+      ]
+    },
+    {
+      "target": "identity",
+      "difficulty": 4,
+      "studyGroup": "identity",
+      "usageLabel": "spelling word",
+      "teachingNote": "Identity is a commonly misspelled word. Practise the exact letter order: identity.",
+      "commonMisspelling": "identiy",
+      "sentences": [
+        "The passport proved her identity."
+      ]
+    },
+    {
+      "target": "imaginary",
+      "difficulty": 4,
+      "studyGroup": "imaginary",
+      "usageLabel": "spelling word",
+      "teachingNote": "Imaginary is a commonly misspelled word. Practise the exact letter order: imaginary.",
+      "commonMisspelling": "imaginery",
+      "sentences": [
+        "Mina drew an imaginary island."
+      ]
+    },
+    {
+      "target": "imitation",
+      "difficulty": 4,
+      "studyGroup": "imitation",
+      "usageLabel": "noun",
+      "teachingNote": "Imitation is a commonly misspelled word. Practise the exact letter order: imitation.",
+      "commonMisspelling": "immitation",
+      "sentences": [
+        "The toy sword was only an imitation."
+      ]
+    },
+    {
+      "target": "incidentally",
+      "difficulty": 5,
+      "studyGroup": "incidentally",
+      "usageLabel": "adverb",
+      "teachingNote": "Incidentally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "incidently",
+      "sentences": [
+        "Incidentally, the same author wrote our class novel."
+      ]
+    },
+    {
+      "target": "intelligent",
+      "difficulty": 5,
+      "studyGroup": "intelligent",
+      "usageLabel": "adjective",
+      "teachingNote": "Intelligent has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "inteligent",
+      "sentences": [
+        "The intelligent dog learned the command quickly."
+      ]
+    },
+    {
+      "target": "interesting",
+      "difficulty": 5,
+      "studyGroup": "interesting",
+      "usageLabel": "adjective",
+      "teachingNote": "Interesting is a commonly misspelled word. Practise the exact letter order: interesting.",
+      "commonMisspelling": "intresting",
+      "sentences": [
+        "The guide told an interesting story."
+      ]
+    },
+    {
+      "target": "interfere",
+      "difficulty": 4,
+      "studyGroup": "interfere",
+      "usageLabel": "verb",
+      "teachingNote": "Interfere is a commonly misspelled word. Practise the exact letter order: interfere.",
+      "sentences": [
+        "Please do not interfere while the glue is drying."
+      ],
+      "commonMisspelling": "interfear"
+    },
+    {
+      "target": "interpretation",
+      "difficulty": 5,
+      "studyGroup": "interpretation",
+      "usageLabel": "noun",
+      "teachingNote": "Interpretation is a commonly misspelled word. Practise the exact letter order: interpretation.",
+      "commonMisspelling": "interpretaion",
+      "sentences": [
+        "Her interpretation of the poem was thoughtful."
+      ]
+    },
+    {
+      "target": "interruption",
+      "difficulty": 5,
+      "studyGroup": "interruption",
+      "usageLabel": "noun",
+      "teachingNote": "Interruption has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "interuption",
+      "sentences": [
+        "The fire alarm caused an interruption."
+      ]
+    },
+    {
+      "target": "invitation",
+      "difficulty": 4,
+      "studyGroup": "invitation",
+      "usageLabel": "noun",
+      "teachingNote": "Invitation is a commonly misspelled word. Practise the exact letter order: invitation.",
+      "commonMisspelling": "invitiation",
+      "sentences": [
+        "Mina made an invitation for her birthday picnic."
+      ]
+    },
+    {
+      "target": "irrelevant",
+      "difficulty": 4,
+      "studyGroup": "irrelevant",
+      "usageLabel": "adjective",
+      "teachingNote": "Irrelevant has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "irrelevent",
+      "sentences": [
+        "The extra detail was irrelevant."
+      ]
+    },
+    {
+      "target": "irritable",
+      "difficulty": 4,
+      "studyGroup": "irritable",
+      "usageLabel": "adjective",
+      "teachingNote": "Irritable has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "iritable",
+      "sentences": [
+        "The tired toddler became irritable."
+      ]
+    },
+    {
+      "target": "island",
+      "difficulty": 3,
+      "studyGroup": "island",
+      "usageLabel": "noun",
+      "teachingNote": "Island is a commonly misspelled word. Practise the exact letter order: island.",
+      "commonMisspelling": "iland",
+      "sentences": [
+        "The island was only reachable by boat."
+      ]
+    },
+    {
+      "target": "jealous",
+      "difficulty": 3,
+      "studyGroup": "jealous",
+      "usageLabel": "adjective",
+      "teachingNote": "Jealous is a commonly misspelled word. Practise the exact letter order: jealous.",
+      "commonMisspelling": "jelous",
+      "sentences": [
+        "Rafi felt jealous when his sister won."
+      ]
+    },
+    {
+      "target": "jewellery",
+      "difficulty": 4,
+      "studyGroup": "jewellery",
+      "usageLabel": "noun",
+      "teachingNote": "Jewellery has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "jewelry",
+      "sentences": [
+        "Grandma kept her jewellery in a wooden box."
+      ]
+    },
+    {
+      "target": "ketchup",
+      "difficulty": 3,
+      "studyGroup": "ketchup",
+      "usageLabel": "noun",
+      "teachingNote": "Ketchup is a commonly misspelled word. Practise the exact letter order: ketchup.",
+      "commonMisspelling": "catchup",
+      "sentences": [
+        "A drop of ketchup landed on the blanket."
+      ]
+    },
+    {
+      "target": "laboratory",
+      "difficulty": 4,
+      "studyGroup": "laboratory",
+      "usageLabel": "noun",
+      "teachingNote": "Laboratory is a commonly misspelled word. Practise the exact letter order: laboratory.",
+      "commonMisspelling": "laboritory",
+      "sentences": [
+        "The laboratory smelled faintly of soap."
+      ]
+    },
+    {
+      "target": "length",
+      "difficulty": 3,
+      "studyGroup": "length",
+      "usageLabel": "noun",
+      "teachingNote": "Length is a commonly misspelled word. Practise the exact letter order: length.",
+      "commonMisspelling": "lenght",
+      "sentences": [
+        "Mina measured the length of the ribbon."
+      ]
+    },
+    {
+      "target": "lesson",
+      "difficulty": 3,
+      "studyGroup": "lesson",
+      "usageLabel": "noun",
+      "teachingNote": "Lesson has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "leson",
+      "sentences": [
+        "The swimming lesson began at nine."
+      ]
+    },
+    {
+      "target": "liaison",
+      "difficulty": 3,
+      "studyGroup": "liaison",
+      "usageLabel": "noun",
+      "teachingNote": "Liaison is a commonly misspelled word. Practise the exact letter order: liaison.",
+      "commonMisspelling": "liason",
+      "sentences": [
+        "The teacher acted as liaison with the parents."
+      ]
+    },
+    {
+      "target": "license",
+      "difficulty": 3,
+      "studyGroup": "license",
+      "usageLabel": "noun",
+      "teachingNote": "License is a commonly misspelled word. Practise the exact letter order: license.",
+      "commonMisspelling": "licence",
+      "sentences": [
+        "The council will license the stall before the market opens."
+      ]
+    },
+    {
+      "target": "loneliness",
+      "difficulty": 4,
+      "studyGroup": "loneliness",
+      "usageLabel": "spelling word",
+      "teachingNote": "Loneliness has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "lonliness",
+      "sentences": [
+        "The new pupil felt loneliness at lunchtime."
+      ]
+    },
+    {
+      "target": "losing",
+      "difficulty": 3,
+      "studyGroup": "losing",
+      "usageLabel": "verb",
+      "teachingNote": "Losing is a commonly misspelled word. Practise the exact letter order: losing.",
+      "commonMisspelling": "loosing",
+      "sentences": [
+        "The team was losing by one point."
+      ]
+    },
+    {
+      "target": "lying",
+      "difficulty": 2,
+      "studyGroup": "lying",
+      "usageLabel": "verb",
+      "teachingNote": "Lying is a commonly misspelled word. Practise the exact letter order: lying.",
+      "commonMisspelling": "lieing",
+      "sentences": [
+        "The wet football was lying beside the goal."
+      ]
+    },
+    {
+      "target": "marriage",
+      "difficulty": 4,
+      "studyGroup": "marriage",
+      "usageLabel": "noun",
+      "teachingNote": "Marriage has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "marraige",
+      "sentences": [
+        "The story ended with a joyful marriage."
+      ]
+    },
+    {
+      "target": "mathematics",
+      "difficulty": 5,
+      "studyGroup": "mathematics",
+      "usageLabel": "noun",
+      "teachingNote": "Mathematics is a commonly misspelled word. Practise the exact letter order: mathematics.",
+      "commonMisspelling": "mathmatics",
+      "sentences": [
+        "Mathematics helped Mina solve the puzzle."
+      ]
+    },
+    {
+      "target": "medicine",
+      "difficulty": 4,
+      "studyGroup": "medicine",
+      "usageLabel": "noun",
+      "teachingNote": "Medicine is a commonly misspelled word. Practise the exact letter order: medicine.",
+      "commonMisspelling": "medecine",
+      "sentences": [
+        "The nurse kept the medicine in a locked cupboard."
+      ]
+    },
+    {
+      "target": "minute",
+      "difficulty": 3,
+      "studyGroup": "minute",
+      "usageLabel": "noun",
+      "teachingNote": "Minute is a commonly misspelled word. Practise the exact letter order: minute.",
+      "commonMisspelling": "minuit",
+      "sentences": [
+        "Wait one minute before opening the oven door."
+      ]
+    },
+    {
+      "target": "mysterious",
+      "difficulty": 4,
+      "studyGroup": "mysterious",
+      "usageLabel": "adjective",
+      "teachingNote": "Mysterious is a commonly misspelled word. Practise the exact letter order: mysterious.",
+      "commonMisspelling": "misterious",
+      "sentences": [
+        "A mysterious footprint appeared in the mud."
+      ]
+    },
+    {
+      "target": "naturally",
+      "difficulty": 4,
+      "studyGroup": "naturally",
+      "usageLabel": "adverb",
+      "teachingNote": "Naturally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "naturaly",
+      "sentences": [
+        "The shy cat naturally hid from strangers."
+      ]
+    },
+    {
+      "target": "necessary",
+      "difficulty": 4,
+      "studyGroup": "necessary",
+      "usageLabel": "adjective",
+      "teachingNote": "Necessary has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "neccessary",
+      "sentences": [
+        "A helmet is necessary for cycling."
+      ]
+    },
+    {
+      "target": "neighbour",
+      "difficulty": 4,
+      "studyGroup": "neighbour",
+      "usageLabel": "spelling word",
+      "teachingNote": "Neighbour has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "nieghbour",
+      "sentences": [
+        "Our neighbour watered the plants."
+      ]
+    },
+    {
+      "target": "neither",
+      "difficulty": 3,
+      "studyGroup": "neither",
+      "usageLabel": "conjunction",
+      "teachingNote": "Neither has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "neather",
+      "sentences": [
+        "Neither answer was correct."
+      ]
+    },
+    {
+      "target": "often",
+      "difficulty": 2,
+      "studyGroup": "often",
+      "usageLabel": "spelling word",
+      "teachingNote": "Often is a commonly misspelled word. Practise the exact letter order: often.",
+      "commonMisspelling": "offen",
+      "sentences": [
+        "Rafi often reads before breakfast."
+      ]
+    },
+    {
+      "target": "omission",
+      "difficulty": 4,
+      "studyGroup": "omission",
+      "usageLabel": "noun",
+      "teachingNote": "Omission has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "omision",
+      "sentences": [
+        "The omission of one number changed the total."
+      ]
+    },
+    {
+      "target": "once",
+      "difficulty": 2,
+      "studyGroup": "once",
+      "usageLabel": "spelling word",
+      "teachingNote": "Once is a commonly misspelled word. Practise the exact letter order: once.",
+      "commonMisspelling": "wonce",
+      "sentences": [
+        "Mina visited the castle once during summer."
+      ]
+    },
+    {
+      "target": "operate",
+      "difficulty": 3,
+      "studyGroup": "operate",
+      "usageLabel": "verb",
+      "teachingNote": "Operate is a commonly misspelled word. Practise the exact letter order: operate.",
+      "commonMisspelling": "opperate",
+      "sentences": [
+        "Only trained staff may operate the lights."
+      ]
+    },
+    {
+      "target": "optimism",
+      "difficulty": 4,
+      "studyGroup": "optimism",
+      "usageLabel": "noun",
+      "teachingNote": "Optimism is a commonly misspelled word. Practise the exact letter order: optimism.",
+      "commonMisspelling": "optomism",
+      "sentences": [
+        "Her optimism helped the team keep trying."
+      ]
+    },
+    {
+      "target": "original",
+      "difficulty": 4,
+      "studyGroup": "original",
+      "usageLabel": "adjective",
+      "teachingNote": "Original is a commonly misspelled word. Practise the exact letter order: original.",
+      "commonMisspelling": "orignal",
+      "sentences": [
+        "The original drawing was pinned above the copy."
+      ]
+    },
+    {
+      "target": "ought",
+      "difficulty": 2,
+      "studyGroup": "ought",
+      "usageLabel": "spelling word",
+      "teachingNote": "Ought is a commonly misspelled word. Practise the exact letter order: ought.",
+      "commonMisspelling": "ort",
+      "sentences": [
+        "You ought to check the gate."
+      ]
+    },
+    {
+      "target": "our",
+      "difficulty": 2,
+      "studyGroup": "our",
+      "usageLabel": "possessive determiner",
+      "teachingNote": "Our is a commonly misspelled word. Practise the exact letter order: our.",
+      "commonMisspelling": "are",
+      "sentences": [
+        "Our class planted beans by the window."
+      ]
+    },
+    {
+      "target": "paid",
+      "difficulty": 2,
+      "studyGroup": "paid",
+      "usageLabel": "verb",
+      "teachingNote": "Paid is a commonly misspelled word. Practise the exact letter order: paid.",
+      "commonMisspelling": "payed",
+      "sentences": [
+        "Mina paid for the postcard."
+      ]
+    },
+    {
+      "target": "particularly",
+      "difficulty": 5,
+      "studyGroup": "particularly",
+      "usageLabel": "adverb",
+      "teachingNote": "Particularly is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "particulary",
+      "sentences": [
+        "The ending was particularly exciting."
+      ]
+    },
+    {
+      "target": "peculiar",
+      "difficulty": 4,
+      "studyGroup": "peculiar",
+      "usageLabel": "adjective",
+      "teachingNote": "Peculiar is a commonly misspelled word. Practise the exact letter order: peculiar.",
+      "commonMisspelling": "peculier",
+      "sentences": [
+        "A peculiar smell came from the cupboard."
+      ]
+    },
+    {
+      "target": "people",
+      "difficulty": 3,
+      "studyGroup": "people",
+      "usageLabel": "spelling word",
+      "teachingNote": "People is a commonly misspelled word. Practise the exact letter order: people.",
+      "commonMisspelling": "peple",
+      "sentences": [
+        "People waited calmly for the train."
+      ]
+    },
+    {
+      "target": "perceive",
+      "difficulty": 4,
+      "studyGroup": "perceive",
+      "usageLabel": "verb",
+      "teachingNote": "Perceive has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "percieve",
+      "sentences": [
+        "Some insects perceive colours differently."
+      ]
+    },
+    {
+      "target": "perform",
+      "difficulty": 3,
+      "studyGroup": "perform",
+      "usageLabel": "verb",
+      "teachingNote": "Perform is a commonly misspelled word. Practise the exact letter order: perform.",
+      "commonMisspelling": "preform",
+      "sentences": [
+        "The band will perform after lunch."
+      ]
+    },
+    {
+      "target": "permanent",
+      "difficulty": 4,
+      "studyGroup": "permanent",
+      "usageLabel": "spelling word",
+      "teachingNote": "Permanent is a commonly misspelled word. Practise the exact letter order: permanent.",
+      "commonMisspelling": "permenant",
+      "sentences": [
+        "The marker left a permanent stain."
+      ]
+    },
+    {
+      "target": "persevere",
+      "difficulty": 4,
+      "studyGroup": "persevere",
+      "usageLabel": "verb",
+      "teachingNote": "Persevere is a commonly misspelled word. Practise the exact letter order: persevere.",
+      "commonMisspelling": "perservere",
+      "sentences": [
+        "Mina chose to persevere after the kite tore."
+      ]
+    },
+    {
+      "target": "personally",
+      "difficulty": 4,
+      "studyGroup": "personally",
+      "usageLabel": "adverb",
+      "teachingNote": "Personally has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "personaly",
+      "sentences": [
+        "I personally prefer the blue design."
+      ]
+    },
+    {
+      "target": "persuade",
+      "difficulty": 4,
+      "studyGroup": "persuade",
+      "usageLabel": "verb",
+      "teachingNote": "Persuade is a commonly misspelled word. Practise the exact letter order: persuade.",
+      "commonMisspelling": "perswade",
+      "sentences": [
+        "Rafi tried to persuade his brother to share."
+      ]
+    },
+    {
+      "target": "picture",
+      "difficulty": 3,
+      "studyGroup": "picture",
+      "usageLabel": "spelling word",
+      "teachingNote": "Picture is a commonly misspelled word. Practise the exact letter order: picture.",
+      "commonMisspelling": "picutre",
+      "sentences": [
+        "The picture showed a castle beside a lake."
+      ]
+    },
+    {
+      "target": "piece",
+      "difficulty": 2,
+      "studyGroup": "piece",
+      "usageLabel": "spelling word",
+      "teachingNote": "Piece has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "peice",
+      "sentences": [
+        "One piece of the puzzle was missing."
+      ]
+    },
+    {
+      "target": "planning",
+      "difficulty": 4,
+      "studyGroup": "planning",
+      "usageLabel": "verb",
+      "teachingNote": "Planning has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "planing",
+      "sentences": [
+        "Careful planning made the fair run smoothly."
+      ]
+    },
+    {
+      "target": "pleasant",
+      "difficulty": 4,
+      "studyGroup": "pleasant",
+      "usageLabel": "adjective",
+      "teachingNote": "Pleasant is a commonly misspelled word. Practise the exact letter order: pleasant.",
+      "commonMisspelling": "plesant",
+      "sentences": [
+        "A pleasant breeze moved through the garden."
+      ]
+    },
+    {
+      "target": "political",
+      "difficulty": 4,
+      "studyGroup": "political",
+      "usageLabel": "adjective",
+      "teachingNote": "Political is a commonly misspelled word. Practise the exact letter order: political.",
+      "commonMisspelling": "poltical",
+      "sentences": [
+        "The article explained a political argument."
+      ]
+    },
+    {
+      "target": "possess",
+      "difficulty": 3,
+      "studyGroup": "possess",
+      "usageLabel": "verb",
+      "teachingNote": "Possess has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "posess",
+      "sentences": [
+        "Some plants possess tiny hooks."
+      ]
+    },
+    {
+      "target": "possible",
+      "difficulty": 4,
+      "studyGroup": "possible",
+      "usageLabel": "adjective",
+      "teachingNote": "Possible has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "possable",
+      "sentences": [
+        "It is possible to finish before lunch."
+      ]
+    },
+    {
+      "target": "practical",
+      "difficulty": 4,
+      "studyGroup": "practical",
+      "usageLabel": "adjective",
+      "teachingNote": "Practical is a commonly misspelled word. Practise the exact letter order: practical.",
+      "commonMisspelling": "practicle",
+      "sentences": [
+        "The practical task involved building a bridge."
+      ]
+    },
+    {
+      "target": "prefer",
+      "difficulty": 3,
+      "studyGroup": "prefer",
+      "usageLabel": "verb",
+      "teachingNote": "Prefer is a commonly misspelled word. Practise the exact letter order: prefer.",
+      "commonMisspelling": "prefere",
+      "sentences": [
+        "Mina would prefer the window seat."
+      ]
+    },
+    {
+      "target": "prejudice",
+      "difficulty": 4,
+      "studyGroup": "prejudice",
+      "usageLabel": "noun",
+      "teachingNote": "Prejudice is a commonly misspelled word. Practise the exact letter order: prejudice.",
+      "commonMisspelling": "predjudice",
+      "sentences": [
+        "The story challenged prejudice."
+      ]
+    },
+    {
+      "target": "presence",
+      "difficulty": 4,
+      "studyGroup": "presence",
+      "usageLabel": "noun",
+      "teachingNote": "Presence ends with -ence.",
+      "commonMisspelling": "presance",
+      "sentences": [
+        "The teacher's calm presence helped."
+      ]
+    },
+    {
+      "target": "pretty",
+      "difficulty": 3,
+      "studyGroup": "pretty",
+      "usageLabel": "adjective",
+      "teachingNote": "Pretty has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "pritty",
+      "sentences": [
+        "The pretty lanterns glowed above the playground."
+      ]
+    },
+    {
+      "target": "probably",
+      "difficulty": 4,
+      "studyGroup": "probably",
+      "usageLabel": "adverb",
+      "teachingNote": "Probably is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "probaly",
+      "sentences": [
+        "The match will probably move indoors."
+      ]
+    },
+    {
+      "target": "professional",
+      "difficulty": 5,
+      "studyGroup": "professional",
+      "usageLabel": "adjective",
+      "teachingNote": "Professional has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "proffesional",
+      "sentences": [
+        "The professional dancer warmed up."
+      ]
+    },
+    {
+      "target": "promise",
+      "difficulty": 3,
+      "studyGroup": "promise",
+      "usageLabel": "verb",
+      "teachingNote": "Promise is a commonly misspelled word. Practise the exact letter order: promise.",
+      "commonMisspelling": "promiss",
+      "sentences": [
+        "Rafi made a promise to return the book."
+      ]
+    },
+    {
+      "target": "proof",
+      "difficulty": 2,
+      "studyGroup": "proof",
+      "usageLabel": "spelling word",
+      "teachingNote": "Proof has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "proove",
+      "sentences": [
+        "The muddy footprints were proof."
+      ]
+    },
+    {
+      "target": "psychology",
+      "difficulty": 4,
+      "studyGroup": "psychology",
+      "usageLabel": "noun",
+      "teachingNote": "Psychology is a commonly misspelled word. Practise the exact letter order: psychology.",
+      "commonMisspelling": "psycology",
+      "sentences": [
+        "The article introduced psychology to the class."
+      ]
+    },
+    {
+      "target": "quantity",
+      "difficulty": 4,
+      "studyGroup": "quantity",
+      "usageLabel": "noun",
+      "teachingNote": "Quantity is a commonly misspelled word. Practise the exact letter order: quantity.",
+      "commonMisspelling": "quantaty",
+      "sentences": [
+        "The recipe needed a small quantity of sugar."
+      ]
+    },
+    {
+      "target": "quarter",
+      "difficulty": 3,
+      "studyGroup": "quarter",
+      "usageLabel": "noun",
+      "teachingNote": "Quarter is a commonly misspelled word. Practise the exact letter order: quarter.",
+      "commonMisspelling": "quater",
+      "sentences": [
+        "A quarter of the cake was left."
+      ]
+    },
+    {
+      "target": "quiet",
+      "difficulty": 3,
+      "studyGroup": "quiet_quit_quite",
+      "usageLabel": "adjective",
+      "teachingNote": "Quiet means making little or no noise.",
+      "commonMisspelling": "quite",
+      "sentences": [
+        "The library was quiet after the younger class left.",
+        "A quiet voice came from the back of the hall."
+      ]
+    },
+    {
+      "target": "quit",
+      "difficulty": 3,
+      "studyGroup": "quiet_quit_quite",
+      "usageLabel": "verb",
+      "teachingNote": "Quit means to stop doing something.",
+      "commonMisspelling": "quite",
+      "sentences": [
+        "Rafi did not quit when the puzzle became difficult.",
+        "The captain refused to quit before the final whistle."
+      ]
+    },
+    {
+      "target": "quite",
+      "difficulty": 3,
+      "studyGroup": "quiet_quit_quite",
+      "usageLabel": "adverb",
+      "teachingNote": "Quite means fairly, completely, or really, depending on the sentence.",
+      "commonMisspelling": "quiet",
+      "sentences": [
+        "The answer was quite close to the correct one.",
+        "Mina felt quite proud of her careful drawing."
+      ]
+    },
+    {
+      "target": "realise",
+      "difficulty": 3,
+      "studyGroup": "realise",
+      "usageLabel": "verb",
+      "teachingNote": "Realise is a commonly misspelled word. Practise the exact letter order: realise.",
+      "commonMisspelling": "realize",
+      "sentences": [
+        "Mina began to realise why the answer was wrong."
+      ]
+    },
+    {
+      "target": "recognise",
+      "difficulty": 4,
+      "studyGroup": "recognise",
+      "usageLabel": "verb",
+      "teachingNote": "Recognise is a commonly misspelled word. Practise the exact letter order: recognise.",
+      "commonMisspelling": "recognize",
+      "sentences": [
+        "The puppy seemed to recognise its owner's voice."
+      ]
+    },
+    {
+      "target": "repetition",
+      "difficulty": 4,
+      "studyGroup": "repetition",
+      "usageLabel": "noun",
+      "teachingNote": "Repetition is a commonly misspelled word. Practise the exact letter order: repetition.",
+      "commonMisspelling": "repetion",
+      "sentences": [
+        "Repetition helped the choir learn the chorus."
+      ]
+    },
+    {
+      "target": "running",
+      "difficulty": 3,
+      "studyGroup": "running",
+      "usageLabel": "verb",
+      "teachingNote": "Running has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "runing",
+      "sentences": [
+        "Running on wet tiles is unsafe."
+      ]
+    },
+    {
+      "target": "sacrifice",
+      "difficulty": 4,
+      "studyGroup": "sacrifice",
+      "usageLabel": "verb",
+      "teachingNote": "Sacrifice is a commonly misspelled word. Practise the exact letter order: sacrifice.",
+      "commonMisspelling": "sacrafice",
+      "sentences": [
+        "The captain made a sacrifice for the team."
+      ]
+    },
+    {
+      "target": "safety",
+      "difficulty": 3,
+      "studyGroup": "safety",
+      "usageLabel": "noun",
+      "teachingNote": "Safety is a commonly misspelled word. Practise the exact letter order: safety.",
+      "commonMisspelling": "safty",
+      "sentences": [
+        "The safety sign warned pupils to walk."
+      ]
+    },
+    {
+      "target": "said",
+      "difficulty": 2,
+      "studyGroup": "said",
+      "usageLabel": "verb",
+      "teachingNote": "Said is a commonly misspelled word. Practise the exact letter order: said.",
+      "commonMisspelling": "sed",
+      "sentences": [
+        "Mina said the answer clearly."
+      ]
+    },
+    {
+      "target": "school",
+      "difficulty": 3,
+      "studyGroup": "school",
+      "usageLabel": "noun",
+      "teachingNote": "School has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "scool",
+      "sentences": [
+        "The school gates opened at half past eight."
+      ]
+    },
+    {
+      "target": "secretary",
+      "difficulty": 4,
+      "studyGroup": "secretary",
+      "usageLabel": "noun",
+      "teachingNote": "Secretary is a commonly misspelled word. Practise the exact letter order: secretary.",
+      "commonMisspelling": "secretery",
+      "sentences": [
+        "The secretary answered the office phone."
+      ]
+    },
+    {
+      "target": "shining",
+      "difficulty": 3,
+      "studyGroup": "shining",
+      "usageLabel": "verb",
+      "teachingNote": "Shining is a commonly misspelled word. Practise the exact letter order: shining.",
+      "commonMisspelling": "shineing",
+      "sentences": [
+        "The shining trophy stood on the table."
+      ]
+    },
+    {
+      "target": "similar",
+      "difficulty": 3,
+      "studyGroup": "similar",
+      "usageLabel": "adjective",
+      "teachingNote": "Similar is a commonly misspelled word. Practise the exact letter order: similar.",
+      "commonMisspelling": "similer",
+      "sentences": [
+        "The two drawings looked similar."
+      ]
+    },
+    {
+      "target": "sincerely",
+      "difficulty": 4,
+      "studyGroup": "sincerely",
+      "usageLabel": "adverb",
+      "teachingNote": "Sincerely is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "sincerly",
+      "sentences": [
+        "Rafi sincerely thanked everyone."
+      ]
+    },
+    {
+      "target": "soldier",
+      "difficulty": 3,
+      "studyGroup": "soldier",
+      "usageLabel": "noun",
+      "teachingNote": "Soldier has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "solider",
+      "sentences": [
+        "The soldier carried supplies across the bridge."
+      ]
+    },
+    {
+      "target": "something",
+      "difficulty": 4,
+      "studyGroup": "something",
+      "usageLabel": "spelling word",
+      "teachingNote": "Something is a commonly misspelled word. Practise the exact letter order: something.",
+      "commonMisspelling": "somthing",
+      "sentences": [
+        "Something rattled inside the mystery box."
+      ]
+    },
+    {
+      "target": "sometimes",
+      "difficulty": 4,
+      "studyGroup": "sometimes",
+      "usageLabel": "adverb",
+      "teachingNote": "Sometimes is a commonly misspelled word. Practise the exact letter order: sometimes.",
+      "commonMisspelling": "sometime",
+      "sentences": [
+        "Sometimes the quickest route is not safest."
+      ]
+    },
+    {
+      "target": "speech",
+      "difficulty": 3,
+      "studyGroup": "speech",
+      "usageLabel": "noun",
+      "teachingNote": "Speech has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "speach",
+      "sentences": [
+        "Mina practised her speech in the mirror."
+      ]
+    },
+    {
+      "target": "started",
+      "difficulty": 3,
+      "studyGroup": "started",
+      "usageLabel": "verb",
+      "teachingNote": "Started is a commonly misspelled word. Practise the exact letter order: started.",
+      "commonMisspelling": "startted",
+      "sentences": [
+        "The race started after the whistle."
+      ]
+    },
+    {
+      "target": "stopped",
+      "difficulty": 3,
+      "studyGroup": "stopped",
+      "usageLabel": "verb",
+      "teachingNote": "Stopped has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "stoped",
+      "sentences": [
+        "The rain stopped before playtime."
+      ]
+    },
+    {
+      "target": "stopping",
+      "difficulty": 4,
+      "studyGroup": "stopping",
+      "usageLabel": "verb",
+      "teachingNote": "Stopping has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "stoping",
+      "sentences": [
+        "Stopping suddenly made the scooter skid."
+      ]
+    },
+    {
+      "target": "strength",
+      "difficulty": 4,
+      "studyGroup": "strength",
+      "usageLabel": "noun",
+      "teachingNote": "Strength is a commonly misspelled word. Practise the exact letter order: strength.",
+      "commonMisspelling": "strengh",
+      "sentences": [
+        "The bridge needed enough strength."
+      ]
+    },
+    {
+      "target": "studying",
+      "difficulty": 4,
+      "studyGroup": "studying",
+      "usageLabel": "verb",
+      "teachingNote": "Studying is a commonly misspelled word. Practise the exact letter order: studying.",
+      "commonMisspelling": "studing",
+      "sentences": [
+        "Studying each day helped Rafi remember."
+      ]
+    },
+    {
+      "target": "succeed",
+      "difficulty": 3,
+      "studyGroup": "succeed",
+      "usageLabel": "verb",
+      "teachingNote": "Succeed has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "suceed",
+      "sentences": [
+        "The group can succeed if everyone listens."
+      ]
+    },
+    {
+      "target": "successful",
+      "difficulty": 4,
+      "studyGroup": "successful",
+      "usageLabel": "adjective",
+      "teachingNote": "Successful has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "sucessful",
+      "sentences": [
+        "The cake sale was successful."
+      ]
+    },
+    {
+      "target": "surely",
+      "difficulty": 3,
+      "studyGroup": "surely",
+      "usageLabel": "adverb",
+      "teachingNote": "Surely is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "surelly",
+      "sentences": [
+        "Surely the key must be in the drawer."
+      ]
+    },
+    {
+      "target": "surprise",
+      "difficulty": 4,
+      "studyGroup": "surprise",
+      "usageLabel": "spelling word",
+      "teachingNote": "Surprise is a commonly misspelled word. Practise the exact letter order: surprise.",
+      "commonMisspelling": "suprise",
+      "sentences": [
+        "The surprise party began at six."
+      ]
+    },
+    {
+      "target": "swimming",
+      "difficulty": 4,
+      "studyGroup": "swimming",
+      "usageLabel": "spelling word",
+      "teachingNote": "Swimming has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "swiming",
+      "sentences": [
+        "Swimming lessons helped Mina feel safer."
+      ]
+    },
+    {
+      "target": "temperature",
+      "difficulty": 5,
+      "studyGroup": "temperature",
+      "usageLabel": "noun",
+      "teachingNote": "Temperature is a commonly misspelled word. Practise the exact letter order: temperature.",
+      "commonMisspelling": "tempature",
+      "sentences": [
+        "The temperature dropped after sunset."
+      ]
+    },
+    {
+      "target": "temporary",
+      "difficulty": 4,
+      "studyGroup": "temporary",
+      "usageLabel": "adjective",
+      "teachingNote": "Temporary is a commonly misspelled word. Practise the exact letter order: temporary.",
+      "commonMisspelling": "temporery",
+      "sentences": [
+        "The temporary bridge stayed up during repairs."
+      ]
+    },
+    {
+      "target": "things",
+      "difficulty": 3,
+      "studyGroup": "things",
+      "usageLabel": "spelling word",
+      "teachingNote": "Things is a commonly misspelled word. Practise the exact letter order: things.",
+      "commonMisspelling": "thigs",
+      "sentences": [
+        "The lost things were placed by the office."
+      ]
+    },
+    {
+      "target": "thought",
+      "difficulty": 3,
+      "studyGroup": "thought",
+      "usageLabel": "verb",
+      "teachingNote": "Thought is a commonly misspelled word. Practise the exact letter order: thought.",
+      "commonMisspelling": "thort",
+      "sentences": [
+        "Mina thought carefully before answering."
+      ]
+    },
+    {
+      "target": "threw",
+      "difficulty": 2,
+      "studyGroup": "threw_through",
+      "usageLabel": "verb",
+      "teachingNote": "Threw is the past tense of throw.",
+      "commonMisspelling": "through",
+      "sentences": [
+        "Aisha threw the beanbag into the blue hoop.",
+        "The goalkeeper threw the ball back onto the pitch."
+      ]
+    },
+    {
+      "target": "through",
+      "difficulty": 3,
+      "studyGroup": "threw_through",
+      "usageLabel": "preposition",
+      "teachingNote": "Through means moving from one side or part to another.",
+      "commonMisspelling": "threw",
+      "sentences": [
+        "The path went through the woods behind the school.",
+        "Sunlight shone through the classroom window."
+      ]
+    },
+    {
+      "target": "together",
+      "difficulty": 4,
+      "studyGroup": "together",
+      "usageLabel": "spelling word",
+      "teachingNote": "Together is a commonly misspelled word. Practise the exact letter order: together.",
+      "commonMisspelling": "togethor",
+      "sentences": [
+        "The group worked together."
+      ]
+    },
+    {
+      "target": "toward",
+      "difficulty": 3,
+      "studyGroup": "toward",
+      "usageLabel": "preposition",
+      "teachingNote": "Toward is a commonly misspelled word. Practise the exact letter order: toward.",
+      "commonMisspelling": "towords",
+      "sentences": [
+        "The dog ran toward the gate."
+      ]
+    },
+    {
+      "target": "tried",
+      "difficulty": 2,
+      "studyGroup": "tried",
+      "usageLabel": "verb",
+      "teachingNote": "Tried has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "tryed",
+      "sentences": [
+        "Rafi tried again after the tower fell."
+      ]
+    },
+    {
+      "target": "tries",
+      "difficulty": 2,
+      "studyGroup": "tries",
+      "usageLabel": "verb",
+      "teachingNote": "Tries has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "trys",
+      "sentences": [
+        "Mina tries a new strategy when stuck."
+      ]
+    },
+    {
+      "target": "truly",
+      "difficulty": 2,
+      "studyGroup": "truly",
+      "usageLabel": "adverb",
+      "teachingNote": "Truly is an adverb. Keep the base word and the -ly ending clear.",
+      "commonMisspelling": "truely",
+      "sentences": [
+        "The view was truly wonderful."
+      ]
+    },
+    {
+      "target": "unusual",
+      "difficulty": 3,
+      "studyGroup": "unusual",
+      "usageLabel": "adjective",
+      "teachingNote": "Unusual is a commonly misspelled word. Practise the exact letter order: unusual.",
+      "commonMisspelling": "unusuall",
+      "sentences": [
+        "An unusual cloud floated above the playground."
+      ]
+    },
+    {
+      "target": "using",
+      "difficulty": 2,
+      "studyGroup": "using",
+      "usageLabel": "verb",
+      "teachingNote": "Using is a commonly misspelled word. Practise the exact letter order: using.",
+      "commonMisspelling": "useing",
+      "sentences": [
+        "Using a ruler made the diagram neater."
+      ]
+    },
+    {
+      "target": "usually",
+      "difficulty": 3,
+      "studyGroup": "usually",
+      "usageLabel": "adverb",
+      "teachingNote": "Usually has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "usualy",
+      "sentences": [
+        "Mina usually packs her bag before breakfast."
+      ]
+    },
+    {
+      "target": "village",
+      "difficulty": 3,
+      "studyGroup": "village",
+      "usageLabel": "noun",
+      "teachingNote": "Village has a double letter. Watch the repeated letters in the middle of the word.",
+      "commonMisspelling": "villiage",
+      "sentences": [
+        "The village shop opened early."
+      ]
+    },
+    {
+      "target": "wanted",
+      "difficulty": 3,
+      "studyGroup": "wanted",
+      "usageLabel": "verb",
+      "teachingNote": "Wanted is a commonly misspelled word. Practise the exact letter order: wanted.",
+      "commonMisspelling": "wantted",
+      "sentences": [
+        "Rafi wanted a quiet place to read."
+      ]
+    },
+    {
+      "target": "welcome",
+      "difficulty": 3,
+      "studyGroup": "welcome",
+      "usageLabel": "verb",
+      "teachingNote": "Welcome is a commonly misspelled word. Practise the exact letter order: welcome.",
+      "commonMisspelling": "welcom",
+      "sentences": [
+        "The warm welcome made visitors smile."
+      ]
+    },
+    {
+      "target": "whether",
+      "difficulty": 3,
+      "studyGroup": "weather_whether",
+      "usageLabel": "conjunction",
+      "teachingNote": "Whether introduces a choice or possibility.",
+      "commonMisspelling": "weather",
+      "sentences": [
+        "Mina wondered whether the bus would arrive on time.",
+        "The team had to decide whether to practise indoors."
+      ]
+    },
+    {
+      "target": "woman",
+      "difficulty": 2,
+      "studyGroup": "woman",
+      "usageLabel": "noun",
+      "teachingNote": "Woman is a commonly misspelled word. Practise the exact letter order: woman.",
+      "commonMisspelling": "women",
+      "sentences": [
+        "The woman at the desk checked our tickets."
+      ]
+    },
+    {
+      "target": "would",
+      "difficulty": 2,
+      "studyGroup": "would",
+      "usageLabel": "spelling word",
+      "teachingNote": "Would is a commonly misspelled word. Practise the exact letter order: would.",
+      "commonMisspelling": "woud",
+      "sentences": [
+        "Mina would help after finishing her work."
+      ]
+    },
+    {
+      "target": "writing",
+      "difficulty": 3,
+      "studyGroup": "writing",
+      "usageLabel": "verb",
+      "teachingNote": "Writing is a commonly misspelled word. Practise the exact letter order: writing.",
+      "commonMisspelling": "writting",
+      "sentences": [
+        "Writing slowly made the address clearer."
       ]
     },
     {
       "target": "affect",
-      "difficulty": 4,
+      "difficulty": 3,
       "studyGroup": "affect_effect",
       "usageLabel": "verb",
       "teachingNote": "Affect is usually a verb. It means to change or influence something.",
+      "commonMisspelling": "afect",
       "sentences": [
         "A sudden storm can affect the timing of an outdoor match.",
         "Kind words can affect how brave someone feels."
@@ -35,13 +3521,26 @@
     },
     {
       "target": "effect",
-      "difficulty": 4,
+      "difficulty": 3,
       "studyGroup": "affect_effect",
       "usageLabel": "noun",
       "teachingNote": "Effect is usually a noun. It means the result of a change.",
+      "commonMisspelling": "efect",
       "sentences": [
         "The new rule had a calming effect on the noisy lunch queue.",
         "The bright poster had a cheerful effect on the classroom."
+      ]
+    },
+    {
+      "target": "advise",
+      "difficulty": 3,
+      "studyGroup": "advice_advise",
+      "usageLabel": "verb",
+      "teachingNote": "Advise is a verb. It means to give someone advice.",
+      "commonMisspelling": "advize",
+      "sentences": [
+        "The coach will advise the team before the final race.",
+        "Teachers advise pupils to check their work slowly."
       ]
     },
     {
@@ -50,6 +3549,7 @@
       "studyGroup": "pray_prey",
       "usageLabel": "verb",
       "teachingNote": "Pray is a verb. It means to speak to God or ask hopefully for something.",
+      "commonMisspelling": "praye",
       "sentences": [
         "Some families pray quietly before dinner.",
         "The team did not pray for luck; they practised until they felt ready."
@@ -61,6 +3561,7 @@
       "studyGroup": "pray_prey",
       "usageLabel": "noun",
       "teachingNote": "Prey is a noun. It means an animal hunted by another animal.",
+      "commonMisspelling": "preey",
       "sentences": [
         "The owl watched its prey from the branch before swooping silently.",
         "Tiny fish can become prey for herons near the shallow river."
@@ -72,6 +3573,7 @@
       "studyGroup": "horse_hoarse",
       "usageLabel": "noun",
       "teachingNote": "Horse is a noun. It names the animal.",
+      "commonMisspelling": "hourse",
       "sentences": [
         "The horse trotted across the field after breakfast.",
         "A gentle horse waited beside the wooden gate."
@@ -79,10 +3581,11 @@
     },
     {
       "target": "hoarse",
-      "difficulty": 2,
+      "difficulty": 3,
       "studyGroup": "horse_hoarse",
       "usageLabel": "adjective",
       "teachingNote": "Hoarse is an adjective. It describes a rough or croaky voice.",
+      "commonMisspelling": "horce",
       "sentences": [
         "After cheering all afternoon, Mira's voice sounded hoarse.",
         "The singer drank warm water because his throat felt hoarse."
@@ -90,68 +3593,57 @@
     },
     {
       "target": "seize",
-      "difficulty": 3,
+      "difficulty": 2,
       "studyGroup": "seize",
       "usageLabel": "verb",
-      "teachingNote": "Seize is a verb. It means to grab, take, or use a chance quickly.",
+      "teachingNote": "Seize has a tricky i/e order. Look carefully at the middle letters.",
+      "commonMisspelling": "sieze",
       "sentences": [
-        "The goalkeeper tried to seize the ball before it crossed the line.",
-        "Rafi decided to seize the chance to ask his question."
+        "The goalkeeper tried to seize the ball."
       ]
     },
     {
       "target": "waist",
       "difficulty": 2,
       "studyGroup": "waist",
-      "usageLabel": "noun",
-      "teachingNote": "Waist is a noun. It names the part of the body between the ribs and hips.",
+      "usageLabel": "spelling word",
+      "teachingNote": "Waist is a commonly misspelled word. Practise the exact letter order: waist.",
+      "commonMisspelling": "waest",
       "sentences": [
-        "The belt sat loosely around the puppet's waist.",
-        "She tied the apron around her waist before painting."
+        "The belt sat loosely around the puppet's waist."
       ]
     },
     {
       "target": "thyme",
-      "difficulty": 3,
+      "difficulty": 2,
       "studyGroup": "thyme",
-      "usageLabel": "noun",
-      "teachingNote": "Thyme is a noun. It names a herb used in cooking.",
+      "usageLabel": "spelling word",
+      "teachingNote": "Thyme is a commonly misspelled word. Practise the exact letter order: thyme.",
+      "commonMisspelling": "thime",
       "sentences": [
-        "Dad sprinkled thyme over the potatoes before roasting them.",
-        "The garden pot smelled of thyme after the rain."
+        "Dad sprinkled thyme over the potatoes."
       ]
     },
     {
       "target": "hare",
       "difficulty": 2,
       "studyGroup": "hare",
-      "usageLabel": "noun",
-      "teachingNote": "Hare is a noun. It names an animal like a large, fast rabbit.",
+      "usageLabel": "spelling word",
+      "teachingNote": "Hare is a commonly misspelled word. Practise the exact letter order: hare.",
+      "commonMisspelling": "hair",
       "sentences": [
-        "A brown hare darted across the field at sunrise.",
-        "The hare paused by the hedge, then vanished into the grass."
-      ]
-    },
-    {
-      "target": "forty",
-      "difficulty": 2,
-      "studyGroup": "forty",
-      "usageLabel": "number word",
-      "teachingNote": "Forty is a number word. It tells how many.",
-      "sentences": [
-        "The class counted forty shells on the science table.",
-        "There were forty pages left in the adventure book."
+        "A brown hare darted across the field."
       ]
     },
     {
       "target": "weary",
-      "difficulty": 3,
+      "difficulty": 2,
       "studyGroup": "weary",
       "usageLabel": "adjective",
-      "teachingNote": "Weary is an adjective. It means very tired.",
+      "teachingNote": "Weary is a commonly misspelled word. Practise the exact letter order: weary.",
+      "commonMisspelling": "weery",
       "sentences": [
-        "The weary hikers rested beside the gate after the long climb.",
-        "By bedtime, the puppy looked weary but happy."
+        "The weary hikers rested beside the gate."
       ]
     }
   ]

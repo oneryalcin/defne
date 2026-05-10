@@ -25,6 +25,9 @@ export default function ChildSpellingPage() {
                 <Keyboard size={18} />
                 Start spelling
               </button>
+              <Link className="ribbon ribbon--ghost" href="/child/spelling/words">
+                Spelling words
+              </Link>
               <Link className="ribbon ribbon--ghost" href="/child">
                 Back
               </Link>

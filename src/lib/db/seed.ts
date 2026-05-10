@@ -1,8 +1,10 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 const DEFAULT_LEARNER_ID = "learner_defne";
+const SEEDED_VISUAL_CUE_PROVIDER = "seed_asset";
+const SEEDED_VISUAL_CUE_PROMPT_VERSION = "example-cue-sketch-v1";
 
 interface SeedEntry {
   word: string;
@@ -25,6 +27,7 @@ interface SpellingSeedEntry {
   studyGroup?: string;
   usageLabel?: string;
   teachingNote?: string;
+  commonMisspelling?: string;
   sentences: string[];
 }
 
@@ -49,6 +52,7 @@ export function seedInitialData(db: DatabaseSync): void {
   for (const entry of seedPack.entries) {
     upsertSeedWord(db, entry, now);
   }
+  upsertSeedExampleVisualCues(db, now);
 
   const spellingSeedPack = readSpellingSeedPack();
   for (const entry of spellingSeedPack.entries) {
@@ -128,14 +132,15 @@ function upsertSeedSpellingItem(db: DatabaseSync, entry: SpellingSeedEntry, now:
 
   db.prepare(
     `INSERT INTO spelling_items
-      (id, target_word, normalized_target, difficulty_level, source, status, teaching_note, study_group, usage_label, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'seed', 'active', ?, ?, ?, ?, ?)
+      (id, target_word, normalized_target, difficulty_level, source, status, teaching_note, study_group, usage_label, common_misspelling, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'seed', 'active', ?, ?, ?, ?, ?, ?)
      ON CONFLICT(normalized_target) DO UPDATE SET
        target_word = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.target_word ELSE excluded.target_word END,
        difficulty_level = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.difficulty_level ELSE excluded.difficulty_level END,
        teaching_note = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.teaching_note ELSE excluded.teaching_note END,
        study_group = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.study_group ELSE excluded.study_group END,
        usage_label = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.usage_label ELSE excluded.usage_label END,
+       common_misspelling = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.common_misspelling ELSE excluded.common_misspelling END,
        status = CASE WHEN spelling_items.source = 'parent' THEN spelling_items.status ELSE excluded.status END,
        updated_at = excluded.updated_at`
   ).run(
@@ -146,6 +151,7 @@ function upsertSeedSpellingItem(db: DatabaseSync, entry: SpellingSeedEntry, now:
     (entry.teachingNote ?? "").trim(),
     (entry.studyGroup ?? normalized).trim(),
     (entry.usageLabel ?? "").trim(),
+    (entry.commonMisspelling ?? "").trim() || null,
     now,
     now
   );
@@ -217,6 +223,74 @@ function reconcileSeedExamples(db: DatabaseSync, wordId: string, examples: strin
          updated_at = excluded.updated_at`
     ).run(exampleId, wordId, example, now, now);
   }
+}
+
+function upsertSeedExampleVisualCues(db: DatabaseSync, now: string): void {
+  const assets = listCommittedExampleCueAssets();
+  for (const asset of assets) {
+    const example = db.prepare("SELECT word_id FROM word_examples WHERE id = ? AND status = 'approved'").get(asset.exampleId) as
+      | { word_id: string }
+      | undefined;
+    if (!example) continue;
+
+    db.prepare(
+      `INSERT INTO example_visual_cues
+        (id, example_id, word_id, provider, model, prompt_version, prompt, image_path, image_url, status, reviewed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, NULL, 'approved', ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         word_id = excluded.word_id,
+         provider = excluded.provider,
+         prompt_version = excluded.prompt_version,
+         image_path = excluded.image_path,
+         image_url = NULL,
+         status = CASE
+           WHEN example_visual_cues.status IN ('rejected', 'disabled') THEN example_visual_cues.status
+           ELSE excluded.status
+         END,
+         reviewed_at = CASE
+           WHEN example_visual_cues.status IN ('rejected', 'disabled') THEN example_visual_cues.reviewed_at
+           ELSE COALESCE(example_visual_cues.reviewed_at, excluded.reviewed_at)
+         END,
+         updated_at = excluded.updated_at`
+    ).run(
+      `seed_cue_${asset.exampleId}`,
+      asset.exampleId,
+      example.word_id,
+      SEEDED_VISUAL_CUE_PROVIDER,
+      SEEDED_VISUAL_CUE_PROMPT_VERSION,
+      asset.imagePath,
+      now,
+      now,
+      now
+    );
+  }
+}
+
+function listCommittedExampleCueAssets(): Array<{ exampleId: string; imagePath: string }> {
+  const root = path.join(process.cwd(), "public", "assets", "example-cues");
+  if (!existsSync(root)) return [];
+
+  const byExampleId = new Map<string, string>();
+  const wordDirs = readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("word_"))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const dir of wordDirs) {
+    const dirPath = path.join(root, dir.name);
+    const files = readdirSync(dirPath, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+      .sort((left, right) => left.localeCompare(right));
+
+    for (const file of files) {
+      const match = /^(example_word_[a-z0-9_]+_\d+)-.+\.(?:jpe?g|png|webp)$/i.exec(file);
+      if (!match) continue;
+      const exampleId = match[1];
+      byExampleId.set(exampleId, path.join("public", "assets", "example-cues", dir.name, file).replaceAll(path.sep, "/"));
+    }
+  }
+
+  return Array.from(byExampleId, ([exampleId, imagePath]) => ({ exampleId, imagePath }));
 }
 
 function uniqueTexts(values: string[]): string[] {

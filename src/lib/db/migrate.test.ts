@@ -28,7 +28,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(8);
+    expect(migrations.count).toBe(11);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -83,6 +83,21 @@ describe("SQLite setup", () => {
     expect(exampleCueTable).toBeTruthy();
     const generatedImagesTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'generated_images'").get();
     expect(generatedImagesTable).toBeFalsy();
+
+    const spellingItems = db.prepare("SELECT COUNT(*) AS count FROM spelling_items WHERE status = 'active'").get() as {
+      count: number;
+    };
+    const spellingPrompts = db.prepare("SELECT COUNT(*) AS count FROM spelling_prompts WHERE status = 'approved'").get() as {
+      count: number;
+    };
+    const spellingColumns = db.prepare("PRAGMA table_info(spelling_items)").all() as Array<{ name: string }>;
+    const spellingSessionColumns = db.prepare("PRAGMA table_info(spelling_sessions)").all() as Array<{ name: string }>;
+    expect(spellingItems.count).toBeGreaterThanOrEqual(8);
+    expect(spellingPrompts.count).toBeGreaterThanOrEqual(spellingItems.count);
+    expect(spellingColumns.some((column) => column.name === "teaching_note")).toBe(true);
+    expect(spellingColumns.some((column) => column.name === "study_group")).toBe(true);
+    expect(spellingColumns.some((column) => column.name === "usage_label")).toBe(true);
+    expect(spellingSessionColumns.some((column) => column.name === "intro_completed_at")).toBe(true);
   });
 
   it("keeps generated visual cues when seed examples are reseeded with the same stable ids", () => {

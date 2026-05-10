@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
+import { seedInitialData } from "./seed";
 import {
   createOrUpdateParentWord,
   findActiveWordByText,
@@ -15,6 +16,16 @@ import {
   submitSessionAnswer,
   upsertParentExampleVisualCues
 } from "./repository";
+import {
+  createOrUpdateParentSpellingItem,
+  getParentSpellingItemForEdit,
+  getParentSpellingItems,
+  getSpellingPreview,
+  getSpellingSessionView,
+  startSpellingPractice,
+  startSpellingMission,
+  submitSpellingAnswer
+} from "./spellingRepository";
 
 let tempDir: string | null = null;
 
@@ -491,6 +502,119 @@ describe("round repository orchestration", () => {
 
     expect(findActiveWordByText("  brisk  ")?.word).toBe("Brisk");
     expect(findActiveWordByText("briskly")).toBeNull();
+  });
+});
+
+describe("spelling repository orchestration", () => {
+  it("lets parents add reviewed spelling items with an optional confusable pair", () => {
+    const itemId = createOrUpdateParentSpellingItem({
+      target: "practise",
+      pairedTarget: "practice",
+      usageLabel: "verb",
+      teachingNote: "Practise is a verb. It means to do something repeatedly to improve.",
+      sentences: ["Mina will practise piano before dinner."],
+      difficultyLevel: 2
+    });
+
+    const items = getParentSpellingItems();
+    const saved = items.find((item) => item.id === itemId);
+    const pair = items.find((item) => item.target === "practice");
+
+    expect(saved).toMatchObject({
+      target: "practise",
+      usageLabel: "verb",
+      promptCount: 1
+    });
+    expect(pair).toMatchObject({
+      target: "practice",
+      promptCount: 0
+    });
+
+    const preview = getSpellingPreview(20);
+    expect(preview.items.some((item) => item.target === "practise")).toBe(true);
+    expect(preview.items.some((item) => item.target === "practice")).toBe(false);
+  });
+
+  it("loads and updates existing spelling items without seed refresh overwriting parent edits", () => {
+    createOrUpdateParentSpellingItem({
+      target: "advice",
+      pairedTarget: "advise",
+      usageLabel: "noun",
+      teachingNote: "Advice is a noun. It means a helpful suggestion.",
+      sentences: ["The careful advice helped Mira choose the safer path."],
+      difficultyLevel: 2
+    });
+
+    seedInitialData(getDb());
+    const edited = getParentSpellingItemForEdit("spelling_advice");
+
+    expect(edited).toMatchObject({
+      target: "advice",
+      pairedTarget: "advise",
+      usageLabel: "noun",
+      teachingNote: "Advice is a noun. It means a helpful suggestion."
+    });
+    expect(edited?.sentences).toEqual(["The careful advice helped Mira choose the safer path."]);
+  });
+
+  it("starts a spelling session from the separate spelling list", () => {
+    const preview = getSpellingPreview(4);
+    const sessionId = startSpellingMission(4);
+    const view = getSpellingSessionView(sessionId);
+
+    expect(preview.items).toHaveLength(4);
+    expect(view.totalQuestions).toBe(4);
+    expect(view.phase).toBe("intro");
+    expect(view.question).toBeNull();
+    expect(view.studyGroups[0].items[0].target).toBe(preview.items[0].target);
+    expect(view.studyGroups[0].items[0].teachingNote).toBeTruthy();
+    expect(view.wordBank).toEqual(preview.items.map((item) => item.target));
+
+    startSpellingPractice(sessionId);
+    const practice = getSpellingSessionView(sessionId);
+    expect(practice.phase).toBe("practice");
+    expect(practice.question?.target).toBe(preview.items[0].target);
+    expect(practice.question?.tokens.length).toBeGreaterThan(0);
+    expect(practice.question?.displayedSentence).toContain(preview.items[0].target);
+  });
+
+  it("logs wrong spelling selections without advancing until the child finds the answer", () => {
+    const sessionId = startSpellingMission(1);
+    startSpellingPractice(sessionId);
+    const view = getSpellingSessionView(sessionId);
+    const answer = view.question?.expectedSelection;
+    expect(answer).toBeTruthy();
+
+    const wrong = submitSpellingAnswer({
+      sessionId,
+      submittedAnswer: "word:0",
+      responseTimeMs: 900
+    });
+    const retry = getSpellingSessionView(sessionId, wrong.attemptId ?? undefined);
+
+    expect(wrong.completed).toBe(false);
+    expect(wrong.isCorrect).toBe(false);
+    expect(retry.status).toBe("in_progress");
+    expect(retry.questionNumber).toBe(1);
+    expect(retry.question?.displayedSentence).toBe(view.question?.displayedSentence);
+    expect(retry.lastResult).toMatchObject({
+      isCorrect: false
+    });
+
+    const result = submitSpellingAnswer({
+      sessionId,
+      submittedAnswer: answer ?? "",
+      responseTimeMs: 1200
+    });
+    const completed = getSpellingSessionView(sessionId, result.attemptId ?? undefined);
+
+    expect(result.completed).toBe(true);
+    expect(result.isCorrect).toBe(true);
+    expect(completed.status).toBe("completed");
+    expect(completed.lastResult).toMatchObject({
+      isCorrect: true,
+      correctAnswer: view.question?.target
+    });
   });
 });
 

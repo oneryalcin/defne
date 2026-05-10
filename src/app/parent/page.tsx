@@ -122,6 +122,10 @@ export default async function ParentDashboardPage({
               <Plus size={18} aria-hidden="true" />
               Add word
             </Link>
+            <Link className="ribbon ribbon--ghost" href="/parent/spelling/new">
+              <Plus size={18} aria-hidden="true" />
+              Add spelling
+            </Link>
           </div>
         </header>
 

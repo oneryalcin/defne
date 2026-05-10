@@ -62,7 +62,7 @@ describe("mastery scoring", () => {
       stabilityDays: 20,
       lastSeenAt: "2026-04-30T20:00:00.000Z"
     });
-    expect(masteryColourForState(survived)).toBe("green");
+    expect(scoreFromState(survived, null, "2026-05-01T20:00:00.000Z").colour).toBe("green");
   });
 
   it("does not knock down a recent wrong after clean recovery proof", () => {

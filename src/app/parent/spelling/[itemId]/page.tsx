@@ -22,6 +22,7 @@ export default async function EditSpellingItemPage({
 
       <AddSpellingItemForm
         mode="edit"
+        initialItemId={item.id}
         initialValues={{
           target: item.target,
           pairedTarget: item.pairedTarget,

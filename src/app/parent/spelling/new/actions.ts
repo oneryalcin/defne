@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getParentSpellingItems } from "@/lib/db/spellingRepository";
+import { getParentSpellingItems, normaliseParentSpellingWord } from "@/lib/db/spellingRepository";
 import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 import type { ParentSpellingAssistDraft } from "@/lib/wordGeneration/parentSpellingAssist";
 import { generateParentSpellingAssistDraft } from "@/lib/wordGeneration/parentSpellingAssist";
@@ -29,7 +29,7 @@ export async function generateSpellingAssistAction(
     redirect("/");
   }
 
-  const target = String(formData.get("target") ?? "").trim();
+  const target = normaliseParentSpellingWord(String(formData.get("target") ?? ""));
   if (!target) {
     return { status: "error", message: "Enter a spelling word before generating.", draft: null };
   }

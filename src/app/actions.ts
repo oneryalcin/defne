@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/repository";
 import {
   createOrUpdateParentSpellingItem,
+  normaliseParentSpellingWord,
   startSpellingPractice,
   startSpellingMission,
   submitSpellingAnswer
@@ -235,7 +236,8 @@ export async function saveWordAction(formData: FormData): Promise<void> {
 
 export async function saveSpellingItemAction(formData: FormData): Promise<void> {
   await requireRole("parent");
-  const target = String(formData.get("target") ?? "");
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  const target = normaliseParentSpellingWord(String(formData.get("target") ?? ""));
   const pairedTarget = String(formData.get("pairedTarget") ?? "");
   const usageLabel = String(formData.get("usageLabel") ?? "");
   const teachingNote = String(formData.get("teachingNote") ?? "");
@@ -245,6 +247,7 @@ export async function saveSpellingItemAction(formData: FormData): Promise<void> 
     .filter(Boolean);
 
   createOrUpdateParentSpellingItem({
+    itemId: itemId || undefined,
     target,
     pairedTarget,
     usageLabel,

@@ -781,6 +781,17 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.4;
 }
 
+.spelling-search-field {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0 0;
+  max-width: 420px;
+  min-width: 280px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--graphite-ink);
+}
+
 /* ============================================================
    Mastery pill
    ============================================================ */

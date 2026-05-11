@@ -558,6 +558,60 @@ describe("spelling repository orchestration", () => {
     expect(edited?.sentences).toEqual(["The careful advice helped Mira choose the safer path."]);
   });
 
+  it("normalises casing when updating a spelling target", () => {
+    const createdItemId = createOrUpdateParentSpellingItem({
+      target: "İmmediately",
+      usageLabel: "adverb",
+      teachingNote: "Capital-I variant with a different character.",
+      sentences: ["The child can immediately answer this question."],
+      difficultyLevel: 2
+    });
+
+    const updatedId = createOrUpdateParentSpellingItem({
+      itemId: createdItemId,
+      target: "Immediately",
+      usageLabel: "adverb",
+      teachingNote: "English spelling variant.",
+      sentences: ["The child can immediately answer this question."],
+      difficultyLevel: 2
+    });
+
+    expect(updatedId).toBe(createdItemId);
+    const edited = getParentSpellingItemForEdit(createdItemId);
+
+    expect(edited?.target).toBe("immediately");
+    expect(edited?.teachingNote).toBe("English spelling variant.");
+    expect(getParentSpellingItems().find((item) => item.id === updatedId)?.target).toBe("immediately");
+    expect(getParentSpellingItems().find((item) => item.id === `spelling_immediately`)).toMatchObject({ target: "immediately" });
+  });
+
+  it("removes stale paired words when the spelling pair is changed", () => {
+    const itemId = createOrUpdateParentSpellingItem({
+      target: "flonq",
+      pairedTarget: "bruxel",
+      usageLabel: "adjective",
+      teachingNote: "Testing stale pair cleanup.",
+      sentences: ["The child can repeat this flonq phrase accurately."],
+      difficultyLevel: 2
+    });
+
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "bruxel")?.target).toBe("bruxel");
+
+    const updatedId = createOrUpdateParentSpellingItem({
+      itemId,
+      target: "flonq",
+      pairedTarget: "vibrell",
+      usageLabel: "adjective",
+      teachingNote: "Pair updated to clean up stale row.",
+      sentences: ["The child can repeat this flonq phrase accurately."],
+      difficultyLevel: 2
+    });
+
+    expect(updatedId).toBe(itemId);
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "bruxel")).toBeUndefined();
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "vibrell")).toMatchObject({ target: "vibrell" });
+  });
+
   it("starts a spelling session from the separate spelling list", () => {
     const preview = getSpellingPreview(4);
     const sessionId = startSpellingMission(4);

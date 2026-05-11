@@ -11,7 +11,7 @@ export default function ImportWordsPage() {
 
       <form action={importWordsAction} className="mission-panel">
         <label>
-          Words
+          Vocabulary words
           <textarea
             className="textarea"
             required
@@ -21,7 +21,7 @@ export default function ImportWordsPage() {
         </label>
         <div className="action-row">
           <button className="button" type="submit">
-            Import words
+            Import vocabulary
           </button>
           <Link className="button-secondary" href="/parent/words">
             Cancel

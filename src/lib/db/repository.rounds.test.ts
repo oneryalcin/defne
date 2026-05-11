@@ -8,12 +8,14 @@ import {
   createOrUpdateParentWord,
   findActiveWordByText,
   getMissionPreview,
+  getParentWordForEdit,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer,
+  updateParentWord,
   upsertParentExampleVisualCues
 } from "./repository";
 import {
@@ -492,6 +494,58 @@ describe("round repository orchestration", () => {
         status: "approved"
       }
     ]);
+  });
+
+  it("loads vocabulary edit values from reviewed parent content", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "reluctant",
+      difficultyLevel: 2,
+      definition: "Not willing or not keen to do something straight away.",
+      examples: [
+        "Mina felt reluctant to step onto the diving board.",
+        "The puppy was reluctant to leave the blanket."
+      ],
+      synonyms: ["hesitant", "unwilling"],
+      antonyms: ["eager", "keen"]
+    });
+
+    expect(getParentWordForEdit(wordId)).toMatchObject({
+      id: wordId,
+      word: "reluctant",
+      definition: "Not willing or not keen to do something straight away.",
+      examples: [
+        "Mina felt reluctant to step onto the diving board.",
+        "The puppy was reluctant to leave the blanket."
+      ],
+      synonyms: ["hesitant", "unwilling"],
+      antonyms: ["eager", "keen"]
+    });
+  });
+
+  it("updates an existing vocabulary word in place", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "recieve",
+      definition: "A misspelled shell.",
+      example: "Mina will recieve the letter."
+    });
+
+    const updatedId = updateParentWord({
+      wordId,
+      word: "receive",
+      definition: "To get or be given something.",
+      examples: ["Mina will receive the letter before lunch."],
+      synonyms: ["get"],
+      antonyms: ["send"]
+    });
+
+    expect(updatedId).toBe(wordId);
+    expect(getParentWordForEdit(wordId)).toMatchObject({
+      word: "receive",
+      definition: "To get or be given something.",
+      examples: ["Mina will receive the letter before lunch."],
+      synonyms: ["get"],
+      antonyms: ["send"]
+    });
   });
 
   it("finds active words by normalized text before generation", () => {

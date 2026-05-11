@@ -15,6 +15,14 @@ interface FormValues {
   examples: string[];
 }
 
+interface AddWordFormProps {
+  mode?: "new" | "edit";
+  wordId?: string;
+  initialValues?: Partial<FormValues>;
+  cancelHref?: string;
+  returnTo?: string;
+}
+
 const INITIAL_STATE: ParentWordAssistActionState = {
   status: "idle",
   message: null,
@@ -29,9 +37,31 @@ const EMPTY_VALUES: FormValues = {
   examples: ["", "", ""]
 };
 
-export function AddWordForm() {
+function formValuesFromInitial(initialValues?: Partial<FormValues>): FormValues {
+  const examples = initialValues?.examples ?? EMPTY_VALUES.examples;
+
+  return {
+    word: initialValues?.word ?? EMPTY_VALUES.word,
+    definition: initialValues?.definition ?? EMPTY_VALUES.definition,
+    synonyms: initialValues?.synonyms ?? EMPTY_VALUES.synonyms,
+    antonyms: initialValues?.antonyms ?? EMPTY_VALUES.antonyms,
+    examples: [...examples, "", "", ""].slice(0, Math.max(3, examples.length))
+  };
+}
+
+export function AddWordForm({
+  mode = "new",
+  wordId,
+  initialValues,
+  cancelHref = "/parent/words",
+  returnTo = "/parent/words",
+}: AddWordFormProps = {}) {
   const [assistState, assistAction, assistPending] = useActionState(generateWordAssistAction, INITIAL_STATE);
-  const [values, setValues] = useState<FormValues>(EMPTY_VALUES);
+  const [values, setValues] = useState<FormValues>(() => formValuesFromInitial(initialValues));
+
+  useEffect(() => {
+    setValues(formValuesFromInitial(initialValues));
+  }, [initialValues]);
 
   useEffect(() => {
     if (!assistState.draft) return;
@@ -51,25 +81,27 @@ export function AddWordForm() {
 
   return (
     <div className="mission-panel parent-word-builder">
-      <form action={assistAction} className="parent-word-builder__assist" aria-label="Generate word draft">
-        <label className="parent-word-builder__word-field">
-          Word
-          <span className="parent-word-builder__generate-row">
-            <input
-              className="field"
-              required
-              name="word"
-              placeholder="reluctant"
-              value={values.word}
-              onChange={(event) => setValues((current) => ({ ...current, word: event.target.value }))}
-            />
-            <button className="button" type="submit" disabled={assistPending}>
-              {assistPending ? <LoaderCircle size={18} className="spin" /> : <Sparkles size={18} />}
-              {assistPending ? "Generating..." : "Generate"}
-            </button>
-          </span>
-        </label>
-      </form>
+      {mode === "new" ? (
+        <form action={assistAction} className="parent-word-builder__assist" aria-label="Generate vocabulary draft">
+          <label className="parent-word-builder__word-field">
+            Vocabulary word
+            <span className="parent-word-builder__generate-row">
+              <input
+                className="field"
+                required
+                name="word"
+                placeholder="reluctant"
+                value={values.word}
+                onChange={(event) => setValues((current) => ({ ...current, word: event.target.value }))}
+              />
+              <button className="button" type="submit" disabled={assistPending}>
+                {assistPending ? <LoaderCircle size={18} className="spin" /> : <Sparkles size={18} />}
+                {assistPending ? "Generating..." : "Generate"}
+              </button>
+            </span>
+          </label>
+        </form>
+      ) : null}
 
       {assistState.message && assistState.status !== "success" ? (
         <div className={assistState.status === "error" ? "empty-state parent-word-builder__status is-error" : "empty-state"}>
@@ -79,9 +111,22 @@ export function AddWordForm() {
 
       <form action={saveWordAction} className="parent-word-builder__editor">
         <input type="hidden" name="assistDraft" value={serialisedDraft} readOnly />
-        <input type="hidden" name="word" value={values.word} readOnly />
+        <input type="hidden" name="returnTo" value={returnTo} readOnly />
+        {wordId ? <input type="hidden" name="wordId" value={wordId} readOnly /> : null}
+        {mode === "new" ? <input type="hidden" name="word" value={values.word} readOnly /> : null}
 
         <div className="form-grid">
+          {mode === "edit" ? (
+            <label>
+              Vocabulary word
+              <input
+                className="field"
+                name="word"
+                value={values.word}
+                onChange={(event) => setValues((current) => ({ ...current, word: event.target.value }))}
+              />
+            </label>
+          ) : null}
           <label className="wide">
             Definition
             <textarea
@@ -156,9 +201,9 @@ export function AddWordForm() {
 
         <div className="action-row">
           <button className="button" type="submit">
-            Save word
+            {mode === "edit" ? "Save changes" : "Save vocabulary"}
           </button>
-          <Link className="button-secondary" href="/parent/words">
+          <Link className="button-secondary" href={cancelHref}>
             Cancel
           </Link>
         </div>

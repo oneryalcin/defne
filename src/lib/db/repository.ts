@@ -253,6 +253,15 @@ export interface ParentWordListItem {
   scoreLowerBound: number;
 }
 
+export interface ParentWordEditItem {
+  id: string;
+  word: string;
+  definition: string;
+  examples: string[];
+  synonyms: string[];
+  antonyms: string[];
+}
+
 export interface ParentDashboard {
   totalWords: number;
   completeWords: number;
@@ -1062,6 +1071,35 @@ export function getParentWords(): ParentWordListItem[] {
   });
 }
 
+export function getParentWordForEdit(wordId: string): ParentWordEditItem | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT w.id, w.word, d.definition
+       FROM words w
+       LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       WHERE w.id = ? AND w.status = 'active'`
+    )
+    .get(wordId) as
+    | {
+        id: string;
+        word: string;
+        definition: string | null;
+      }
+    | undefined;
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    word: row.word,
+    definition: row.definition ?? "",
+    examples: getExamples(db, row.id),
+    synonyms: getTextList(db, "word_synonyms", "synonym", row.id),
+    antonyms: getTextList(db, "word_antonyms", "antonym", row.id)
+  };
+}
+
 export interface WordDetailView {
   id: string;
   word: string;
@@ -1421,6 +1459,38 @@ export function createOrUpdateParentWord(input: WordFormInput): string {
     resetLearnerStateAfterContentEdit(db, existingWord.id, now);
   }
   return wordId;
+}
+
+export function updateParentWord(input: WordFormInput & { wordId: string }): string {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const normalized = normalizeWord(input.word);
+  if (!normalized) throw new Error("Word is required.");
+
+  const existingWord = db
+    .prepare("SELECT id FROM words WHERE id = ? AND status = 'active'")
+    .get(input.wordId) as { id: string } | undefined;
+  if (!existingWord) throw new Error("Vocabulary word not found.");
+
+  const duplicateWord = db
+    .prepare("SELECT id FROM words WHERE normalized_word = ? AND id <> ?")
+    .get(normalized, input.wordId) as { id: string } | undefined;
+  if (duplicateWord) throw new Error(`"${input.word.trim()}" is already in the vocabulary list.`);
+
+  db.prepare(
+    `UPDATE words
+     SET word = ?,
+         normalized_word = ?,
+         difficulty_level = ?,
+         content_version = content_version + 1,
+         updated_at = ?
+     WHERE id = ?`
+  ).run(input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, input.wordId);
+
+  replaceOptionalWordRows(db, input.wordId, input, now);
+  ensureLearnerStateForWord(db, input.wordId, now);
+  resetLearnerStateAfterContentEdit(db, input.wordId, now);
+  return input.wordId;
 }
 
 export function findActiveWordByText(word: string): { id: string; word: string } | null {

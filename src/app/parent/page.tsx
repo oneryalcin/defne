@@ -120,7 +120,7 @@ export default async function ParentDashboardPage({
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Link className="ribbon" href="/parent/words/new">
               <Plus size={18} aria-hidden="true" />
-              Add word
+              Add vocabulary
             </Link>
             <Link className="ribbon ribbon--ghost" href="/parent/spelling/new">
               <Plus size={18} aria-hidden="true" />
@@ -293,11 +293,11 @@ export default async function ParentDashboardPage({
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Link className="ribbon" href="/parent/words/new">
                   <Plus size={16} aria-hidden="true" />
-                  Add a word
+                  Add vocabulary
                 </Link>
                 <Link className="ribbon ribbon--ghost" href="/parent/words">
                   <ListChecks size={16} aria-hidden="true" />
-                  Open queue
+                  Open vocabulary
                 </Link>
               </div>
             </div>

@@ -10,6 +10,7 @@ import {
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer,
+  updateParentWord,
   upsertParentExampleVisualCues
 } from "@/lib/db/repository";
 import {
@@ -193,6 +194,7 @@ export async function submitSpellingAnswerAction(formData: FormData): Promise<vo
 
 export async function saveWordAction(formData: FormData): Promise<void> {
   await requireRole("parent");
+  const existingWordId = String(formData.get("wordId") ?? "").trim();
   const submittedWord = String(formData.get("word") ?? "");
   const examples = formData
     .getAll("examples")
@@ -201,14 +203,18 @@ export async function saveWordAction(formData: FormData): Promise<void> {
   const synonyms = splitCommaList(String(formData.get("synonyms") ?? ""));
   const antonyms = splitCommaList(String(formData.get("antonyms") ?? ""));
 
-  const wordId = createOrUpdateParentWord({
+  const wordInput = {
     word: submittedWord,
     definition: String(formData.get("definition") ?? ""),
     examples,
     synonyms,
     antonyms,
     difficultyLevel: 2
-  });
+  };
+
+  const wordId = existingWordId
+    ? updateParentWord({ ...wordInput, wordId: existingWordId })
+    : createOrUpdateParentWord(wordInput);
 
   const draftPayload = String(formData.get("assistDraft") ?? "");
   if (draftPayload) {
@@ -231,7 +237,8 @@ export async function saveWordAction(formData: FormData): Promise<void> {
       upsertParentExampleVisualCues(wordId, cues);
     }
   }
-  redirect("/parent/words");
+  const returnTo = String(formData.get("returnTo") ?? "/parent/words");
+  redirect(returnTo.startsWith("/parent/words") ? returnTo : "/parent/words");
 }
 
 export async function saveSpellingItemAction(formData: FormData): Promise<void> {

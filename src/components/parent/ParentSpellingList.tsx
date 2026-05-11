@@ -80,9 +80,13 @@ export function ParentSpellingList({
                   {item.usageLabel || "no label"} · {item.promptCount} sentence{item.promptCount === 1 ? "" : "s"} · {item.wrongCount} misses
                 </small>
               </div>
-              <div className="action-row">
-                {item.promptCount > 0 ? <span className="empty-state">Ready</span> : <span className="empty-state">Incomplete</span>}
-                <Link className="button-secondary" href={`/parent/spelling/${item.id}`}>
+              <div className="spelling-word-actions">
+                {item.promptCount > 0 ? (
+                  <span className="empty-state spelling-word-status">Ready</span>
+                ) : (
+                  <span className="empty-state spelling-word-status">Incomplete</span>
+                )}
+                <Link className="button-secondary spelling-word-edit" href={`/parent/spelling/${item.id}`}>
                   <Pencil size={16} />
                   Edit
                 </Link>

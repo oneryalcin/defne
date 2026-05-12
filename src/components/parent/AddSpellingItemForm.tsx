@@ -8,6 +8,7 @@ import {
   generateSpellingAssistAction,
   type ParentSpellingAssistActionState
 } from "@/app/parent/spelling/new/actions";
+import { normaliseParentSpellingWord as normalizeTarget } from "@/lib/normalization";
 
 interface FormValues {
   target: string;
@@ -19,6 +20,7 @@ interface FormValues {
 
 interface AddSpellingItemFormProps {
   initialValues?: FormValues;
+  initialItemId?: string;
   mode?: "create" | "edit";
 }
 
@@ -36,7 +38,11 @@ const EMPTY_VALUES: FormValues = {
   sentences: ["", ""]
 };
 
-export function AddSpellingItemForm({ initialValues, mode = "create" }: AddSpellingItemFormProps) {
+export function AddSpellingItemForm({
+  initialValues,
+  initialItemId,
+  mode = "create"
+}: AddSpellingItemFormProps) {
   const [assistState, assistAction, assistPending] = useActionState(generateSpellingAssistAction, INITIAL_STATE);
   const [values, setValues] = useState<FormValues>(initialValues ?? EMPTY_VALUES);
 
@@ -67,6 +73,7 @@ export function AddSpellingItemForm({ initialValues, mode = "create" }: AddSpell
                 placeholder="advise"
                 value={values.target}
                 onChange={(event) => setValues((current) => ({ ...current, target: event.target.value }))}
+                onBlur={() => setValues((current) => ({ ...current, target: normalizeTarget(current.target) }))}
               />
               <button className="button" type="submit" disabled={assistPending}>
                 {assistPending ? <LoaderCircle size={18} className="spin" /> : <Sparkles size={18} />}
@@ -83,8 +90,9 @@ export function AddSpellingItemForm({ initialValues, mode = "create" }: AddSpell
               className="field"
               required
               name="target"
-              readOnly
               value={values.target}
+              onChange={(event) => setValues((current) => ({ ...current, target: event.target.value }))}
+              onBlur={() => setValues((current) => ({ ...current, target: normalizeTarget(current.target) }))}
             />
           </span>
         </label>
@@ -97,7 +105,8 @@ export function AddSpellingItemForm({ initialValues, mode = "create" }: AddSpell
       ) : null}
 
       <form action={saveSpellingItemAction} className="parent-word-builder__editor">
-        <input type="hidden" name="target" value={values.target} readOnly />
+        {mode === "create" ? <input type="hidden" name="target" value={normalizeTarget(values.target)} readOnly /> : null}
+        {initialItemId ? <input type="hidden" name="itemId" value={initialItemId} readOnly /> : null}
 
         <div className="form-grid">
           <label>
@@ -108,6 +117,7 @@ export function AddSpellingItemForm({ initialValues, mode = "create" }: AddSpell
               placeholder="advice"
               value={values.pairedTarget}
               onChange={(event) => setValues((current) => ({ ...current, pairedTarget: event.target.value }))}
+              onBlur={() => setValues((current) => ({ ...current, pairedTarget: normalizeTarget(current.pairedTarget) }))}
             />
           </label>
           <label>

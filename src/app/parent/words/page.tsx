@@ -1,12 +1,20 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { ParentVocabularyList } from "@/components/parent/ParentVocabularyList";
 import { getParentWords } from "@/lib/db/repository";
-import { MasteryBadge } from "@/components/MasteryBadge";
 
 export const dynamic = "force-dynamic";
 
-export default function WordsPage() {
+type SearchParams = Promise<{ q?: string }> | { q?: string };
+
+export default async function WordsPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const words = getParentWords();
+  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as { q?: string };
+  const initialQuery = resolvedSearchParams.q ?? "";
 
   return (
     <main className="page">
@@ -18,21 +26,11 @@ export default function WordsPage() {
       <div className="action-row">
         <Link className="button" href="/parent/words/new">
           <Plus size={18} />
-          Add word
+          Add vocabulary
         </Link>
       </div>
 
-      <section className="word-grid">
-        {words.map((word) => (
-          <article className="word-row" key={word.id}>
-            <div className="word-main">
-              <strong>{word.word}</strong>
-              <span>{word.definition ?? "Needs canonical definition and example before practice."}</span>
-            </div>
-            {word.masteryColour ? <MasteryBadge colour={word.masteryColour} /> : <span className="empty-state">Incomplete</span>}
-          </article>
-        ))}
-      </section>
+      <ParentVocabularyList words={words} initialSearchQuery={initialQuery} />
     </main>
   );
 }

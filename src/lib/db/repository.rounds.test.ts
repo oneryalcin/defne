@@ -8,12 +8,14 @@ import {
   createOrUpdateParentWord,
   findActiveWordByText,
   getMissionPreview,
+  getParentWordForEdit,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer,
+  updateParentWord,
   upsertParentExampleVisualCues
 } from "./repository";
 import {
@@ -494,6 +496,58 @@ describe("round repository orchestration", () => {
     ]);
   });
 
+  it("loads vocabulary edit values from reviewed parent content", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "reluctant",
+      difficultyLevel: 2,
+      definition: "Not willing or not keen to do something straight away.",
+      examples: [
+        "Mina felt reluctant to step onto the diving board.",
+        "The puppy was reluctant to leave the blanket."
+      ],
+      synonyms: ["hesitant", "unwilling"],
+      antonyms: ["eager", "keen"]
+    });
+
+    expect(getParentWordForEdit(wordId)).toMatchObject({
+      id: wordId,
+      word: "reluctant",
+      definition: "Not willing or not keen to do something straight away.",
+      examples: [
+        "Mina felt reluctant to step onto the diving board.",
+        "The puppy was reluctant to leave the blanket."
+      ],
+      synonyms: ["hesitant", "unwilling"],
+      antonyms: ["eager", "keen"]
+    });
+  });
+
+  it("updates an existing vocabulary word in place", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "recieve",
+      definition: "A misspelled shell.",
+      example: "Mina will recieve the letter."
+    });
+
+    const updatedId = updateParentWord({
+      wordId,
+      word: "receive",
+      definition: "To get or be given something.",
+      examples: ["Mina will receive the letter before lunch."],
+      synonyms: ["get"],
+      antonyms: ["send"]
+    });
+
+    expect(updatedId).toBe(wordId);
+    expect(getParentWordForEdit(wordId)).toMatchObject({
+      word: "receive",
+      definition: "To get or be given something.",
+      examples: ["Mina will receive the letter before lunch."],
+      synonyms: ["get"],
+      antonyms: ["send"]
+    });
+  });
+
   it("finds active words by normalized text before generation", () => {
     createOrUpdateParentWord({
       word: "Brisk",
@@ -556,6 +610,60 @@ describe("spelling repository orchestration", () => {
       teachingNote: "Advice is a noun. It means a helpful suggestion."
     });
     expect(edited?.sentences).toEqual(["The careful advice helped Mira choose the safer path."]);
+  });
+
+  it("normalises casing when updating a spelling target", () => {
+    const createdItemId = createOrUpdateParentSpellingItem({
+      target: "İmmediately",
+      usageLabel: "adverb",
+      teachingNote: "Capital-I variant with a different character.",
+      sentences: ["The child can immediately answer this question."],
+      difficultyLevel: 2
+    });
+
+    const updatedId = createOrUpdateParentSpellingItem({
+      itemId: createdItemId,
+      target: "Immediately",
+      usageLabel: "adverb",
+      teachingNote: "English spelling variant.",
+      sentences: ["The child can immediately answer this question."],
+      difficultyLevel: 2
+    });
+
+    expect(updatedId).toBe(createdItemId);
+    const edited = getParentSpellingItemForEdit(createdItemId);
+
+    expect(edited?.target).toBe("immediately");
+    expect(edited?.teachingNote).toBe("English spelling variant.");
+    expect(getParentSpellingItems().find((item) => item.id === updatedId)?.target).toBe("immediately");
+    expect(getParentSpellingItems().find((item) => item.id === `spelling_immediately`)).toMatchObject({ target: "immediately" });
+  });
+
+  it("removes stale paired words when the spelling pair is changed", () => {
+    const itemId = createOrUpdateParentSpellingItem({
+      target: "flonq",
+      pairedTarget: "bruxel",
+      usageLabel: "adjective",
+      teachingNote: "Testing stale pair cleanup.",
+      sentences: ["The child can repeat this flonq phrase accurately."],
+      difficultyLevel: 2
+    });
+
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "bruxel")?.target).toBe("bruxel");
+
+    const updatedId = createOrUpdateParentSpellingItem({
+      itemId,
+      target: "flonq",
+      pairedTarget: "vibrell",
+      usageLabel: "adjective",
+      teachingNote: "Pair updated to clean up stale row.",
+      sentences: ["The child can repeat this flonq phrase accurately."],
+      difficultyLevel: 2
+    });
+
+    expect(updatedId).toBe(itemId);
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "bruxel")).toBeUndefined();
+    expect(getParentSpellingItems().find((item) => item.id !== itemId && item.target === "vibrell")).toMatchObject({ target: "vibrell" });
   });
 
   it("starts a spelling session from the separate spelling list", () => {

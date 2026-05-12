@@ -1,11 +1,20 @@
 import Link from "next/link";
-import { Pencil, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { ParentSpellingList } from "@/components/parent/ParentSpellingList";
 import { getParentSpellingItems } from "@/lib/db/spellingRepository";
+
+type SearchParams = Promise<{ q?: string }> | { q?: string };
 
 export const dynamic = "force-dynamic";
 
-export default function ParentSpellingPage() {
+export default async function ParentSpellingPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const items = getParentSpellingItems();
+  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as { q?: string };
+  const initialQuery = resolvedSearchParams.q ?? "";
 
   return (
     <main className="page">
@@ -21,26 +30,7 @@ export default function ParentSpellingPage() {
         </Link>
       </div>
 
-      <section className="word-grid">
-        {items.map((item) => (
-          <article className="word-row" key={item.id}>
-            <div className="word-main">
-              <strong>{item.target}</strong>
-              <span>{item.teachingNote || "Pair shell only. Add teaching note and clean sentences before practice."}</span>
-              <small>
-                {item.usageLabel || "no label"} · {item.promptCount} sentence{item.promptCount === 1 ? "" : "s"} · {item.wrongCount} misses
-              </small>
-            </div>
-            <div className="action-row">
-              {item.promptCount > 0 ? <span className="empty-state">Ready</span> : <span className="empty-state">Incomplete</span>}
-              <Link className="button-secondary" href={`/parent/spelling/${item.id}`}>
-                <Pencil size={16} />
-                Edit
-              </Link>
-            </div>
-          </article>
-        ))}
-      </section>
+      <ParentSpellingList items={items} initialSearchQuery={initialQuery} />
     </main>
   );
 }

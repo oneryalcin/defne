@@ -11,6 +11,9 @@ import { selectRoundWords } from "../learning/roundSelection";
 import type { FailureType, LearnerWordState, PracticeAttemptOutcome, PracticeWord } from "../types";
 import { getDb } from "./index";
 import { defaultLearnerId, normalizeWord } from "./seed";
+import { normaliseParentSpellingWord } from "../normalization";
+
+export { normaliseParentSpellingWord } from "../normalization";
 
 interface SpellingSessionRow {
   id: string;
@@ -71,6 +74,7 @@ export interface SpellingPreview {
 }
 
 export interface ParentSpellingItemInput {
+  itemId?: string;
   target: string;
   pairedTarget?: string;
   usageLabel?: string;
@@ -317,31 +321,94 @@ export function getParentSpellingItemForEdit(itemId: string): ParentSpellingEdit
 export function createOrUpdateParentSpellingItem(input: ParentSpellingItemInput): string {
   const db = getDb();
   const now = new Date().toISOString();
-  const normalizedTarget = normalizeWord(input.target);
+  const canonicalTarget = normaliseParentSpellingWord(input.target);
+  const normalizedTarget = normalizeWord(canonicalTarget);
   if (!normalizedTarget) throw new Error("Target word is required.");
 
-  const normalizedPair = normalizeWord(input.pairedTarget ?? "");
+  const canonicalPair = normaliseParentSpellingWord(input.pairedTarget ?? "");
+  const normalizedPair = normalizeWord(canonicalPair);
   const studyGroup = spellingStudyGroup(normalizedTarget, normalizedPair);
+  const resolvedItemId = input.itemId?.trim();
   const itemId = deterministicSpellingItemId(normalizedTarget);
   const sentences = uniqueTexts(input.sentences);
   if (sentences.length === 0) throw new Error("At least one sentence is required.");
 
-  upsertParentSpellingShell(db, {
-    itemId,
-    target: input.target.trim(),
-    normalizedTarget,
-    studyGroup,
-    usageLabel: input.usageLabel ?? "",
-    teachingNote: input.teachingNote,
-    difficultyLevel: input.difficultyLevel,
-    ownsContent: true,
-    now
-  });
+  if (resolvedItemId) {
+    const existing =
+      db
+        .prepare("SELECT id, normalized_target, study_group FROM spelling_items WHERE id = ?")
+        .get(resolvedItemId) as { id: string; normalized_target: string; study_group: string } | undefined;
+    if (!existing) throw new Error("Spelling item not found.");
+    if (existing.normalized_target !== normalizedTarget) {
+      const duplicate = db
+        .prepare("SELECT id FROM spelling_items WHERE normalized_target = ? AND id <> ?")
+        .get(normalizedTarget, resolvedItemId) as { id: string } | undefined;
+      if (duplicate) {
+        throw new Error(`\"${canonicalTarget}\" is already in the spelling list.`);
+      }
+    }
+
+    const existingRelatedTargets = studyGroupTokens(existing.study_group).filter(
+      (target) => target !== existing.normalized_target
+    );
+    const nextRelatedTargets = normalizedPair
+      ? studyGroupTokens(studyGroup).filter((target) => target !== normalizedTarget)
+      : [];
+    const staleRelatedTargets = existingRelatedTargets.filter((target) => !nextRelatedTargets.includes(target));
+
+    db.prepare(
+      `UPDATE spelling_items
+       SET target_word = ?,
+           normalized_target = ?,
+           study_group = ?,
+           source = 'parent',
+           usage_label = ?,
+           teaching_note = ?,
+           difficulty_level = ?,
+           updated_at = ?
+       WHERE id = ?`
+    ).run(
+      canonicalTarget,
+      normalizedTarget,
+      studyGroup,
+      input.usageLabel ?? "",
+      input.teachingNote,
+      clampDifficulty(input.difficultyLevel ?? 2),
+      now,
+      existing.id
+    );
+
+    for (const staleTarget of staleRelatedTargets) {
+      const stalePairId = deterministicSpellingItemId(staleTarget);
+      db.prepare(
+        `DELETE FROM spelling_items
+         WHERE id = ?
+           AND study_group = ?
+           AND source = 'parent'
+           AND status = 'active'
+           AND TRIM(usage_label) = ''
+           AND TRIM(teaching_note) = ''
+           AND NOT EXISTS (SELECT 1 FROM spelling_prompts p WHERE p.item_id = spelling_items.id)`
+      ).run(stalePairId, existing.study_group);
+    }
+  } else {
+    upsertParentSpellingShell(db, {
+      itemId,
+      target: canonicalTarget,
+      normalizedTarget,
+      studyGroup,
+      usageLabel: input.usageLabel ?? "",
+      teachingNote: input.teachingNote,
+      difficultyLevel: input.difficultyLevel,
+      ownsContent: true,
+      now
+    });
+  }
 
   if (normalizedPair) {
     upsertParentSpellingShell(db, {
       itemId: deterministicSpellingItemId(normalizedPair),
-      target: input.pairedTarget?.trim() ?? normalizedPair,
+      target: canonicalPair || normalizedPair,
       normalizedTarget: normalizedPair,
       studyGroup,
       usageLabel: "",
@@ -352,8 +419,8 @@ export function createOrUpdateParentSpellingItem(input: ParentSpellingItemInput)
     });
   }
 
-  replaceParentSpellingPrompts(db, itemId, sentences, now);
-  return itemId;
+  replaceParentSpellingPrompts(db, resolvedItemId ?? itemId, sentences, now);
+  return resolvedItemId ?? itemId;
 }
 
 export function startSpellingMission(targetItemCount = 8): string {
@@ -1021,6 +1088,13 @@ function spellingStudyGroup(normalizedTarget: string, normalizedPair: string): s
 
 function deterministicSpellingItemId(normalizedTarget: string): string {
   return `spelling_${normalizedTarget.replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}`;
+}
+
+function studyGroupTokens(studyGroup: string): string[] {
+  return studyGroup
+    .split("_")
+    .map((token) => token.trim())
+    .filter(Boolean);
 }
 
 function uniqueTexts(values: string[]): string[] {

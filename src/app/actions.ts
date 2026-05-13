@@ -118,6 +118,7 @@ export async function startMeaningRecognitionAction(formData: FormData): Promise
 export async function setVisualCuesAction(formData: FormData): Promise<void> {
   await requireRole("parent");
   setVisualCuePreference({
+    generationEnabled: formData.get("visualCueGeneration") === "on",
     learnCards: formData.get("visualCueLearnCards") === "on",
     meaningQuestions: formData.get("visualCueMeaningQuestions") === "on",
     contextQuestions: formData.get("visualCueContextQuestions") === "on"

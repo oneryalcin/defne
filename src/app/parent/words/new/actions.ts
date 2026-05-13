@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { findActiveWordByText } from "@/lib/db/repository";
+import { findActiveWordByText, getVisualCueGenerationPreference } from "@/lib/db/repository";
 import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 import type { ParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
 import { generateParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
@@ -44,13 +44,18 @@ export async function generateWordAssistAction(
   }
 
   try {
-    const draft = await generateParentWordAssistDraft(word);
+    const draft = await generateParentWordAssistDraft(word, {
+      generateImages: getVisualCueGenerationPreference()
+    });
+    const hasImagePreviews = draft.examples.some((example) => example.visualCue);
     return {
       status: "success",
       message:
         draft.warnings.length > 0
           ? `Generated text help. ${draft.warnings.join(" ")}`
-          : "Generated draft content and image previews.",
+          : hasImagePreviews
+            ? "Generated draft content and image previews."
+            : "Generated draft content.",
       draft
     };
   } catch (error) {

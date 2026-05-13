@@ -7,9 +7,8 @@ import {
   type GeneratedExampleVisualCue
 } from "@/lib/imageGeneration/exampleVisualCues";
 import { deterministicWordId, normalizeWord } from "@/lib/db/seed";
+import { generateDeepSeekJsonText, type DeepSeekJsonGenerationOptions } from "./deepSeek";
 
-const GEMINI_TEXT_MODEL = "gemini-2.5-flash";
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const DRAFT_IMAGE_DIR = "public/assets/example-cues/drafts";
 const DRAFT_IMAGE_SEGMENTS = ["public", "assets", "example-cues", "drafts"] as const;
 
@@ -39,44 +38,54 @@ interface ParentWordAssistTextDraft {
   examples: string[];
 }
 
-export async function generateParentWordAssistDraft(word: string): Promise<ParentWordAssistDraft> {
+export interface ParentWordAssistOptions {
+  generateImages?: boolean;
+  textGeneration?: DeepSeekJsonGenerationOptions;
+}
+
+export async function generateParentWordAssistDraft(
+  word: string,
+  options: ParentWordAssistOptions = {}
+): Promise<ParentWordAssistDraft> {
   const cleanWord = word.trim();
   if (!cleanWord) {
     throw new Error("Enter a word before generating help.");
   }
 
-  const textDraft = await generateParentWordTextDraft(cleanWord);
+  const textDraft = await generateParentWordTextDraft(cleanWord, options.textGeneration);
   const wordId = deterministicWordId(normalizeWord(cleanWord));
   const warnings: string[] = [];
-  const examples = await Promise.all(
-    textDraft.examples.map(async (sentence, index) => {
-      try {
-        const cue = await generateAndStoreDraftVisualCue({
-          word: cleanWord,
-          wordId,
-          definition: textDraft.definition,
-          sentence,
-          exampleIndex: index
-        });
-        return {
-          sentence,
-          visualCue: {
-            exampleId: cue.exampleId,
-            provider: cue.provider,
-            model: cue.model,
-            promptVersion: cue.promptVersion,
-            prompt: cue.prompt,
-            imagePath: cue.imagePath
+  const examples = options.generateImages
+    ? await Promise.all(
+        textDraft.examples.map(async (sentence, index) => {
+          try {
+            const cue = await generateAndStoreDraftVisualCue({
+              word: cleanWord,
+              wordId,
+              definition: textDraft.definition,
+              sentence,
+              exampleIndex: index
+            });
+            return {
+              sentence,
+              visualCue: {
+                exampleId: cue.exampleId,
+                provider: cue.provider,
+                model: cue.model,
+                promptVersion: cue.promptVersion,
+                prompt: cue.prompt,
+                imagePath: cue.imagePath
+              }
+            };
+          } catch (error) {
+            warnings.push(
+              `Image ${index + 1} could not be generated${error instanceof Error && error.message ? `: ${error.message}` : "."}`
+            );
+            return { sentence, visualCue: null };
           }
-        };
-      } catch (error) {
-        warnings.push(
-          `Image ${index + 1} could not be generated${error instanceof Error && error.message ? `: ${error.message}` : "."}`
-        );
-        return { sentence, visualCue: null };
-      }
-    })
-  );
+        })
+      )
+    : textDraft.examples.map((sentence) => ({ sentence, visualCue: null }));
 
   return {
     word: cleanWord,
@@ -88,40 +97,16 @@ export async function generateParentWordAssistDraft(word: string): Promise<Paren
   };
 }
 
-async function generateParentWordTextDraft(word: string): Promise<ParentWordAssistTextDraft> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured, so assisted generation is unavailable.");
-  }
-
-  const response = await fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_TEXT_MODEL)}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: buildParentWordAssistPrompt(word) }]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.5,
-        responseMimeType: "application/json"
-      }
-    })
+async function generateParentWordTextDraft(
+  word: string,
+  options?: DeepSeekJsonGenerationOptions
+): Promise<ParentWordAssistTextDraft> {
+  const text = await generateDeepSeekJsonText(buildParentWordAssistPrompt(word), {
+    temperature: 0.5,
+    maxTokens: 1600,
+    ...options
   });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Text generation failed (${response.status}): ${body.slice(0, 600)}`);
-  }
-
-  const json = (await response.json()) as GeminiTextResponse;
-  const text = extractGeminiText(json);
-  return normaliseTextDraftPayload(text);
+  return normaliseTextDraftPayload(text, word);
 }
 
 function buildParentWordAssistPrompt(word: string): string {
@@ -136,9 +121,12 @@ Generate a JSON object for the word "${word}" with exactly these keys:
 
 Quality bar:
 - Definition: child-legible, concrete, one sentence, no dictionary jargon.
+- Definition must not use the target word "${word}" or obvious close forms such as plurals, -ed, or -ing forms.
 - Examples: each must be distinct, vivid, and meaning-forward. They should help a child infer the word from context, not just insert the word into a bland template.
+- Each example must include the exact target word "${word}" once, using that spelling and form. Do not substitute a derivative or inflected form.
 - The target word must be supported by observable evidence in the same sentence. If the target word were blanked out, a child should still be able to guess the meaning from actions, causes, consequences, body language, timing, contrast, or objects.
 - Avoid weak template examples like "a brisk walk helped us feel awake" where the sentence mainly repeats a common phrase. For speed or pace meanings, show the pace: people almost jogging, keeping up, arriving faster, breath warming in the air, footsteps tapping quickly, or someone asking the group to slow down.
+- Avoid teaching the word by negating it, such as "not ${word}" or "no longer ${word}". Use positive examples where the context demonstrates the meaning directly.
 - For words with multiple senses, choose one child-useful main sense and make all three examples teach that same sense clearly unless the definition explicitly covers more than one.
 - Examples may be multi-clause if that improves clarity.
 - Use a mix of settings when possible: home, outdoors, school, hobby, nature, travel, community life.
@@ -155,18 +143,7 @@ Rules:
   `.trim();
 }
 
-function extractGeminiText(response: GeminiTextResponse): string {
-  for (const candidate of response.candidates ?? []) {
-    for (const part of candidate.content?.parts ?? []) {
-      if (typeof part.text === "string" && part.text.trim()) {
-        return part.text;
-      }
-    }
-  }
-  throw new Error("Text generation returned no draft content.");
-}
-
-function normaliseTextDraftPayload(rawText: string): ParentWordAssistTextDraft {
+function normaliseTextDraftPayload(rawText: string, word: string): ParentWordAssistTextDraft {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawText);
@@ -180,13 +157,62 @@ function normaliseTextDraftPayload(rawText: string): ParentWordAssistTextDraft {
   if (examples.length !== 3) {
     throw new Error("Generated draft did not include exactly 3 examples.");
   }
+  const definition = normaliseRequiredText(record.definition, "definition");
+  if (containsDisallowedTargetForm(definition, word)) {
+    throw new Error(`Generated draft used the target word or a close form in its definition: ${definition}`);
+  }
+  const invalidExample = examples.find((example) => countExactWordOccurrences(example, word) !== 1);
+  if (invalidExample) {
+    throw new Error(`Generated draft used a non-exact target word form in example: ${invalidExample}`);
+  }
+  const exampleWithDerivedForm = examples.find((example) => containsDisallowedTargetForm(example, word, { allowExact: true }));
+  if (exampleWithDerivedForm) {
+    throw new Error(`Generated draft used a close target word form in example: ${exampleWithDerivedForm}`);
+  }
 
   return {
-    definition: normaliseRequiredText(record.definition, "definition"),
+    definition,
     synonyms: normaliseStringList(record.synonyms, 2).slice(0, 2),
     antonyms: normaliseStringList(record.antonyms, 2).slice(0, 2),
     examples
   };
+}
+
+function countExactWordOccurrences(text: string, word: string): number {
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(word)}(?=$|[^\\p{L}\\p{N}])`, "giu");
+  return Array.from(text.matchAll(pattern)).length;
+}
+
+function containsDisallowedTargetForm(
+  text: string,
+  word: string,
+  options: { allowExact?: boolean } = {}
+): boolean {
+  const disallowedForms = targetWordForms(word).filter((form) => !options.allowExact || form !== word.toLocaleLowerCase("en-GB"));
+  if (disallowedForms.length === 0) return false;
+  const pattern = new RegExp(
+    `(^|[^\\p{L}\\p{N}])(${disallowedForms.map(escapeRegExp).join("|")})(?=$|[^\\p{L}\\p{N}])`,
+    "iu"
+  );
+  return pattern.test(text);
+}
+
+function targetWordForms(word: string): string[] {
+  const lower = word.trim().toLocaleLowerCase("en-GB");
+  if (!lower || /\s/.test(lower)) return lower ? [lower] : [];
+  const forms = new Set([lower, `${lower}s`, `${lower}ed`, `${lower}ing`]);
+  if (lower.endsWith("e")) {
+    forms.add(`${lower}d`);
+    forms.add(`${lower.slice(0, -1)}ing`);
+  }
+  if (lower.endsWith("y")) {
+    forms.add(`${lower.slice(0, -1)}ies`);
+  }
+  return Array.from(forms).sort((a, b) => b.length - a.length);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function normaliseRequiredText(value: unknown, field: string): string {
@@ -260,14 +286,4 @@ async function optimiseImageForApp(filePath: string, resizeMax: number, jpegQual
     .jpeg({ quality: jpegQuality, mozjpeg: true })
     .toBuffer();
   await writeFile(filePath, optimized);
-}
-
-interface GeminiTextResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
 }

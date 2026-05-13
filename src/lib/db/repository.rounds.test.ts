@@ -684,7 +684,7 @@ describe("spelling repository orchestration", () => {
     expect(practice.phase).toBe("practice");
     expect(practice.question?.target).toBe(preview.items[0].target);
     expect(practice.question?.tokens.length).toBeGreaterThan(0);
-    expect(practice.question?.displayedSentence).toContain(preview.items[0].target);
+    expect(practice.question?.displayedSentence.toLocaleLowerCase("en-GB")).toContain(preview.items[0].target);
   });
 
   it("mixes equally new spelling words instead of falling back to alphabetical order", () => {

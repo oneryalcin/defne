@@ -266,6 +266,7 @@ export interface ParentDashboard {
   totalWords: number;
   completeWords: number;
   visualCuesEnabled: boolean;
+  visualCueGenerationEnabled: boolean;
   visualCuePreferences: VisualCuePreferences;
   latestSession: {
     startedAt: string;
@@ -325,12 +326,21 @@ export function getVisualCuePreference(): VisualCuePreferences {
   return getVisualCuePreferenceFromDb(getDb());
 }
 
-export function setVisualCuePreference(preferences: Pick<VisualCuePreferences, "learnCards" | "meaningQuestions" | "contextQuestions">): void {
+export function getVisualCueGenerationPreference(): boolean {
+  return getVisualCueGenerationPreferenceFromDb(getDb());
+}
+
+export function setVisualCuePreference(
+  preferences: Pick<VisualCuePreferences, "learnCards" | "meaningQuestions" | "contextQuestions"> & {
+    generationEnabled?: boolean;
+  }
+): void {
   const db = getDb();
   const enabled = preferences.learnCards || preferences.meaningQuestions || preferences.contextQuestions;
   db.prepare(
     `UPDATE learner_profiles
      SET visual_cues_enabled = ?,
+         visual_cue_generation_enabled = ?,
          visual_cues_on_learn_cards = ?,
          visual_cues_on_meaning_questions = ?,
          visual_cues_on_context_questions = ?,
@@ -338,6 +348,7 @@ export function setVisualCuePreference(preferences: Pick<VisualCuePreferences, "
      WHERE learner_id = ?`
   ).run(
     enabled ? 1 : 0,
+    preferences.generationEnabled ? 1 : 0,
     preferences.learnCards ? 1 : 0,
     preferences.meaningQuestions ? 1 : 0,
     preferences.contextQuestions ? 1 : 0,
@@ -889,6 +900,7 @@ export function getParentDashboard(): ParentDashboard {
   const db = getDb();
   const words = getParentWords();
   const visualCuePreferences = getVisualCuePreferenceFromDb(db);
+  const visualCueGenerationEnabled = getVisualCueGenerationPreferenceFromDb(db);
   const totalWords = words.length;
   const completeWords = words.filter((word) => word.isComplete).length;
   const redOrangeWords = words.filter((word) => word.masteryColour === "red" || word.masteryColour === "orange").slice(0, 12);
@@ -931,6 +943,7 @@ export function getParentDashboard(): ParentDashboard {
     totalWords,
     completeWords,
     visualCuesEnabled: visualCuePreferences.enabled,
+    visualCueGenerationEnabled,
     visualCuePreferences,
     latestSession: latest
       ? {
@@ -2408,6 +2421,17 @@ function getVisualCuePreferenceFromDb(db: DatabaseSync): VisualCuePreferences {
     meaningQuestions: enabled && (row ? row.visual_cues_on_meaning_questions === 1 : false),
     contextQuestions: enabled && (row ? row.visual_cues_on_context_questions === 1 : false)
   };
+}
+
+function getVisualCueGenerationPreferenceFromDb(db: DatabaseSync): boolean {
+  const row = db
+    .prepare(
+      `SELECT visual_cue_generation_enabled
+       FROM learner_profiles
+       WHERE learner_id = ?`
+    )
+    .get(defaultLearnerId()) as { visual_cue_generation_enabled: number } | undefined;
+  return row ? row.visual_cue_generation_enabled === 1 : false;
 }
 
 function getVisualCueForQuestion(db: DatabaseSync, question: PracticeQuestion, word: string): VisualCue | null {

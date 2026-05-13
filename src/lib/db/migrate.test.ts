@@ -31,7 +31,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(14);
+    expect(migrations.count).toBe(15);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -69,24 +69,27 @@ describe("SQLite setup", () => {
 
     const profileColumns = db.prepare("PRAGMA table_info(learner_profiles)").all() as Array<{ name: string }>;
     expect(profileColumns.some((column) => column.name === "visual_cues_enabled")).toBe(true);
+    expect(profileColumns.some((column) => column.name === "visual_cue_generation_enabled")).toBe(true);
     expect(profileColumns.some((column) => column.name === "visual_cues_on_learn_cards")).toBe(true);
     expect(profileColumns.some((column) => column.name === "visual_cues_on_meaning_questions")).toBe(true);
     expect(profileColumns.some((column) => column.name === "visual_cues_on_context_questions")).toBe(true);
     const profile = db
       .prepare(
-        `SELECT visual_cues_enabled, visual_cues_on_learn_cards,
+        `SELECT visual_cues_enabled, visual_cue_generation_enabled, visual_cues_on_learn_cards,
                 visual_cues_on_meaning_questions, visual_cues_on_context_questions
          FROM learner_profiles
          LIMIT 1`
       )
       .get() as {
       visual_cues_enabled: number;
+      visual_cue_generation_enabled: number;
       visual_cues_on_learn_cards: number;
       visual_cues_on_meaning_questions: number;
       visual_cues_on_context_questions: number;
     };
     expect(profile).toMatchObject({
       visual_cues_enabled: 1,
+      visual_cue_generation_enabled: 0,
       visual_cues_on_learn_cards: 1,
       visual_cues_on_meaning_questions: 0,
       visual_cues_on_context_questions: 0

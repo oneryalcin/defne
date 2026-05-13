@@ -306,9 +306,20 @@ export default async function ParentDashboardPage({
               <span className="bento__eyebrow">Question visuals</span>
               <h3>Image cues</h3>
               <p style={{ margin: 0, fontFamily: "var(--font-body)", fontSize: 14, lineHeight: 1.55, color: "var(--steel-secondary)" }}>
-                Choose where approved example images appear. Steps without images stay text-only.
+                Choose whether image cues are generated for new vocabulary and where approved images appear.
               </p>
               <form action={setVisualCuesAction} className="visual-toggle-form">
+                <label className="visual-placement">
+                  <input
+                    type="checkbox"
+                    name="visualCueGeneration"
+                    defaultChecked={dashboard.visualCueGenerationEnabled}
+                  />
+                  <span>
+                    <strong>Draft image previews</strong>
+                    <small>Generate Gemini image previews when adding a new vocabulary word.</small>
+                  </span>
+                </label>
                 <label className="visual-placement">
                   <input
                     type="checkbox"
@@ -343,7 +354,11 @@ export default async function ParentDashboardPage({
                   </span>
                 </label>
                 <p className="visual-toggle-summary">
-                  {dashboard.visualCuesEnabled ? "Images are enabled for selected steps." : "Images are off for child practice."}
+                  {dashboard.visualCueGenerationEnabled
+                    ? "New vocabulary can include draft image previews."
+                    : "New vocabulary generation is text-only by default."}
+                  {" "}
+                  {dashboard.visualCuesEnabled ? "Approved images are enabled for selected child steps." : "Approved images are off for child practice."}
                 </p>
                 <button className="ribbon ribbon--ghost" type="submit">
                   Save setting

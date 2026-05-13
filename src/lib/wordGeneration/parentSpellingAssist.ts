@@ -1,5 +1,4 @@
-const GEMINI_TEXT_MODEL = "gemini-2.5-flash";
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+import { generateDeepSeekJsonText, type DeepSeekJsonGenerationOptions } from "./deepSeek";
 
 export interface ParentSpellingAssistDraft {
   target: string;
@@ -17,13 +16,20 @@ interface ParentSpellingAssistTextDraft {
   sentences: string[];
 }
 
-export async function generateParentSpellingAssistDraft(target: string): Promise<ParentSpellingAssistDraft> {
+export interface ParentSpellingAssistOptions {
+  textGeneration?: DeepSeekJsonGenerationOptions;
+}
+
+export async function generateParentSpellingAssistDraft(
+  target: string,
+  options: ParentSpellingAssistOptions = {}
+): Promise<ParentSpellingAssistDraft> {
   const cleanTarget = target.trim();
   if (!cleanTarget) {
     throw new Error("Enter a spelling word before generating help.");
   }
 
-  const draft = await generateParentSpellingTextDraft(cleanTarget);
+  const draft = await generateParentSpellingTextDraft(cleanTarget, options.textGeneration);
   return {
     target: cleanTarget,
     pairedTarget: draft.pairedTarget,
@@ -34,39 +40,15 @@ export async function generateParentSpellingAssistDraft(target: string): Promise
   };
 }
 
-async function generateParentSpellingTextDraft(target: string): Promise<ParentSpellingAssistTextDraft> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured, so assisted spelling generation is unavailable.");
-  }
-
-  const response = await fetch(`${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_TEXT_MODEL)}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: buildParentSpellingAssistPrompt(target) }]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.35,
-        responseMimeType: "application/json"
-      }
-    })
+async function generateParentSpellingTextDraft(
+  target: string,
+  options?: DeepSeekJsonGenerationOptions
+): Promise<ParentSpellingAssistTextDraft> {
+  const text = await generateDeepSeekJsonText(buildParentSpellingAssistPrompt(target), {
+    temperature: 0.35,
+    maxTokens: 1200,
+    ...options
   });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Spelling text generation failed (${response.status}): ${body.slice(0, 600)}`);
-  }
-
-  const json = (await response.json()) as GeminiTextResponse;
-  const text = extractGeminiText(json);
   return normaliseTextDraftPayload(text);
 }
 
@@ -93,17 +75,6 @@ Rules:
 - Return JSON only.
 - Do not wrap in markdown fences.
   `.trim();
-}
-
-function extractGeminiText(response: GeminiTextResponse): string {
-  for (const candidate of response.candidates ?? []) {
-    for (const part of candidate.content?.parts ?? []) {
-      if (typeof part.text === "string" && part.text.trim()) {
-        return part.text;
-      }
-    }
-  }
-  throw new Error("Text generation returned no spelling draft content.");
 }
 
 function normaliseTextDraftPayload(rawText: string): ParentSpellingAssistTextDraft {
@@ -156,14 +127,4 @@ function normaliseStringList(value: unknown, limit: number): string[] {
     if (result.length >= limit) break;
   }
   return result;
-}
-
-interface GeminiTextResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
 }

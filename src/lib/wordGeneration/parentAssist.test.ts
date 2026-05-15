@@ -50,6 +50,83 @@ describe("parent vocabulary assist", () => {
       thinking: { type: "disabled" },
       stream: false
     });
+    const messages = fetchCalls[0].body.messages as Array<{ content: string }>;
+    expect(messages[1].content).toContain("Do not include any of these exact words in the definition:");
+    expect(messages[1].content).toContain('"reluctant"');
+  });
+
+  it("cleans a leading dictionary-style target prefix before validating the definition", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  definition: "A fez is a tall, red, flat-topped hat with a tassel, originally from Morocco.",
+                  synonyms: ["hat", "cap"],
+                  antonyms: ["bareheaded", "uncovered"],
+                  examples: [
+                    "The dancer wore a red fez with a black tassel that swung as he bowed to the crowd.",
+                    "Grandad placed his fez carefully on the shelf so the tassel would not get crushed.",
+                    "At the museum, Mina spotted a bright fez beside robes from North Africa."
+                  ]
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+
+    const draft = await generateParentWordAssistDraft("fez", {
+      textGeneration: { apiKey: "test-key", fetchImpl }
+    });
+
+    expect(draft.definition).toBe("a tall, red, flat-topped hat with a tassel, originally from Morocco.");
+  });
+
+  it("retries text generation when the first JSON draft fails validation", async () => {
+    const prompts: string[] = [];
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+      prompts.push(body.messages[1].content);
+      const content =
+        prompts.length === 1
+          ? {
+              definition: "Loot is stolen treasure taken by looting.",
+              synonyms: ["plunder", "spoils"],
+              antonyms: ["gift", "earning"],
+              examples: [
+                "The pirates carried the loot away in heavy chests after robbing the ship.",
+                "Police found the loot hidden under a loose floorboard after the burglary.",
+                "The thieves dropped the loot when the alarm rang through the museum."
+              ]
+            }
+          : {
+              definition: "stolen treasure taken after a robbery or raid",
+              synonyms: ["plunder", "spoils"],
+              antonyms: ["gift", "earning"],
+              examples: [
+                "The pirates carried the loot away in heavy chests after robbing the ship.",
+                "Police found the loot hidden under a loose floorboard after the burglary.",
+                "The thieves dropped the loot when the alarm rang through the museum."
+              ]
+            };
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(content) } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const draft = await generateParentWordAssistDraft("loot", {
+      textGeneration: { apiKey: "test-key", fetchImpl }
+    });
+
+    expect(draft.definition).toBe("stolen treasure taken after a robbery or raid");
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1]).toContain("Your previous JSON was rejected by the app validator");
+    expect(prompts[1]).toContain("looting");
   });
 
   it("rejects examples that do not use the exact target word form", async () => {

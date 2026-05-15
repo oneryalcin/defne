@@ -101,15 +101,29 @@ async function generateParentWordTextDraft(
   word: string,
   options?: DeepSeekJsonGenerationOptions
 ): Promise<ParentWordAssistTextDraft> {
-  const text = await generateDeepSeekJsonText(buildParentWordAssistPrompt(word), {
-    temperature: 0.5,
-    maxTokens: 1600,
-    ...options
-  });
-  return normaliseTextDraftPayload(text, word);
+  const basePrompt = buildParentWordAssistPrompt(word);
+  let validationMessage: string | null = null;
+  let lastValidationError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const text = await generateDeepSeekJsonText(buildParentWordAssistPromptWithFeedback(basePrompt, validationMessage), {
+      temperature: 0.5,
+      maxTokens: 1600,
+      ...options
+    });
+    try {
+      return normaliseTextDraftPayload(text, word);
+    } catch (error) {
+      lastValidationError = error;
+      validationMessage = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  throw lastValidationError instanceof Error ? lastValidationError : new Error("Generated draft failed validation.");
 }
 
 function buildParentWordAssistPrompt(word: string): string {
+  const forbiddenDefinitionForms = targetWordForms(word).map((form) => `"${form}"`).join(", ");
   return `
 You are helping a parent add one vocabulary word to a calm local-first Year 5 vocabulary app in British English.
 
@@ -121,7 +135,8 @@ Generate a JSON object for the word "${word}" with exactly these keys:
 
 Quality bar:
 - Definition: child-legible, concrete, one sentence, no dictionary jargon.
-- Definition must not use the target word "${word}" or obvious close forms such as plurals, -ed, or -ing forms.
+- Definition must be a meaning phrase, as if it followed "It means ..."; do not start with "${word} is", "a ${word} is", or "${word} means".
+- Do not include any of these exact words in the definition: ${forbiddenDefinitionForms}.
 - Examples: each must be distinct, vivid, and meaning-forward. They should help a child infer the word from context, not just insert the word into a bland template.
 - Each example must include the exact target word "${word}" once, using that spelling and form. Do not substitute a derivative or inflected form.
 - The target word must be supported by observable evidence in the same sentence. If the target word were blanked out, a child should still be able to guess the meaning from actions, causes, consequences, body language, timing, contrast, or objects.
@@ -143,6 +158,16 @@ Rules:
   `.trim();
 }
 
+function buildParentWordAssistPromptWithFeedback(basePrompt: string, validationMessage: string | null): string {
+  if (!validationMessage) return basePrompt;
+  return `${basePrompt}
+
+Your previous JSON was rejected by the app validator:
+${validationMessage}
+
+Return a new corrected JSON object only.`;
+}
+
 function normaliseTextDraftPayload(rawText: string, word: string): ParentWordAssistTextDraft {
   let parsed: unknown;
   try {
@@ -157,7 +182,7 @@ function normaliseTextDraftPayload(rawText: string, word: string): ParentWordAss
   if (examples.length !== 3) {
     throw new Error("Generated draft did not include exactly 3 examples.");
   }
-  const definition = normaliseRequiredText(record.definition, "definition");
+  const definition = removeLeadingTargetDefinitionPrefix(normaliseRequiredText(record.definition, "definition"), word);
   if (containsDisallowedTargetForm(definition, word)) {
     throw new Error(`Generated draft used the target word or a close form in its definition: ${definition}`);
   }
@@ -197,10 +222,28 @@ function containsDisallowedTargetForm(
   return pattern.test(text);
 }
 
+function removeLeadingTargetDefinitionPrefix(text: string, word: string): string {
+  const lower = word.trim().toLocaleLowerCase("en-GB");
+  if (!lower || /\s/.test(lower)) return text;
+  const quotedWord = `["'“”‘’]?${escapeRegExp(word.trim())}["'“”‘’]?`;
+  const pattern = new RegExp(
+    `^\\s*(?:(?:a|an|the)\\s+)?${quotedWord}\\s*(?::|-|\\b(?:is|means|refers to|describes)\\b)\\s+`,
+    "iu"
+  );
+  const cleaned = text.replace(pattern, "").trim();
+  return cleaned || text;
+}
+
 function targetWordForms(word: string): string[] {
   const lower = word.trim().toLocaleLowerCase("en-GB");
   if (!lower || /\s/.test(lower)) return lower ? [lower] : [];
   const forms = new Set([lower, `${lower}s`, `${lower}ed`, `${lower}ing`]);
+  if (/(s|x|z|ch|sh)$/.test(lower)) {
+    forms.add(`${lower}es`);
+  }
+  if (/z$/.test(lower)) {
+    forms.add(`${lower}zes`);
+  }
   if (lower.endsWith("e")) {
     forms.add(`${lower}d`);
     forms.add(`${lower.slice(0, -1)}ing`);

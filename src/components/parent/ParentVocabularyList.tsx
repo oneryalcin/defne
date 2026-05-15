@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import {
+  assignVocabularyWordAction,
   clearVocabularyWordPriorityAction,
   requestVocabularyWordNextRoundAction,
-  unassignVocabularyWordAction
+  unassignVocabularyWordAction,
 } from "@/app/actions";
 import { MasteryBadge } from "@/components/MasteryBadge";
 import type { ParentWordListItem } from "@/lib/db/repository";
+import type { ParentVocabularyLibraryItem } from "@/lib/db/learners";
 
 const MASTERY_LABELS: Record<NonNullable<ParentWordListItem["masteryColour"]>, string> = {
   red: "Needs work",
@@ -20,20 +21,41 @@ const MASTERY_LABELS: Record<NonNullable<ParentWordListItem["masteryColour"]>, s
   green: "Mastered",
 };
 
+function searchRank(fields: {
+  word: string;
+  definition?: string | null;
+  example?: string | null;
+  status?: string | null;
+}, normalizedQuery: string): number | null {
+  const word = fields.word.toLocaleLowerCase("en-GB");
+  const definition = (fields.definition ?? "").toLocaleLowerCase("en-GB");
+  const example = (fields.example ?? "").toLocaleLowerCase("en-GB");
+  const status = (fields.status ?? "").toLocaleLowerCase("en-GB");
+
+  if (word === normalizedQuery) return 0;
+  if (word.startsWith(normalizedQuery)) return 1;
+  if (word.includes(normalizedQuery)) return 2;
+  if (definition.startsWith(normalizedQuery)) return 3;
+  if (definition.includes(normalizedQuery)) return 4;
+  if (example.includes(normalizedQuery)) return 5;
+  if (status.includes(normalizedQuery)) return 6;
+  return null;
+}
+
 export function ParentVocabularyList({
   words,
+  libraryWords,
   initialSearchQuery,
   learnerId,
+  learnerName,
 }: {
   words: ParentWordListItem[];
+  libraryWords: ParentVocabularyLibraryItem[];
   initialSearchQuery: string;
   learnerId?: string;
+  learnerName: string;
 }) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const currentQuery = searchParams.get("q") ?? "";
 
   useEffect(() => {
     setSearchQuery(initialSearchQuery);
@@ -43,36 +65,46 @@ export function ParentVocabularyList({
     const normalized = searchQuery.trim();
 
     const timer = window.setTimeout(() => {
-      if (normalized === currentQuery) return;
-      const params = new URLSearchParams();
+      const params = new URLSearchParams(window.location.search);
       if (normalized) params.set("q", normalized);
+      else params.delete("q");
       if (learnerId) params.set("learnerId", learnerId);
+      else params.delete("learnerId");
       const next = params.toString();
-      const nextHref = next ? `${pathname}?${next}` : pathname;
-      router.replace(nextHref);
-    }, 250);
+      const nextHref = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+      if (nextHref !== `${window.location.pathname}${window.location.search}`) {
+        window.history.replaceState(null, "", nextHref);
+      }
+    }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [pathname, router, searchQuery, currentQuery, learnerId]);
+  }, [searchQuery, learnerId]);
 
   const filteredWords = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
     if (!normalized) return words;
 
-    return words.filter((word) => {
-      const target = word.word.toLocaleLowerCase("en-GB");
-      const definition = (word.definition ?? "").toLocaleLowerCase("en-GB");
-      const example = (word.example ?? "").toLocaleLowerCase("en-GB");
+    return words.flatMap((word) => {
       const mastery = word.masteryColour ? MASTERY_LABELS[word.masteryColour].toLocaleLowerCase("en-GB") : "incomplete";
-
-      return (
-        target.includes(normalized) ||
-        definition.includes(normalized) ||
-        example.includes(normalized) ||
-        mastery.includes(normalized)
-      );
-    });
+      const rank = searchRank({
+        word: word.word,
+        definition: word.definition,
+        example: word.example,
+        status: mastery
+      }, normalized);
+      return rank === null ? [] : [{ word, rank }];
+    }).sort((a, b) => a.rank - b.rank || a.word.word.localeCompare(b.word.word)).map((result) => result.word);
   }, [words, searchQuery]);
+
+  const filteredLibraryWords = useMemo(() => {
+    const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
+    if (!normalized) return libraryWords;
+
+    return libraryWords.flatMap((word) => {
+      const rank = searchRank({ word: word.word, definition: word.definition }, normalized);
+      return rank === null ? [] : [{ word, rank }];
+    }).sort((a, b) => a.rank - b.rank || a.word.word.localeCompare(b.word.word)).map((result) => result.word);
+  }, [libraryWords, searchQuery]);
 
   return (
     <>
@@ -141,6 +173,42 @@ export function ParentVocabularyList({
             {searchQuery.trim()
               ? `No assigned vocabulary words match "${searchQuery.trim()}".`
               : "No vocabulary words are assigned to this child yet."}
+          </p>
+        )}
+      </section>
+
+      <section className="page-title" style={{ marginTop: 32 }}>
+        <h2>Shared vocabulary library</h2>
+        <p>Add existing seed or parent-created words to {learnerName} without duplicating the library entry.</p>
+      </section>
+      <section className="word-grid">
+        {filteredLibraryWords.length > 0 ? (
+          filteredLibraryWords.map((word) => (
+            <article className="word-row" key={`library-${word.id}`}>
+              <div className="word-main">
+                <strong>{word.word}</strong>
+                <span>{word.definition ?? "Needs canonical definition and example before practice."}</span>
+              </div>
+              {word.assigned ? (
+                <form action={unassignVocabularyWordAction}>
+                  <input type="hidden" name="learnerId" value={learnerId} />
+                  <input type="hidden" name="wordId" value={word.id} />
+                  <button className="button-secondary library-word-button" type="submit">Pause for child</button>
+                </form>
+              ) : (
+                <form action={assignVocabularyWordAction}>
+                  <input type="hidden" name="learnerId" value={learnerId} />
+                  <input type="hidden" name="wordId" value={word.id} />
+                  <button className="button library-word-button" type="submit">Add to child</button>
+                </form>
+              )}
+            </article>
+          ))
+        ) : (
+          <p className="empty-state" style={{ gridColumn: "1 / -1" }}>
+            {searchQuery.trim()
+              ? `No shared vocabulary words match "${searchQuery.trim()}".`
+              : "No shared vocabulary words are available yet."}
           </p>
         )}
       </section>

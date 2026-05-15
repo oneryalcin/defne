@@ -27,6 +27,14 @@ export interface CreateLearnerInput {
 
 export type AssignmentPriorityMode = "normal" | "next_round_once";
 
+export interface ParentVocabularyLibraryItem {
+  id: string;
+  word: string;
+  definition: string | null;
+  assigned: boolean;
+  priorityMode: AssignmentPriorityMode;
+}
+
 export function listLearners(): LearnerSummary[] {
   const db = getDb();
   const rows = db
@@ -190,9 +198,7 @@ export function clearVocabularyWordPriority(learnerId: string, wordId: string): 
     .run(now, learnerId, wordId);
 }
 
-export function listAvailableVocabularyForLearner(
-  learnerId: string
-): Array<{ id: string; word: string; definition: string | null; assigned: boolean; priorityMode: AssignmentPriorityMode }> {
+export function listAvailableVocabularyForLearner(learnerId: string): ParentVocabularyLibraryItem[] {
   const rows = getDb()
     .prepare(
       `SELECT w.id,

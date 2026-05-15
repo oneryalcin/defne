@@ -3,28 +3,10 @@ import { Plus } from "lucide-react";
 import { ParentVocabularyList } from "@/components/parent/ParentVocabularyList";
 import { getParentWords } from "@/lib/db/repository";
 import { listAvailableVocabularyForLearner, listLearners, resolveSelectedLearnerId } from "@/lib/db/learners";
-import { assignVocabularyWordAction, unassignVocabularyWordAction } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{ q?: string; learnerId?: string }>;
-
-function matchesVocabularyQuery(
-  word: {
-    word: string;
-    definition?: string | null;
-    example?: string | null;
-  },
-  normalizedQuery: string,
-) {
-  if (!normalizedQuery) return true;
-
-  return (
-    word.word.toLocaleLowerCase("en-GB").includes(normalizedQuery) ||
-    (word.definition ?? "").toLocaleLowerCase("en-GB").includes(normalizedQuery) ||
-    (word.example ?? "").toLocaleLowerCase("en-GB").includes(normalizedQuery)
-  );
-}
 
 export default async function WordsPage({
   searchParams,
@@ -38,8 +20,7 @@ export default async function WordsPage({
   const words = getParentWords(learnerId);
   const libraryWords = listAvailableVocabularyForLearner(learnerId);
   const initialQuery = resolvedSearchParams.q ?? "";
-  const normalizedQuery = initialQuery.trim().toLocaleLowerCase("en-GB");
-  const visibleLibraryWords = libraryWords.filter((word) => matchesVocabularyQuery(word, normalizedQuery));
+  const learnerName = selectedLearner?.displayName ?? "this child";
 
   return (
     <main className="page">
@@ -66,43 +47,13 @@ export default async function WordsPage({
         </Link>
       </div>
 
-      <ParentVocabularyList words={words} initialSearchQuery={initialQuery} learnerId={learnerId} />
-
-      <section className="page-title" style={{ marginTop: 32 }}>
-        <h2>Shared vocabulary library</h2>
-        <p>Add existing seed or parent-created words to {selectedLearner?.displayName ?? "this child"} without duplicating the library entry.</p>
-      </section>
-      <section className="word-grid">
-        {visibleLibraryWords.length > 0 ? (
-          visibleLibraryWords.map((word) => (
-            <article className="word-row" key={`library-${word.id}`}>
-              <div className="word-main">
-                <strong>{word.word}</strong>
-                <span>{word.definition ?? "Needs canonical definition and example before practice."}</span>
-              </div>
-              {word.assigned ? (
-                <form action={unassignVocabularyWordAction}>
-                  <input type="hidden" name="learnerId" value={learnerId} />
-                  <input type="hidden" name="wordId" value={word.id} />
-                  <button className="button-secondary library-word-button" type="submit">Pause for child</button>
-                </form>
-              ) : (
-                <form action={assignVocabularyWordAction}>
-                  <input type="hidden" name="learnerId" value={learnerId} />
-                  <input type="hidden" name="wordId" value={word.id} />
-                  <button className="button library-word-button" type="submit">Add to child</button>
-                </form>
-              )}
-            </article>
-          ))
-        ) : (
-          <p className="empty-state" style={{ gridColumn: "1 / -1" }}>
-            {initialQuery.trim()
-              ? `No shared vocabulary words match "${initialQuery.trim()}".`
-              : "No shared vocabulary words are available yet."}
-          </p>
-        )}
-      </section>
+      <ParentVocabularyList
+        words={words}
+        libraryWords={libraryWords}
+        initialSearchQuery={initialQuery}
+        learnerId={learnerId}
+        learnerName={learnerName}
+      />
     </main>
   );
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { ListChecks, Plus } from "lucide-react";
-import { setVisualCuesAction } from "@/app/actions";
+import { createChildAction, setVisualCuesAction } from "@/app/actions";
 import {
   getMissionPreview,
   getParentDashboard,
   getParentWords,
 } from "@/lib/db/repository";
+import { listLearners, resolveSelectedLearnerId } from "@/lib/db/learners";
 import type { MasteryColour } from "@/lib/types";
 import { WordHeatmap } from "@/components/WordHeatmap";
 
@@ -29,21 +30,22 @@ const MASTERY_KEY: Record<MasteryColour, string> = {
   green: "is-green",
 };
 
-type SearchParams = Promise<{ p?: string }> | { p?: string };
+type SearchParams = Promise<{ p?: string; learnerId?: string }>;
 
 export default async function ParentDashboardPage({
   searchParams,
 }: {
   searchParams?: SearchParams;
 }) {
-  const dashboard = getParentDashboard();
-  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as {
-    p?: string;
-  };
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const learners = listLearners();
+  const learnerId = resolveSelectedLearnerId(resolvedSearchParams.learnerId);
+  const selectedLearner = learners.find((learner) => learner.id === learnerId) ?? learners[0];
+  const dashboard = getParentDashboard(learnerId);
   const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
   const nextRound = (() => {
     try {
-      return getMissionPreview(12);
+      return getMissionPreview(12, learnerId);
     } catch {
       return null;
     }
@@ -57,7 +59,7 @@ export default async function ParentDashboardPage({
     .slice(0, 6);
 
   // True deck-wide distribution from the actual learner state (one row per word).
-  const allWords = getParentWords();
+  const allWords = getParentWords(learnerId);
   const distribution = countMastery(
     allWords
       .map((w) => w.masteryColour)
@@ -84,7 +86,7 @@ export default async function ParentDashboardPage({
       <article className="book-page parent-spread" aria-labelledby="parent-title">
         <header className="dash-header">
           <div className="dash-header__brand">
-            <span className="cover-chapter">Defne · pilot dashboard</span>
+            <span className="cover-chapter">{dashboard.learnerName} · pilot dashboard</span>
             <span className="dash-header__sub">Last round · {lastSession}</span>
           </div>
           <div className="dash-header__right">
@@ -101,12 +103,51 @@ export default async function ParentDashboardPage({
                 aria-hidden="true"
               />
               <span className="dash-child-pill__name">
-                <strong>Defne</strong>
-                <span>Year 5 · British English</span>
+                <strong>{dashboard.learnerName}</strong>
+                <span>{selectedLearner?.yearGroup ?? "Year 5"} · British English</span>
               </span>
             </span>
           </div>
         </header>
+
+        <section className="dash-section" aria-labelledby="children">
+          <header className="section-head">
+            <span className="section-head__label">Children</span>
+            <h2 id="children" className="section-head__title">Choose the active child.</h2>
+            <p className="section-head__sub">New children start with an empty deck. Add existing library words or create new vocabulary for the selected child.</p>
+          </header>
+          <div className="bento-grid">
+            <div className="bento col-8">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {learners.map((learner) => (
+                  <Link
+                    key={learner.id}
+                    className={learner.id === learnerId ? "ribbon" : "ribbon ribbon--ghost"}
+                    href={`/parent?learnerId=${encodeURIComponent(learner.id)}`}
+                  >
+                    {learner.displayName} · {learner.vocabularyCount} words
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <form action={createChildAction} className="bento col-4">
+              <span className="bento__eyebrow">New child</span>
+              <label>
+                Name
+                <input className="field" name="displayName" placeholder="Mina" required />
+              </label>
+              <label>
+                Access code
+                <input className="field" name="accessCode" placeholder="mina" required />
+              </label>
+              <label>
+                Year group
+                <input className="field" name="yearGroup" defaultValue="Year 5" />
+              </label>
+              <button className="ribbon" type="submit">Add child</button>
+            </form>
+          </div>
+        </section>
 
         <header className="parent-head">
           <div>
@@ -118,7 +159,7 @@ export default async function ParentDashboardPage({
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Link className="ribbon" href="/parent/words/new">
+            <Link className="ribbon" href={`/parent/words/new?learnerId=${encodeURIComponent(learnerId)}`}>
               <Plus size={18} aria-hidden="true" />
               Add vocabulary
             </Link>
@@ -291,11 +332,11 @@ export default async function ParentDashboardPage({
                 with three comeback spaces for stable and mastered words.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <Link className="ribbon" href="/parent/words/new">
+                <Link className="ribbon" href={`/parent/words/new?learnerId=${encodeURIComponent(learnerId)}`}>
                   <Plus size={16} aria-hidden="true" />
                   Add vocabulary
                 </Link>
-                <Link className="ribbon ribbon--ghost" href="/parent/words">
+                <Link className="ribbon ribbon--ghost" href={`/parent/words?learnerId=${encodeURIComponent(learnerId)}`}>
                   <ListChecks size={16} aria-hidden="true" />
                   Open vocabulary
                 </Link>
@@ -309,6 +350,7 @@ export default async function ParentDashboardPage({
                 Choose whether image cues are generated for new vocabulary and where approved images appear.
               </p>
               <form action={setVisualCuesAction} className="visual-toggle-form">
+                <input type="hidden" name="learnerId" value={learnerId} />
                 <label className="visual-placement">
                   <input
                     type="checkbox"
@@ -385,7 +427,8 @@ export default async function ParentDashboardPage({
               page={heatmapPage}
               pageSize={HEATMAP_PAGE_SIZE}
               variant="parent"
-              basePath="/parent"
+              basePath={`/parent?learnerId=${encodeURIComponent(learnerId)}`}
+              detailQuery={`?learnerId=${encodeURIComponent(learnerId)}`}
             />
           </div>
         </section>

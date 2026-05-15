@@ -3,6 +3,7 @@ export type PilotRole = "child" | "parent";
 export type PilotSession = {
   accessCode: string;
   role: PilotRole;
+  learnerId?: string;
 };
 
 export const PILOT_SESSION_COOKIE = "defne-pilot-session";
@@ -42,26 +43,29 @@ function safeDecode(raw: string): string {
 }
 
 export function serializePilotSession(session: PilotSession): string {
-  return `${encodeURIComponent(session.accessCode)}${SESSION_SEPARATOR}${session.role}`;
+  const base = `${encodeURIComponent(session.accessCode)}${SESSION_SEPARATOR}${session.role}`;
+  return session.learnerId ? `${base}${SESSION_SEPARATOR}${encodeURIComponent(session.learnerId)}` : base;
 }
 
 export function parsePilotSession(cookieValue: string | null | undefined): PilotSession | null {
   if (!cookieValue) return null;
 
   const parts = cookieValue.split(SESSION_SEPARATOR);
-  if (parts.length !== 2) return null;
+  if (parts.length !== 2 && parts.length !== 3) return null;
 
-  const [encodedAccessCode, rolePart] = parts;
+  const [encodedAccessCode, rolePart, encodedLearnerId] = parts;
   if (!encodedAccessCode || !isPilotRole(rolePart)) return null;
 
   const accessCode = safeDecode(encodedAccessCode);
   const resolvedRole = resolvePilotRole(accessCode);
 
-  if (resolvedRole !== rolePart) return null;
+  if (resolvedRole && resolvedRole !== rolePart) return null;
+  if (!resolvedRole && rolePart === "parent") return null;
 
   return {
     accessCode,
-    role: resolvedRole
+    role: rolePart,
+    learnerId: encodedLearnerId ? safeDecode(encodedLearnerId) : undefined
   };
 }
 

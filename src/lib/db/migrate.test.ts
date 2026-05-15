@@ -31,7 +31,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(15);
+    expect(migrations.count).toBe(17);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -94,6 +94,21 @@ describe("SQLite setup", () => {
       visual_cues_on_meaning_questions: 0,
       visual_cues_on_context_questions: 0
     });
+
+    const accessCode = db
+      .prepare("SELECT learner_id FROM learner_access_codes WHERE access_code = 'arina'")
+      .get() as { learner_id: string } | undefined;
+    const vocabularyAssignments = db
+      .prepare("SELECT COUNT(*) AS count FROM learner_vocabulary_words WHERE learner_id = 'learner_defne' AND status = 'active'")
+      .get() as { count: number };
+    const vocabularyAssignmentColumns = db.prepare("PRAGMA table_info(learner_vocabulary_words)").all() as Array<{ name: string }>;
+    const spellingAssignmentColumns = db.prepare("PRAGMA table_info(learner_spelling_items)").all() as Array<{ name: string }>;
+    expect(accessCode?.learner_id).toBe("learner_defne");
+    expect(vocabularyAssignments.count).toBe(words.count);
+    expect(vocabularyAssignmentColumns.some((column) => column.name === "priority_mode")).toBe(true);
+    expect(vocabularyAssignmentColumns.some((column) => column.name === "priority_consumed_at")).toBe(true);
+    expect(spellingAssignmentColumns.some((column) => column.name === "priority_mode")).toBe(true);
+    expect(spellingAssignmentColumns.some((column) => column.name === "priority_consumed_at")).toBe(true);
 
     const exampleCueTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'example_visual_cues'").get();
     expect(exampleCueTable).toBeTruthy();

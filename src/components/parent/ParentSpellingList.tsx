@@ -4,14 +4,21 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
+import {
+  clearSpellingItemPriorityAction,
+  requestSpellingItemNextRoundAction,
+  unassignSpellingItemAction
+} from "@/app/actions";
 import type { ParentSpellingListItem } from "@/lib/db/spellingRepository";
 
 export function ParentSpellingList({
   items,
   initialSearchQuery,
+  learnerId,
 }: {
   items: ParentSpellingListItem[];
   initialSearchQuery: string;
+  learnerId?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const pathname = usePathname();
@@ -30,13 +37,14 @@ export function ParentSpellingList({
       if (normalized === currentQuery) return;
       const params = new URLSearchParams();
       if (normalized) params.set("q", normalized);
+      if (learnerId) params.set("learnerId", learnerId);
       const next = params.toString();
       const nextHref = next ? `${pathname}?${next}` : pathname;
       router.replace(nextHref);
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [pathname, router, searchQuery, currentQuery]);
+  }, [pathname, router, searchQuery, currentQuery, learnerId]);
 
   const filteredItems = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
@@ -86,7 +94,32 @@ export function ParentSpellingList({
                 ) : (
                   <span className="empty-state spelling-word-status">Incomplete</span>
                 )}
-                <Link className="button-secondary spelling-word-edit" href={`/parent/spelling/${item.id}`}>
+                {learnerId ? (
+                  item.priorityMode === "next_round_once" ? (
+                    <form action={clearSpellingItemPriorityAction}>
+                      <input type="hidden" name="learnerId" value={learnerId} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <button className="button-secondary spelling-word-priority" type="submit">Undo</button>
+                    </form>
+                  ) : (
+                    <form action={requestSpellingItemNextRoundAction}>
+                      <input type="hidden" name="learnerId" value={learnerId} />
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <button className="button-secondary spelling-word-priority" type="submit">Next round</button>
+                    </form>
+                  )
+                ) : null}
+                {learnerId ? (
+                  <form action={unassignSpellingItemAction}>
+                    <input type="hidden" name="learnerId" value={learnerId} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <button className="button-secondary spelling-word-pause" type="submit">Pause</button>
+                  </form>
+                ) : null}
+                <Link
+                  className="button-secondary spelling-word-edit"
+                  href={`/parent/spelling/${item.id}${learnerId ? `?learnerId=${encodeURIComponent(learnerId)}` : ""}`}
+                >
                   <Pencil size={16} />
                   Edit
                 </Link>
@@ -96,8 +129,8 @@ export function ParentSpellingList({
         ) : (
           <p className="empty-state" style={{ gridColumn: "1 / -1" }}>
             {searchQuery.trim()
-              ? `No spelling words match \"${searchQuery.trim()}\".`
-              : "No spelling words are available yet."}
+              ? `No assigned spelling words match "${searchQuery.trim()}".`
+              : "No spelling words are assigned to this child yet."}
           </p>
         )}
       </section>

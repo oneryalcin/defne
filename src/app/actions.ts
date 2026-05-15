@@ -14,11 +14,25 @@ import {
   upsertParentExampleVisualCues
 } from "@/lib/db/repository";
 import {
+  assignVocabularyWordToLearner,
+  createLearner,
+  getLearnerAccessByCode,
+  learnerExists,
+  clearVocabularyWordPriority,
+  requestVocabularyWordNextRound,
+  resolveSelectedLearnerId,
+  unassignVocabularyWordFromLearner
+} from "@/lib/db/learners";
+import {
+  assignSpellingItemToLearner,
+  clearSpellingItemPriority,
   createOrUpdateParentSpellingItem,
   normaliseParentSpellingWord,
+  requestSpellingItemNextRound,
   startSpellingPractice,
   startSpellingMission,
-  submitSpellingAnswer
+  submitSpellingAnswer,
+  unassignSpellingItemFromLearner
 } from "@/lib/db/spellingRepository";
 import {
   PILOT_SESSION_COOKIE,
@@ -31,7 +45,7 @@ import {
 } from "@/lib/pilotAuth";
 import type { ParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
 
-async function setPilotCookie(accessCode: string, role: "child" | "parent"): Promise<void> {
+async function setPilotCookie(accessCode: string, role: "child" | "parent", learnerId?: string): Promise<void> {
   const jar = await cookies();
   const h = await headers();
   const forwardProto = h.get("x-forwarded-proto");
@@ -39,7 +53,7 @@ async function setPilotCookie(accessCode: string, role: "child" | "parent"): Pro
 
   jar.set({
     name: PILOT_SESSION_COOKIE,
-    value: serializePilotSession({ accessCode, role }),
+    value: serializePilotSession({ accessCode, role, learnerId }),
     path: "/",
     httpOnly: true,
     sameSite: "lax",
@@ -56,16 +70,29 @@ async function requireRole(expectedRole: "child" | "parent"): Promise<void> {
   }
 }
 
+async function requireChildLearnerId(): Promise<string> {
+  const jar = await cookies();
+  const current = parsePilotSession(jar.get(PILOT_SESSION_COOKIE)?.value);
+  if (!current || current.role !== "child" || !current.learnerId) {
+    const access = current?.role === "child" ? getLearnerAccessByCode(current.accessCode) : null;
+    if (access) return access.learnerId;
+    redirect("/");
+  }
+  if (!learnerExists(current.learnerId)) redirect("/");
+  return current.learnerId;
+}
+
 export async function loginAction(formData: FormData): Promise<void> {
   const accessCode = normalisePilotAccessCode(String(formData.get("accessCode") ?? ""));
-  const role = resolvePilotRole(accessCode);
+  const childAccess = getLearnerAccessByCode(accessCode);
+  const role = childAccess ? "child" : resolvePilotRole(accessCode);
   const next = String(formData.get("next") ?? "");
 
   if (!role) {
     redirect("/?error=unknown_user");
   }
 
-  await setPilotCookie(accessCode, role);
+  await setPilotCookie(accessCode, role, childAccess?.learnerId);
   redirect(next.startsWith("/") ? next : roleHomePath(role));
 }
 
@@ -81,14 +108,14 @@ export async function logoutAction(): Promise<void> {
 }
 
 export async function startMissionAction(): Promise<void> {
-  await requireRole("child");
-  const sessionId = startRoundMission(12);
+  const learnerId = await requireChildLearnerId();
+  const sessionId = startRoundMission(12, learnerId);
   redirect(`/child/session/${sessionId}`);
 }
 
 export async function startSpellingMissionAction(): Promise<void> {
-  await requireRole("child");
-  const sessionId = startSpellingMission(8);
+  const learnerId = await requireChildLearnerId();
+  const sessionId = startSpellingMission(8, learnerId);
   redirect(`/child/spelling/session/${sessionId}`);
 }
 
@@ -117,13 +144,14 @@ export async function startMeaningRecognitionAction(formData: FormData): Promise
 
 export async function setVisualCuesAction(formData: FormData): Promise<void> {
   await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
   setVisualCuePreference({
     generationEnabled: formData.get("visualCueGeneration") === "on",
     learnCards: formData.get("visualCueLearnCards") === "on",
     meaningQuestions: formData.get("visualCueMeaningQuestions") === "on",
     contextQuestions: formData.get("visualCueContextQuestions") === "on"
-  });
-  redirect("/parent");
+  }, learnerId);
+  redirect(`/parent?learnerId=${encodeURIComponent(learnerId)}`);
 }
 
 export async function submitAnswerAction(formData: FormData): Promise<void> {
@@ -195,6 +223,7 @@ export async function submitSpellingAnswerAction(formData: FormData): Promise<vo
 
 export async function saveWordAction(formData: FormData): Promise<void> {
   await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
   const existingWordId = String(formData.get("wordId") ?? "").trim();
   const submittedWord = String(formData.get("word") ?? "");
   const examples = formData
@@ -214,8 +243,8 @@ export async function saveWordAction(formData: FormData): Promise<void> {
   };
 
   const wordId = existingWordId
-    ? updateParentWord({ ...wordInput, wordId: existingWordId })
-    : createOrUpdateParentWord(wordInput);
+    ? updateParentWord({ ...wordInput, wordId: existingWordId }, learnerId)
+    : createOrUpdateParentWord(wordInput, learnerId);
 
   const draftPayload = String(formData.get("assistDraft") ?? "");
   if (draftPayload) {
@@ -244,6 +273,7 @@ export async function saveWordAction(formData: FormData): Promise<void> {
 
 export async function saveSpellingItemAction(formData: FormData): Promise<void> {
   await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
   const itemId = String(formData.get("itemId") ?? "").trim();
   const target = normaliseParentSpellingWord(String(formData.get("target") ?? ""));
   const pairedTarget = String(formData.get("pairedTarget") ?? "");
@@ -262,15 +292,90 @@ export async function saveSpellingItemAction(formData: FormData): Promise<void> 
     teachingNote,
     sentences,
     difficultyLevel: 2
-  });
+  }, learnerId);
 
-  redirect("/parent/spelling");
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
 }
 
 export async function importWordsAction(formData: FormData): Promise<void> {
   await requireRole("parent");
-  importWordShells(String(formData.get("words") ?? ""));
-  redirect("/parent/words");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  importWordShells(String(formData.get("words") ?? ""), learnerId);
+  redirect(`/parent/words?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function createChildAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = createLearner({
+    displayName: String(formData.get("displayName") ?? ""),
+    accessCode: String(formData.get("accessCode") ?? ""),
+    yearGroup: String(formData.get("yearGroup") ?? "") || undefined
+  });
+  redirect(`/parent?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function assignVocabularyWordAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) assignVocabularyWordToLearner(learnerId, wordId);
+  redirect(`/parent/words?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function unassignVocabularyWordAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) unassignVocabularyWordFromLearner(learnerId, wordId);
+  redirect(`/parent/words?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function requestVocabularyWordNextRoundAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) requestVocabularyWordNextRound(learnerId, wordId);
+  redirect(`/parent/words?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function clearVocabularyWordPriorityAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) clearVocabularyWordPriority(learnerId, wordId);
+  redirect(`/parent/words?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function assignSpellingItemAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  if (itemId) assignSpellingItemToLearner(learnerId, itemId);
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function unassignSpellingItemAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  if (itemId) unassignSpellingItemFromLearner(learnerId, itemId);
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function requestSpellingItemNextRoundAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  if (itemId) requestSpellingItemNextRound(learnerId, itemId);
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function clearSpellingItemPriorityAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  const itemId = String(formData.get("itemId") ?? "").trim();
+  if (itemId) clearSpellingItemPriority(learnerId, itemId);
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
 }
 
 function splitCommaList(value: string): string[] {

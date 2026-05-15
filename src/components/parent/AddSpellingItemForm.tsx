@@ -21,6 +21,7 @@ interface FormValues {
 interface AddSpellingItemFormProps {
   initialValues?: FormValues;
   initialItemId?: string;
+  learnerId?: string;
   mode?: "create" | "edit";
 }
 
@@ -41,6 +42,7 @@ const EMPTY_VALUES: FormValues = {
 export function AddSpellingItemForm({
   initialValues,
   initialItemId,
+  learnerId,
   mode = "create"
 }: AddSpellingItemFormProps) {
   const [assistState, assistAction, assistPending] = useActionState(generateSpellingAssistAction, INITIAL_STATE);
@@ -107,6 +109,7 @@ export function AddSpellingItemForm({
       <form action={saveSpellingItemAction} className="parent-word-builder__editor">
         {mode === "create" ? <input type="hidden" name="target" value={normalizeTarget(values.target)} readOnly /> : null}
         {initialItemId ? <input type="hidden" name="itemId" value={initialItemId} readOnly /> : null}
+        {learnerId ? <input type="hidden" name="learnerId" value={learnerId} readOnly /> : null}
 
         <div className="form-grid">
           <label>
@@ -172,7 +175,7 @@ export function AddSpellingItemForm({
           <button className="button" type="submit">
             {mode === "edit" ? "Save changes" : "Save spelling word"}
           </button>
-          <Link className="button-secondary" href="/parent/spelling">
+          <Link className="button-secondary" href={`/parent/spelling${learnerId ? `?learnerId=${encodeURIComponent(learnerId)}` : ""}`}>
             Cancel
           </Link>
         </div>

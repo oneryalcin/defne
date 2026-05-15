@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getWordDetail } from "@/lib/db/repository";
+import { resolveSelectedLearnerId } from "@/lib/db/learners";
 import type { MasteryColour } from "@/lib/types";
 import { AttemptStrip } from "@/components/word-debug/AttemptStrip";
 import { CompetitorList } from "@/components/word-debug/CompetitorList";
@@ -36,11 +37,15 @@ const COLOUR_LABEL: Record<MasteryColour, string> = {
 
 export default async function WordDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ wordId: string }>;
+  searchParams?: Promise<{ learnerId?: string }>;
 }) {
   const { wordId } = await params;
-  const detail = getWordDetail(wordId);
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const learnerId = resolveSelectedLearnerId(resolvedSearchParams.learnerId);
+  const detail = getWordDetail(wordId, learnerId);
   if (!detail) notFound();
 
   const colour = detail.masteryColour;
@@ -62,7 +67,7 @@ export default async function WordDetailPage({
         <header className="dash-header">
           <div className="dash-header__brand">
             <Link
-              href="/parent"
+              href={`/parent?learnerId=${encodeURIComponent(learnerId)}`}
               className="cover-chapter"
               style={{
                 display: "inline-flex",

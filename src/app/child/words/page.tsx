@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { WordHeatmap } from "@/components/WordHeatmap";
 import { getParentWords } from "@/lib/db/repository";
+import { getLearnerAccessByCode } from "@/lib/db/learners";
+import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 
 const HEATMAP_PAGE_SIZE = 120;
 
-type SearchParams = Promise<{ p?: string }> | { p?: string };
+type SearchParams = Promise<{ p?: string }>;
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +16,11 @@ export default async function ChildWordsPage({
 }: {
   searchParams?: SearchParams;
 }) {
-  const allWords = getParentWords();
-  const resolvedSearchParams = (await Promise.resolve(searchParams ?? {})) as {
-    p?: string;
-  };
+  const cookieStore = await cookies();
+  const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
+  const learnerId = session?.learnerId ?? (session?.role === "child" ? getLearnerAccessByCode(session.accessCode)?.learnerId : undefined);
+  const allWords = getParentWords(learnerId);
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const heatmapPage = Math.max(
     1,
     parseInt(resolvedSearchParams.p ?? "1", 10) || 1,

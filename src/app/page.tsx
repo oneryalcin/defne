@@ -23,10 +23,10 @@ type HomeSearchParams = {
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: Promise<HomeSearchParams> | HomeSearchParams;
+  searchParams: Promise<HomeSearchParams>;
 }) {
   const status = getHomeStatus();
-  const { error, required, current } = await Promise.resolve(searchParams);
+  const { error, required, current } = await searchParams;
   const cookieStore = await cookies();
   const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
   const requiredRole = isPilotRoleValue(required) ? required : undefined;

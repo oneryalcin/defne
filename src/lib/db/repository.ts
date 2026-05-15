@@ -37,6 +37,7 @@ import type {
 } from "../types";
 import { getDb } from "./index";
 import { defaultLearnerId, deterministicWordId, normalizeWord } from "./seed";
+import { assignVocabularyWordToLearnerInDb } from "./learners";
 
 export interface VisualCue {
   src: string;
@@ -251,6 +252,7 @@ export interface ParentWordListItem {
   scoreReasons: string[];
   /** Wilson lower bound (0–1) used to bucket the colour. 0 when untouched. */
   scoreLowerBound: number;
+  priorityMode: "normal" | "next_round_once";
 }
 
 export interface ParentWordEditItem {
@@ -263,6 +265,8 @@ export interface ParentWordEditItem {
 }
 
 export interface ParentDashboard {
+  learnerId: string;
+  learnerName: string;
   totalWords: number;
   completeWords: number;
   visualCuesEnabled: boolean;
@@ -323,17 +327,18 @@ export function getHomeStatus(): { wordCount: number; completeWordCount: number;
 }
 
 export function getVisualCuePreference(): VisualCuePreferences {
-  return getVisualCuePreferenceFromDb(getDb());
+  return getVisualCuePreferenceFromDb(getDb(), defaultLearnerId());
 }
 
 export function getVisualCueGenerationPreference(): boolean {
-  return getVisualCueGenerationPreferenceFromDb(getDb());
+  return getVisualCueGenerationPreferenceFromDb(getDb(), defaultLearnerId());
 }
 
 export function setVisualCuePreference(
   preferences: Pick<VisualCuePreferences, "learnCards" | "meaningQuestions" | "contextQuestions"> & {
     generationEnabled?: boolean;
-  }
+  },
+  learnerId = defaultLearnerId()
 ): void {
   const db = getDb();
   const enabled = preferences.learnCards || preferences.meaningQuestions || preferences.contextQuestions;
@@ -353,13 +358,13 @@ export function setVisualCuePreference(
     preferences.meaningQuestions ? 1 : 0,
     preferences.contextQuestions ? 1 : 0,
     new Date().toISOString(),
-    defaultLearnerId()
+    learnerId
   );
 }
 
-export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
+export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultLearnerId()): MissionPreview {
   const db = getDb();
-  const words = getPracticeWordsForSelection(db);
+  const words = getPracticeWordsForSelection(db, learnerId);
   const byId = new Map(words.map((word) => [word.id, word]));
 
   // Make sure a round is committed before we render anything: this way
@@ -367,9 +372,10 @@ export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
   // load on Start. Without this, the cover and the started round each
   // run the selector independently and the random tie-break causes them
   // to disagree.
-  abandonStaleInProgressRounds(db, targetQuestionCount);
-  if (!hasInProgressRound(db)) {
-    startRoundMission(targetQuestionCount);
+  abandonStaleInProgressRounds(db, targetQuestionCount, learnerId);
+  abandonUnstartedPreviewRoundForPendingParentPriority(db, learnerId);
+  if (!hasInProgressRound(db, learnerId)) {
+    startRoundMission(targetQuestionCount, learnerId);
   }
   const liveRound = db
     .prepare(
@@ -379,23 +385,23 @@ export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
        ORDER BY started_at DESC
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as
+    .get(learnerId) as
     | { word_ids_json: string; summary_json: string }
     | undefined;
 
   const nowIso = new Date().toISOString();
   const selection: RoundWordSelection = liveRound
     ? roundSelectionFromLiveRound(liveRound, byId)
-    : selectRoundWords(words, nowIso, targetQuestionCount, getRemediationWordIds(db));
+    : selectRoundWordsWithParentPriority(db, words, nowIso, targetQuestionCount, learnerId);
   const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
-  const attemptsByWordId = loadAttemptHistoryByWord(db);
+  const attemptsByWordId = loadAttemptHistoryByWord(db, learnerId);
   const realAttemptsByWordId = new Map(
     (db
       .prepare(
         `SELECT word_id, COUNT(*) AS n FROM practice_attempts
          WHERE learner_id = ? GROUP BY word_id`
       )
-      .all(defaultLearnerId()) as Array<{ word_id: string; n: number }>).map(
+      .all(learnerId) as Array<{ word_id: string; n: number }>).map(
       (row) => [row.word_id, row.n]
     )
   );
@@ -429,14 +435,14 @@ export function getMissionPreview(targetQuestionCount = 12): MissionPreview {
   };
 }
 
-function hasInProgressRound(db: DatabaseSync): boolean {
+function hasInProgressRound(db: DatabaseSync, learnerId = defaultLearnerId()): boolean {
   const row = db
     .prepare(
       `SELECT 1 AS x FROM practice_rounds
        WHERE learner_id = ? AND status = 'in_progress'
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as { x: number } | undefined;
+    .get(learnerId) as { x: number } | undefined;
   return Boolean(row);
 }
 
@@ -466,9 +472,82 @@ function roundSelectionFromLiveRound(
   return { wordIds, reasons };
 }
 
-export function startRoundMission(roundWordCount = 12): string {
+function selectRoundWordsWithParentPriority(
+  db: DatabaseSync,
+  words: PracticeWord[],
+  nowIso: string,
+  targetCount: number,
+  learnerId: string
+): RoundWordSelection {
+  const count = Math.max(6, Math.min(12, Math.round(targetCount)));
+  const byId = new Map(words.map((word) => [word.id, word]));
+  const priorityIds = getVocabularyNextRoundPriorityWordIds(db, learnerId)
+    .filter((wordId) => byId.has(wordId))
+    .slice(0, Math.min(3, count));
+  const prioritySet = new Set(priorityIds);
+  const remainingSelection = selectRoundWords(
+    words.filter((word) => !prioritySet.has(word.id)),
+    nowIso,
+    count,
+    getRemediationWordIds(db, learnerId)
+  );
+  const fillIds = remainingSelection.wordIds.filter((wordId) => !prioritySet.has(wordId)).slice(0, count - priorityIds.length);
+  const fillIdSet = new Set(fillIds);
+
+  return {
+    wordIds: [...priorityIds, ...fillIds],
+    reasons: [
+      ...priorityIds.map((wordId) => parentNextRoundReason(byId.get(wordId) ?? null, wordId)),
+      ...remainingSelection.reasons.filter((reason) => fillIdSet.has(reason.wordId))
+    ]
+  };
+}
+
+function getVocabularyNextRoundPriorityWordIds(db: DatabaseSync, learnerId: string): string[] {
+  const rows = db
+    .prepare(
+      `SELECT lvw.word_id
+       FROM learner_vocabulary_words lvw
+       JOIN words w ON w.id = lvw.word_id AND w.status = 'active'
+       JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       WHERE lvw.learner_id = ?
+         AND lvw.status = 'active'
+         AND lvw.priority_mode = 'next_round_once'
+         AND EXISTS (SELECT 1 FROM word_examples e WHERE e.word_id = w.id AND e.status = 'approved')
+       ORDER BY lvw.priority_requested_at ASC, w.word ASC`
+    )
+    .all(learnerId) as Array<{ word_id: string }>;
+  return rows.map((row) => row.word_id);
+}
+
+function parentNextRoundReason(word: PracticeWord | null, wordId: string): RoundSelectionReason {
+  return {
+    wordId,
+    word: word?.word ?? wordId,
+    reason: "parent_next_round",
+    label: "Parent picked for next round",
+    detail: "A parent marked this active word to be tested once soon; mastery scoring was not changed."
+  };
+}
+
+function consumeVocabularyNextRoundPriorities(db: DatabaseSync, learnerId: string, wordIds: string[], now: string): void {
+  if (wordIds.length === 0) return;
+  const placeholders = wordIds.map(() => "?").join(", ");
+  db.prepare(
+    `UPDATE learner_vocabulary_words
+     SET priority_mode = 'normal',
+         priority_consumed_at = ?,
+         updated_at = ?
+     WHERE learner_id = ?
+       AND priority_mode = 'next_round_once'
+       AND word_id IN (${placeholders})`
+  ).run(now, now, learnerId, ...wordIds);
+}
+
+export function startRoundMission(roundWordCount = 12, learnerId = defaultLearnerId()): string {
   const db = getDb();
-  abandonStaleInProgressRounds(db, roundWordCount);
+  abandonStaleInProgressRounds(db, roundWordCount, learnerId);
+  abandonUnstartedPreviewRoundForPendingParentPriority(db, learnerId);
 
   // Reuse the in-progress round if one already exists. The cover preview
   // commits one when the user lands on /child, so the words shown there
@@ -480,12 +559,12 @@ export function startRoundMission(roundWordCount = 12): string {
        ORDER BY started_at DESC
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as { session_id: string } | undefined;
+    .get(learnerId) as { session_id: string } | undefined;
   if (existing) return existing.session_id;
 
-  const words = getPracticeWordsForSelection(db);
+  const words = getPracticeWordsForSelection(db, learnerId);
   const now = new Date().toISOString();
-  const selection = selectRoundWords(words, now, roundWordCount, getRemediationWordIds(db));
+  const selection = selectRoundWordsWithParentPriority(db, words, now, roundWordCount, learnerId);
   const wordIds = selection.wordIds;
   if (wordIds.length === 0) {
     throw new Error("No complete vocabulary words are available for a round.");
@@ -515,7 +594,7 @@ export function startRoundMission(roundWordCount = 12): string {
     `INSERT INTO practice_sessions
       (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
      VALUES (?, ?, 'daily_mission', 'in_progress', ?, 0, ?, ?, ?, ?)`
-  ).run(sessionId, defaultLearnerId(), plan.length, now, JSON.stringify(summary), now, now);
+  ).run(sessionId, learnerId, plan.length, now, JSON.stringify(summary), now, now);
 
   db.prepare(
     `INSERT INTO practice_rounds
@@ -525,7 +604,7 @@ export function startRoundMission(roundWordCount = 12): string {
   ).run(
     roundId,
     sessionId,
-    defaultLearnerId(),
+    learnerId,
     DEFAULT_ROUND_MAX_RETRY_PASSES,
     JSON.stringify(wordIds),
     now,
@@ -534,14 +613,16 @@ export function startRoundMission(roundWordCount = 12): string {
     now
   );
 
+  consumeVocabularyNextRoundPriorities(db, learnerId, selection.wordIds, now);
+
   return sessionId;
 }
 
 function abandonStaleInProgressRounds(
   db: DatabaseSync,
-  expectedWordCount = 12
+  expectedWordCount = 12,
+  learnerId = defaultLearnerId()
 ): void {
-  const learnerId = defaultLearnerId();
   const rows = db
     .prepare(
       `SELECT id, session_id, started_at, json_array_length(word_ids_json) AS word_count
@@ -593,18 +674,76 @@ function abandonStaleInProgressRounds(
   }
 }
 
+function abandonUnstartedPreviewRoundForPendingParentPriority(db: DatabaseSync, learnerId: string): void {
+  const pending = db
+    .prepare(
+      `SELECT lvw.word_id, lvw.priority_requested_at
+       FROM learner_vocabulary_words lvw
+       JOIN words w ON w.id = lvw.word_id AND w.status = 'active'
+       WHERE lvw.learner_id = ?
+         AND lvw.status = 'active'
+         AND lvw.priority_mode = 'next_round_once'
+         AND lvw.priority_requested_at IS NOT NULL
+       ORDER BY lvw.priority_requested_at ASC
+       LIMIT 3`
+    )
+    .all(learnerId) as Array<{ word_id: string; priority_requested_at: string }>;
+  if (pending.length === 0) return;
+
+  const liveRound = db
+    .prepare(
+      `SELECT pr.id, pr.session_id, pr.word_ids_json, pr.card_view_counts_json, pr.started_at
+       FROM practice_rounds pr
+       WHERE pr.learner_id = ?
+         AND pr.status = 'in_progress'
+         AND pr.current_step = 'learn_cards'
+         AND NOT EXISTS (
+           SELECT 1 FROM practice_attempts pa WHERE pa.session_id = pr.session_id
+         )
+       ORDER BY pr.started_at DESC, pr.created_at DESC
+       LIMIT 1`
+    )
+    .get(learnerId) as
+    | { id: string; session_id: string; word_ids_json: string; card_view_counts_json: string; started_at: string }
+    | undefined;
+  if (!liveRound) return;
+
+  const cardViewCounts = JSON.parse(liveRound.card_view_counts_json) as Record<string, number>;
+  if (Object.values(cardViewCounts).some((count) => count > 0)) return;
+
+  const liveWordIds = new Set(JSON.parse(liveRound.word_ids_json) as string[]);
+  const needsNewPreview = pending.some((row) => {
+    const requestedAt = new Date(row.priority_requested_at).getTime();
+    const startedAt = new Date(liveRound.started_at).getTime();
+    return !liveWordIds.has(row.word_id) || (Number.isFinite(requestedAt) && Number.isFinite(startedAt) && requestedAt > startedAt);
+  });
+  if (!needsNewPreview) return;
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE practice_rounds
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.id);
+  db.prepare(
+    `UPDATE practice_sessions
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.session_id);
+}
+
 export function getSessionView(sessionId: string, selectedCardId?: string): SessionView {
   const db = getDb();
   const session = getSessionRow(db, sessionId);
   const round = getRoundRowForSession(db, sessionId);
-  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db, session.learner_id);
   if (round) {
     return getRoundSessionView(db, session, round, selectedCardId, visualCuePreferences);
   }
 
   const plan = readSessionPlan(session);
   const attempts = getSessionAttemptCount(db, sessionId);
-  const words = getPracticeWords();
+  const words = getPracticeWords(session.learner_id);
   const wordMap = new Map(words.map((word) => [word.id, word]));
 
   if (session.status !== "in_progress" || attempts >= plan.length) {
@@ -664,7 +803,7 @@ export function submitSessionAnswer(input: {
     return { completed: true, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
-  const words = getPracticeWords();
+  const words = getPracticeWords(session.learner_id);
   const word = words.find((candidate) => candidate.id === current.wordId);
   if (!word) throw new Error(`Session word ${current.wordId} is not available.`);
 
@@ -690,7 +829,7 @@ export function submitSessionAnswer(input: {
   ).run(
     attemptId,
     session.id,
-    defaultLearnerId(),
+    session.learner_id,
     word.id,
     current.questionType,
     JSON.stringify({
@@ -757,7 +896,7 @@ export function recordRoundCardView(sessionId: string, wordId: string): void {
      WHERE id = ?`
   ).run(JSON.stringify(counts), now, round.id);
 
-  const state = getStateForWord(db, wordId);
+  const state = getStateForWord(db, wordId, round.learner_id);
   saveLearnerWordState(db, {
     ...state,
     lastExposedAt: now,
@@ -786,7 +925,7 @@ export function startRoundMeaningRecognition(sessionId: string): void {
 export function getAttemptReview(sessionId: string, attemptId: string): AttemptReview {
   const db = getDb();
   const session = getSessionRow(db, sessionId);
-  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db, session.learner_id);
   const plan = readSessionPlan(session);
   const row = db
     .prepare(
@@ -848,7 +987,7 @@ export function getAttemptReview(sessionId: string, attemptId: string): AttemptR
     .all(sessionId) as unknown as Array<{ id: string }>;
   const questionNumber = Math.max(1, attemptIds.findIndex((attempt) => attempt.id === attemptId) + 1);
   const isRoundAttempt = row.round_step !== null;
-  const submittedWord = getPracticeWords().find(
+  const submittedWord = getPracticeWords(session.learner_id).find(
     (word) => normalizeWord(word.word) === normalizeWord(row.submitted_answer ?? "")
   );
   const submittedWordDefinition =
@@ -896,11 +1035,14 @@ export function getSessionSummary(sessionId: string): SessionSummary {
   return JSON.parse(session.summary_json) as SessionSummary;
 }
 
-export function getParentDashboard(): ParentDashboard {
+export function getParentDashboard(learnerId = defaultLearnerId()): ParentDashboard {
   const db = getDb();
-  const words = getParentWords();
-  const visualCuePreferences = getVisualCuePreferenceFromDb(db);
-  const visualCueGenerationEnabled = getVisualCueGenerationPreferenceFromDb(db);
+  const words = getParentWords(learnerId);
+  const visualCuePreferences = getVisualCuePreferenceFromDb(db, learnerId);
+  const visualCueGenerationEnabled = getVisualCueGenerationPreferenceFromDb(db, learnerId);
+  const learner = db.prepare("SELECT display_name FROM learners WHERE id = ?").get(learnerId) as
+    | { display_name: string }
+    | undefined;
   const totalWords = words.length;
   const completeWords = words.filter((word) => word.isComplete).length;
   const redOrangeWords = words.filter((word) => word.masteryColour === "red" || word.masteryColour === "orange").slice(0, 12);
@@ -909,7 +1051,7 @@ export function getParentDashboard(): ParentDashboard {
     .filter((word) => {
       const row = db
         .prepare("SELECT next_review_at FROM learner_word_state WHERE learner_id = ? AND word_id = ?")
-        .get(defaultLearnerId(), word.id) as { next_review_at: string | null } | undefined;
+        .get(learnerId, word.id) as { next_review_at: string | null } | undefined;
       return row?.next_review_at ? new Date(row.next_review_at).getTime() <= Date.now() : word.masteryColour !== "green";
     })
     .slice(0, 10);
@@ -922,7 +1064,7 @@ export function getParentDashboard(): ParentDashboard {
        ORDER BY started_at DESC
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as unknown as
+    .get(learnerId) as unknown as
     | { started_at: string; actual_question_count: number; summary_json: string }
     | undefined;
 
@@ -934,12 +1076,14 @@ export function getParentDashboard(): ParentDashboard {
        ORDER BY ended_at DESC, started_at DESC
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as { summary_json: string } | undefined;
+    .get(learnerId) as { summary_json: string } | undefined;
   const latestRound = latestRoundRow
     ? ((JSON.parse(latestRoundRow.summary_json) as SessionSummary).round ?? null)
     : null;
 
   return {
+    learnerId,
+    learnerName: learner?.display_name ?? "Learner",
     totalWords,
     completeWords,
     visualCuesEnabled: visualCuePreferences.enabled,
@@ -959,7 +1103,7 @@ export function getParentDashboard(): ParentDashboard {
   };
 }
 
-export function getParentWords(): ParentWordListItem[] {
+export function getParentWords(learnerId = defaultLearnerId()): ParentWordListItem[] {
   const db = getDb();
   const rows = db
     .prepare(
@@ -980,14 +1124,16 @@ export function getParentWords(): ParentWordListItem[] {
               (SELECT COUNT(*) FROM practice_attempts pa
                  WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 1) AS real_correct,
               (SELECT COUNT(*) FROM practice_attempts pa
-                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 0) AS real_wrong
+                 WHERE pa.word_id = w.id AND pa.learner_id = ? AND pa.is_correct = 0) AS real_wrong,
+              lvw.priority_mode
        FROM words w
+       JOIN learner_vocabulary_words lvw ON lvw.word_id = w.id AND lvw.learner_id = ? AND lvw.status = 'active'
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        LEFT JOIN learner_word_state s ON s.word_id = w.id AND s.learner_id = ?
        WHERE w.status = 'active'
        ORDER BY w.word ASC`
     )
-    .all(defaultLearnerId(), defaultLearnerId(), defaultLearnerId(), defaultLearnerId()) as unknown as Array<{
+    .all(learnerId, learnerId, learnerId, learnerId, learnerId) as unknown as Array<{
     id: string;
     word: string;
     difficulty_level: number;
@@ -1012,11 +1158,12 @@ export function getParentWords(): ParentWordListItem[] {
     real_attempts: number;
     real_correct: number;
     real_wrong: number;
+    priority_mode: "normal" | "next_round_once";
   }>;
 
   // Pull every attempt for this learner once, group by word, so we can
   // run the time-weighted scorer for each word without N+1 queries.
-  const attemptsByWordId = loadAttemptHistoryByWord(db);
+  const attemptsByWordId = loadAttemptHistoryByWord(db, learnerId);
 
   return rows.map((row) => {
     // "Started" means a real practice_attempts row exists, not just a
@@ -1028,8 +1175,8 @@ export function getParentWords(): ParentWordListItem[] {
     let scoreLowerBound = 0;
     if (realAttempts > 0 && row.attempt_count !== null) {
       const state: LearnerWordState = {
-        id: `state_${defaultLearnerId()}_${row.id}`,
-        learnerId: defaultLearnerId(),
+        id: `state_${learnerId}_${row.id}`,
+        learnerId,
         wordId: row.id,
         stabilityDays: row.stability_days ?? 1,
         masteryColour: row.mastery_colour ?? "red",
@@ -1079,7 +1226,8 @@ export function getParentWords(): ParentWordListItem[] {
       wrongCount: row.real_wrong,
       lastSeenAt: row.last_seen_at,
       scoreReasons,
-      scoreLowerBound
+      scoreLowerBound,
+      priorityMode: row.priority_mode
     };
   });
 }
@@ -1168,7 +1316,7 @@ export interface WordDetailView {
   }>;
 }
 
-export function getWordDetail(wordId: string): WordDetailView | null {
+export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): WordDetailView | null {
   const db = getDb();
   const wordRow = db
     .prepare(
@@ -1211,7 +1359,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
     .prepare(
       `SELECT * FROM learner_word_state WHERE learner_id = ? AND word_id = ?`
     )
-    .get(defaultLearnerId(), wordId) as StateRow | undefined;
+    .get(learnerId, wordId) as StateRow | undefined;
 
   const attemptRows = db
     .prepare(
@@ -1221,7 +1369,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
        WHERE learner_id = ? AND word_id = ?
        ORDER BY created_at DESC`
     )
-    .all(defaultLearnerId(), wordId) as Array<{
+    .all(learnerId, wordId) as Array<{
     id: string;
     created_at: string;
     question_type: string | null;
@@ -1290,12 +1438,12 @@ export function getWordDetail(wordId: string): WordDetailView | null {
   }
 
   // Live deck rank + projection for the explainability page.
-  const allWords = getPracticeWordsForSelection(db);
-  const allAttempts = loadAttemptHistoryByWord(db);
+  const allWords = getPracticeWordsForSelection(db, learnerId);
+  const allAttempts = loadAttemptHistoryByWord(db, learnerId);
   const nowIso = new Date().toISOString();
   const deck = deckPriorities(allWords, allAttempts, nowIso);
   const rank = rankFor(deck, wordId);
-  const selectedNextRoundWordIds = selectedWordIdsForDebug(db, allWords, nowIso);
+  const selectedNextRoundWordIds = selectedWordIdsForDebug(db, allWords, nowIso, learnerId);
   const isSelectedNextRound = selectedNextRoundWordIds.has(wordId);
   const pickProbabilityNow = isSelectedNextRound ? 1 : 0;
 
@@ -1380,7 +1528,7 @@ export function getWordDetail(wordId: string): WordDetailView | null {
   };
 }
 
-function loadAttemptHistoryByWord(db: DatabaseSync): Map<string, AttemptRecord[]> {
+function loadAttemptHistoryByWord(db: DatabaseSync, learnerId = defaultLearnerId()): Map<string, AttemptRecord[]> {
   const rows = db
     .prepare(
       `SELECT word_id, created_at, is_correct, hint_level_used
@@ -1388,7 +1536,7 @@ function loadAttemptHistoryByWord(db: DatabaseSync): Map<string, AttemptRecord[]
        WHERE learner_id = ?
        ORDER BY created_at ASC`
     )
-    .all(defaultLearnerId()) as Array<{
+    .all(learnerId) as Array<{
     word_id: string;
     created_at: string;
     is_correct: number;
@@ -1407,9 +1555,9 @@ function loadAttemptHistoryByWord(db: DatabaseSync): Map<string, AttemptRecord[]
   return byWordId;
 }
 
-function getPracticeWordsForSelection(db: DatabaseSync): PracticeWord[] {
-  const attemptsByWordId = loadAttemptHistoryByWord(db);
-  return getPracticeWords().map((word) => {
+function getPracticeWordsForSelection(db: DatabaseSync, learnerId = defaultLearnerId()): PracticeWord[] {
+  const attemptsByWordId = loadAttemptHistoryByWord(db, learnerId);
+  return getPracticeWords(learnerId).map((word) => {
     const attempts = attemptsByWordId.get(word.id) ?? null;
     if (!attempts || attempts.length === 0) return word;
     return {
@@ -1425,7 +1573,8 @@ function getPracticeWordsForSelection(db: DatabaseSync): PracticeWord[] {
 function selectedWordIdsForDebug(
   db: DatabaseSync,
   words: PracticeWord[],
-  nowIso: string
+  nowIso: string,
+  learnerId = defaultLearnerId()
 ): Set<string> {
   const activeRound = db
     .prepare(
@@ -1435,17 +1584,17 @@ function selectedWordIdsForDebug(
        ORDER BY started_at DESC, created_at DESC
        LIMIT 1`
     )
-    .get(defaultLearnerId()) as { word_ids_json: string } | undefined;
+    .get(learnerId) as { word_ids_json: string } | undefined;
   if (activeRound) {
     return new Set(JSON.parse(activeRound.word_ids_json) as string[]);
   }
 
   return new Set(
-    selectRoundWords(words, nowIso, 12, getRemediationWordIds(db)).wordIds
+    selectRoundWordsWithParentPriority(db, words, nowIso, 12, learnerId).wordIds
   );
 }
 
-export function createOrUpdateParentWord(input: WordFormInput): string {
+export function createOrUpdateParentWord(input: WordFormInput, learnerId = defaultLearnerId()): string {
   const db = getDb();
   const now = new Date().toISOString();
   const normalized = normalizeWord(input.word);
@@ -1467,14 +1616,15 @@ export function createOrUpdateParentWord(input: WordFormInput): string {
   ).run(wordId, input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, now);
 
   replaceOptionalWordRows(db, wordId, input, now);
-  ensureLearnerStateForWord(db, wordId, now);
+  assignVocabularyWordToLearnerInDb(db, learnerId, wordId, now);
+  ensureLearnerStateForWord(db, wordId, now, learnerId);
   if (existingWord) {
-    resetLearnerStateAfterContentEdit(db, existingWord.id, now);
+    resetLearnerStateAfterContentEdit(db, existingWord.id, now, learnerId);
   }
   return wordId;
 }
 
-export function updateParentWord(input: WordFormInput & { wordId: string }): string {
+export function updateParentWord(input: WordFormInput & { wordId: string }, learnerId = defaultLearnerId()): string {
   const db = getDb();
   const now = new Date().toISOString();
   const normalized = normalizeWord(input.word);
@@ -1501,8 +1651,9 @@ export function updateParentWord(input: WordFormInput & { wordId: string }): str
   ).run(input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, input.wordId);
 
   replaceOptionalWordRows(db, input.wordId, input, now);
-  ensureLearnerStateForWord(db, input.wordId, now);
-  resetLearnerStateAfterContentEdit(db, input.wordId, now);
+  assignVocabularyWordToLearnerInDb(db, learnerId, input.wordId, now);
+  ensureLearnerStateForWord(db, input.wordId, now, learnerId);
+  resetLearnerStateAfterContentEdit(db, input.wordId, now, learnerId);
   return input.wordId;
 }
 
@@ -1555,7 +1706,7 @@ export function upsertParentExampleVisualCues(wordId: string, cues: ParentExampl
   }
 }
 
-function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now: string): void {
+function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now: string, learnerId = defaultLearnerId()): void {
   db.prepare(
     `UPDATE learner_word_state
      SET stability_days = 1,
@@ -1585,22 +1736,22 @@ function resetLearnerStateAfterContentEdit(db: DatabaseSync, wordId: string, now
          learner_state_content_version = (SELECT content_version FROM words WHERE id = ?),
          updated_at = ?
      WHERE learner_id = ? AND word_id = ?`
-  ).run(wordId, now, defaultLearnerId(), wordId);
+  ).run(wordId, now, learnerId, wordId);
 }
 
-export function importWordShells(text: string): number {
+export function importWordShells(text: string, learnerId = defaultLearnerId()): number {
   const lines = text
     .split(/\r?\n|,/)
     .map((line) => line.trim())
     .filter(Boolean);
   const unique = [...new Set(lines.map(normalizeWord))];
   for (const word of unique) {
-    createOrUpdateParentWord({ word, difficultyLevel: 2 });
+    createOrUpdateParentWord({ word, difficultyLevel: 2 }, learnerId);
   }
   return unique.length;
 }
 
-function getRemediationWordIds(db: DatabaseSync): {
+function getRemediationWordIds(db: DatabaseSync, learnerId = defaultLearnerId()): {
   revealAndMoveOnWordIds: string[];
   eventuallyCorrectNotFirstAttemptWordIds: string[];
 } {
@@ -1612,7 +1763,7 @@ function getRemediationWordIds(db: DatabaseSync): {
        GROUP BY word_id
        ORDER BY MAX(created_at) DESC`
     )
-    .all(defaultLearnerId()) as Array<{ word_id: string }>;
+    .all(learnerId) as Array<{ word_id: string }>;
 
   const recoveredRows = db
     .prepare(
@@ -1630,7 +1781,7 @@ function getRemediationWordIds(db: DatabaseSync): {
        GROUP BY a.word_id
        ORDER BY MAX(a.created_at) DESC`
     )
-    .all(defaultLearnerId(), DEFAULT_NEAR_REVIEW_SPACING) as Array<{ word_id: string }>;
+    .all(learnerId, DEFAULT_NEAR_REVIEW_SPACING) as Array<{ word_id: string }>;
 
   return {
     revealAndMoveOnWordIds: revealRows.map((row) => row.word_id),
@@ -1654,7 +1805,7 @@ function getRoundSessionView(
 ): SessionView {
   const wordIds = readRoundWordIds(round);
   const cardViewCounts = readCardViewCounts(round);
-  const words = getPracticeWords();
+  const words = getPracticeWords(session.learner_id);
   const wordMap = new Map(words.map((word) => [word.id, word]));
   const roundWords = wordIds.map((wordId) => {
     const word = wordMap.get(wordId);
@@ -1761,7 +1912,7 @@ function submitRoundAnswer(
     return { completed: false, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
-  const words = getPracticeWords();
+  const words = getPracticeWords(session.learner_id);
   const word = words.find((candidate) => candidate.id === cursor.wordId);
   if (!word) throw new Error(`Round word ${cursor.wordId} is not available.`);
 
@@ -1793,7 +1944,7 @@ function submitRoundAnswer(
   ).run(
     attemptId,
     session.id,
-    defaultLearnerId(),
+    session.learner_id,
     word.id,
     questionType,
     JSON.stringify({
@@ -1885,7 +2036,7 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const contextByWord = new Map(contextProgress.statuses.map((status) => [status.wordId, status]));
   const nowPlusNearReview = new Date(new Date(completedAt).getTime() + 12 * 3_600_000).toISOString();
 
-  const words = getPracticeWords();
+  const words = getPracticeWords(round.learner_id);
   const wordMap = new Map(words.map((word) => [word.id, word]));
   const wordName = (wordId: string) => wordMap.get(wordId)?.word ?? wordId;
   const hasMistake = (wordId: string) => {
@@ -1910,9 +2061,9 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
     );
   });
   const mistakeWordIds = wordIds.filter((wordId) => hasMistake(wordId));
-  updateNearReviewAfterRound(db, wordIds, mistakeWordIds, completedAt, nowPlusNearReview);
+  updateNearReviewAfterRound(db, wordIds, mistakeWordIds, completedAt, nowPlusNearReview, round.learner_id);
 
-  const refreshedWords = getPracticeWords();
+  const refreshedWords = getPracticeWords(round.learner_id);
   const refreshedWordMap = new Map(refreshedWords.map((word) => [word.id, word]));
   const nearReviewWordIds = wordIds.filter((wordId) => refreshedWordMap.get(wordId)?.state.nearReview);
   const nearReviewWords = nearReviewWordIds.map(wordName);
@@ -1958,7 +2109,14 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   };
 }
 
-function updateNearReviewAfterRound(db: DatabaseSync, wordIds: string[], mistakeWordIds: string[], now: string, nextReviewAt: string): void {
+function updateNearReviewAfterRound(
+  db: DatabaseSync,
+  wordIds: string[],
+  mistakeWordIds: string[],
+  now: string,
+  nextReviewAt: string,
+  learnerId = defaultLearnerId()
+): void {
   const mistakeSet = new Set(mistakeWordIds);
   for (const wordId of wordIds) {
     if (mistakeSet.has(wordId)) {
@@ -1969,7 +2127,7 @@ function updateNearReviewAfterRound(db: DatabaseSync, wordIds: string[], mistake
              next_review_at = ?,
              updated_at = ?
          WHERE learner_id = ? AND word_id = ?`
-      ).run(nextReviewAt, now, defaultLearnerId(), wordId);
+      ).run(nextReviewAt, now, learnerId, wordId);
       continue;
     }
 
@@ -1979,7 +2137,7 @@ function updateNearReviewAfterRound(db: DatabaseSync, wordIds: string[], mistake
          FROM learner_word_state
          WHERE learner_id = ? AND word_id = ?`
       )
-      .get(defaultLearnerId(), wordId) as
+      .get(learnerId, wordId) as
       | { near_review: number; eligible_questions_since_last_mistake: number }
       | undefined;
 
@@ -1993,7 +2151,7 @@ function updateNearReviewAfterRound(db: DatabaseSync, wordIds: string[], mistake
            eligible_questions_since_last_mistake = ?,
            updated_at = ?
        WHERE learner_id = ? AND word_id = ?`
-    ).run(keepNearReview ? 1 : 0, eligibleQuestions, now, defaultLearnerId(), wordId);
+    ).run(keepNearReview ? 1 : 0, eligibleQuestions, now, learnerId, wordId);
   }
 }
 
@@ -2105,21 +2263,22 @@ function stepLabel(step: RoundLearningStep): string {
   return "Context usage";
 }
 
-function getPracticeWords(): PracticeWord[] {
+function getPracticeWords(learnerId = defaultLearnerId()): PracticeWord[] {
   const db = getDb();
   const rows = db
     .prepare(
       `SELECT w.id, w.word, w.normalized_word, w.difficulty_level, d.definition
        FROM words w
+       JOIN learner_vocabulary_words lvw ON lvw.word_id = w.id AND lvw.learner_id = ? AND lvw.status = 'active'
        JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
        WHERE w.status = 'active'
          AND EXISTS (SELECT 1 FROM word_examples e WHERE e.word_id = w.id AND e.status = 'approved')
        ORDER BY w.word ASC`
     )
-    .all() as unknown as WordRow[];
+    .all(learnerId) as unknown as WordRow[];
 
   return rows.map((row) => {
-    const state = getStateForWord(db, row.id);
+    const state = getStateForWord(db, row.id, learnerId);
     const exampleRefs = getExampleRows(db, row.id);
     const examples = exampleRefs.map((example) => example.sentence);
     return {
@@ -2263,11 +2422,11 @@ function getSessionAttemptCount(db: DatabaseSync, sessionId: string): number {
     .count;
 }
 
-function getStateForWord(db: DatabaseSync, wordId: string): LearnerWordState {
-  ensureLearnerStateForWord(db, wordId, new Date().toISOString());
+function getStateForWord(db: DatabaseSync, wordId: string, learnerId = defaultLearnerId()): LearnerWordState {
+  ensureLearnerStateForWord(db, wordId, new Date().toISOString(), learnerId);
   const row = db
     .prepare("SELECT * FROM learner_word_state WHERE learner_id = ? AND word_id = ?")
-    .get(defaultLearnerId(), wordId) as unknown as StateRow;
+    .get(learnerId, wordId) as unknown as StateRow;
   return mapState(row);
 }
 
@@ -2332,12 +2491,12 @@ function saveLearnerWordState(db: DatabaseSync, state: LearnerWordState): void {
   );
 }
 
-function ensureLearnerStateForWord(db: DatabaseSync, wordId: string, now: string): void {
+function ensureLearnerStateForWord(db: DatabaseSync, wordId: string, now: string, learnerId = defaultLearnerId()): void {
   db.prepare(
     `INSERT OR IGNORE INTO learner_word_state
       (id, learner_id, word_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?)`
-  ).run(`state_${defaultLearnerId()}_${wordId}`, defaultLearnerId(), wordId, now, now);
+  ).run(`state_${learnerId}_${wordId}`, learnerId, wordId, now, now);
 }
 
 function mapState(row: StateRow): LearnerWordState {
@@ -2396,7 +2555,7 @@ function getExampleRows(db: DatabaseSync, wordId: string): Array<{ id: string; s
   return rows.filter((row) => Boolean(row.sentence));
 }
 
-function getVisualCuePreferenceFromDb(db: DatabaseSync): VisualCuePreferences {
+function getVisualCuePreferenceFromDb(db: DatabaseSync, learnerId = defaultLearnerId()): VisualCuePreferences {
   const row = db
     .prepare(
       `SELECT visual_cues_enabled,
@@ -2406,7 +2565,7 @@ function getVisualCuePreferenceFromDb(db: DatabaseSync): VisualCuePreferences {
        FROM learner_profiles
        WHERE learner_id = ?`
     )
-    .get(defaultLearnerId()) as
+    .get(learnerId) as
     | {
         visual_cues_enabled: number;
         visual_cues_on_learn_cards: number;
@@ -2423,14 +2582,14 @@ function getVisualCuePreferenceFromDb(db: DatabaseSync): VisualCuePreferences {
   };
 }
 
-function getVisualCueGenerationPreferenceFromDb(db: DatabaseSync): boolean {
+function getVisualCueGenerationPreferenceFromDb(db: DatabaseSync, learnerId = defaultLearnerId()): boolean {
   const row = db
     .prepare(
       `SELECT visual_cue_generation_enabled
        FROM learner_profiles
        WHERE learner_id = ?`
     )
-    .get(defaultLearnerId()) as { visual_cue_generation_enabled: number } | undefined;
+    .get(learnerId) as { visual_cue_generation_enabled: number } | undefined;
   return row ? row.visual_cue_generation_enabled === 1 : false;
 }
 

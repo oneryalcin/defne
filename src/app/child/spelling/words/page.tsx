@@ -1,21 +1,33 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { SpellingHeatmap } from "@/components/SpellingHeatmap";
 import { getChildSpellingWords } from "@/lib/db/spellingRepository";
+import { getLearnerAccessByCode, learnerExists } from "@/lib/db/learners";
+import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 140;
 
-type SearchParams = Promise<{ p?: string }> | { p?: string };
+type SearchParams = Promise<{ p?: string }>;
+
+async function currentChildLearnerId(): Promise<string | null> {
+  const jar = await cookies();
+  const current = parsePilotSession(jar.get(PILOT_SESSION_COOKIE)?.value);
+  if (!current || current.role !== "child") return null;
+  if (current.learnerId && learnerExists(current.learnerId)) return current.learnerId;
+  return getLearnerAccessByCode(current.accessCode)?.learnerId ?? null;
+}
 
 export default async function ChildSpellingWordsPage({
   searchParams
 }: {
   searchParams?: SearchParams;
 }) {
-  const params = (await Promise.resolve(searchParams ?? {})) as { p?: string };
+  const params = searchParams ? await searchParams : {};
   const page = Math.max(1, parseInt(params.p ?? "1", 10) || 1);
-  const words = getChildSpellingWords();
+  const learnerId = await currentChildLearnerId();
+  const words = getChildSpellingWords(learnerId ?? undefined);
 
   return (
     <main className="spread">

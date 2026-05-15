@@ -1,15 +1,20 @@
 import { notFound } from "next/navigation";
 import { AddSpellingItemForm } from "@/components/parent/AddSpellingItemForm";
 import { getParentSpellingItemForEdit } from "@/lib/db/spellingRepository";
+import { resolveSelectedLearnerId } from "@/lib/db/learners";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditSpellingItemPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ itemId: string }>;
+  searchParams?: Promise<{ learnerId?: string }>;
 }) {
   const { itemId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const learnerId = resolveSelectedLearnerId(resolvedSearchParams.learnerId);
   const item = getParentSpellingItemForEdit(itemId);
   if (!item) notFound();
 
@@ -23,6 +28,7 @@ export default async function EditSpellingItemPage({
       <AddSpellingItemForm
         mode="edit"
         initialItemId={item.id}
+        learnerId={learnerId}
         initialValues={{
           target: item.target,
           pairedTarget: item.pairedTarget,

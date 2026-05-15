@@ -8,6 +8,7 @@ import {
   createOrUpdateParentWord,
   findActiveWordByText,
   getMissionPreview,
+  getParentWords,
   getParentWordForEdit,
   getSessionSummary,
   getSessionView,
@@ -19,12 +20,20 @@ import {
   upsertParentExampleVisualCues
 } from "./repository";
 import {
+  assignVocabularyWordToLearner,
+  createLearner,
+  listAvailableVocabularyForLearner,
+  requestVocabularyWordNextRound,
+} from "./learners";
+import {
+  assignSpellingItemToLearner,
   createOrUpdateParentSpellingItem,
   getChildSpellingWords,
   getParentSpellingItemForEdit,
   getParentSpellingItems,
   getSpellingPreview,
   getSpellingSessionView,
+  requestSpellingItemNextRound,
   startSpellingPractice,
   startSpellingMission,
   submitSpellingAnswer
@@ -46,6 +55,87 @@ afterEach(() => {
 });
 
 describe("round repository orchestration", () => {
+  it("keeps Defne assigned to the seeded deck while new children start empty", () => {
+    const defneWords = getParentWords("learner_defne");
+    expect(defneWords.length).toBeGreaterThanOrEqual(50);
+
+    const learnerId = createLearner({ displayName: "Mina", accessCode: "mina" });
+    expect(getParentWords(learnerId)).toEqual([]);
+
+    const library = listAvailableVocabularyForLearner(learnerId);
+    const candidate = library.find((word) => !word.assigned);
+    expect(candidate).toBeTruthy();
+    if (!candidate) throw new Error("Expected at least one available vocabulary word.");
+
+    assignVocabularyWordToLearner(learnerId, candidate.id);
+    expect(getParentWords(learnerId).map((word) => word.id)).toEqual([candidate.id]);
+    expect(findActiveWordByText(candidate.word)?.id).toBe(candidate.id);
+  });
+
+  it("assigns a newly created parent word only to the selected child", () => {
+    const learnerId = createLearner({ displayName: "Lina", accessCode: "lina" });
+    const wordId = createOrUpdateParentWord(
+      {
+        word: "glimmer",
+        definition: "a small weak light",
+        examples: ["A glimmer shone under the door."],
+        difficultyLevel: 2
+      },
+      learnerId
+    );
+
+    expect(getParentWords(learnerId).map((word) => word.id)).toContain(wordId);
+    expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
+  });
+
+  it("lets parent priority place an assigned vocabulary word in the next round once without changing V2.1 scoring", () => {
+    const learnerId = createLearner({ displayName: "Nora", accessCode: "nora" });
+    const library = listAvailableVocabularyForLearner(learnerId).filter((word) => !word.assigned);
+    const first = library[0];
+    const second = library[1];
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    if (!first || !second) throw new Error("Expected available vocabulary words.");
+
+    assignVocabularyWordToLearner(learnerId, first.id);
+    assignVocabularyWordToLearner(learnerId, second.id);
+    requestVocabularyWordNextRound(learnerId, second.id);
+
+    const sessionId = startRoundMission(6, learnerId);
+    const view = getSessionView(sessionId);
+    expect(view.round?.cards[0]?.id).toBe(second.id);
+    expect(view.round?.cards[0]?.selectionReason?.reason).toBe("parent_next_round");
+
+    const row = getDb()
+      .prepare("SELECT priority_mode, priority_consumed_at FROM learner_vocabulary_words WHERE learner_id = ? AND word_id = ?")
+      .get(learnerId, second.id) as { priority_mode: string; priority_consumed_at: string | null };
+    expect(row.priority_mode).toBe("normal");
+    expect(row.priority_consumed_at).toBeTruthy();
+  });
+
+  it("rebuilds an unstarted preview round when parent marks a word for the next round", () => {
+    const learnerId = createLearner({ displayName: "Selin", accessCode: "selin" });
+    const library = listAvailableVocabularyForLearner(learnerId).filter((word) => !word.assigned);
+    const assigned = library.slice(0, 8);
+    expect(assigned).toHaveLength(8);
+    assigned.forEach((word) => assignVocabularyWordToLearner(learnerId, word.id));
+
+    const originalSessionId = startRoundMission(6, learnerId);
+    const originalView = getSessionView(originalSessionId);
+    const priorityCandidate = assigned.find((word) => !originalView.round?.cards.some((card) => card.id === word.id));
+    expect(priorityCandidate).toBeTruthy();
+    if (!priorityCandidate) throw new Error("Expected a word outside the original preview.");
+
+    requestVocabularyWordNextRound(learnerId, priorityCandidate.id);
+    const preview = getMissionPreview(6, learnerId);
+
+    expect(preview.words[0]?.id).toBe(priorityCandidate.id);
+    const oldRound = getDb()
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(originalSessionId) as { status: string };
+    expect(oldRound.status).toBe("abandoned");
+  });
+
   it("previews the in-progress round once it has been started", () => {
     // Once a round is committed, the cover preview must reflect that
     // round's word list — not run a fresh selection that could drift
@@ -700,6 +790,37 @@ describe("spelling repository orchestration", () => {
     const preview = getSpellingPreview(1);
 
     expect(preview.items[0].target).toBe("advice");
+  });
+
+  it("lets parent priority place an assigned spelling word in the next spelling mission once", () => {
+    const learnerId = createLearner({ displayName: "Ozan", accessCode: "ozan" });
+    const items = getDb()
+      .prepare(
+        `SELECT i.id
+         FROM spelling_items i
+         WHERE i.status = 'active'
+           AND EXISTS (SELECT 1 FROM spelling_prompts p WHERE p.item_id = i.id AND p.status = 'approved')
+         ORDER BY i.target_word ASC
+         LIMIT 2`
+      )
+      .all() as Array<{ id: string }>;
+    expect(items).toHaveLength(2);
+
+    assignSpellingItemToLearner(learnerId, items[0].id);
+    assignSpellingItemToLearner(learnerId, items[1].id);
+    requestSpellingItemNextRound(learnerId, items[1].id);
+
+    const sessionId = startSpellingMission(2, learnerId);
+    const session = getDb()
+      .prepare("SELECT item_ids_json FROM spelling_sessions WHERE id = ?")
+      .get(sessionId) as { item_ids_json: string };
+    expect(JSON.parse(session.item_ids_json)).toEqual([items[1].id, items[0].id]);
+
+    const row = getDb()
+      .prepare("SELECT priority_mode, priority_consumed_at FROM learner_spelling_items WHERE learner_id = ? AND item_id = ?")
+      .get(learnerId, items[1].id) as { priority_mode: string; priority_consumed_at: string | null };
+    expect(row.priority_mode).toBe("normal");
+    expect(row.priority_consumed_at).toBeTruthy();
   });
 
   it("does not immediately repeat remediated spelling misses above untouched words", () => {

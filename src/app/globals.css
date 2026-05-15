@@ -784,22 +784,34 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.4;
 }
 
+.library-word-button {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
 .spelling-word-actions,
 .vocabulary-word-actions {
   display: grid;
-  flex: 0 0 220px;
-  grid-template-columns: minmax(104px, 1fr) minmax(96px, 1fr);
-  gap: 10px;
+  flex: 0 0 380px;
+  grid-template-columns: minmax(82px, 0.9fr) minmax(104px, 1fr) minmax(68px, 0.74fr) minmax(72px, 0.78fr);
+  gap: 8px;
   align-items: center;
 }
 
 .spelling-word-status,
+.spelling-word-priority,
+.spelling-word-pause,
 .spelling-word-edit,
 .vocabulary-word-status,
+.vocabulary-word-priority,
+.vocabulary-word-pause,
 .vocabulary-word-edit {
   width: 100%;
-  min-height: 52px;
-  padding: 10px 14px;
+  min-height: 42px;
+  padding: 8px 12px;
+  font-size: 0.92rem;
 }
 
 .spelling-word-status,
@@ -2323,6 +2335,7 @@ button, input, textarea, select { font: inherit; }
   .vocabulary-word-actions {
     flex-basis: auto;
     width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .round-preview-panel .mission-strip {

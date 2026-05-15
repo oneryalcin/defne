@@ -48,6 +48,13 @@ export function seedInitialData(db: DatabaseSync): void {
      VALUES (?, 'Year 5', 'en-GB', ?, 'pencil_drawing', ?, ?, ?)`
   ).run(DEFAULT_LEARNER_ID, JSON.stringify(["stories", "drawing", "word games"]), JSON.stringify({ style: "warm pencil sketch" }), now, now);
 
+  if (tableExists(db, "learner_access_codes")) {
+    db.prepare(
+      `INSERT OR IGNORE INTO learner_access_codes (access_code, learner_id, created_at, updated_at)
+       VALUES ('arina', ?, ?, ?)`
+    ).run(DEFAULT_LEARNER_ID, now, now);
+  }
+
   const seedPack = readSeedPack();
   for (const entry of seedPack.entries) {
     upsertSeedWord(db, entry, now);
@@ -61,11 +68,29 @@ export function seedInitialData(db: DatabaseSync): void {
 
   const wordRows = db.prepare("SELECT id FROM words WHERE status = 'active'").all() as Array<{ id: string }>;
   for (const row of wordRows) {
+    if (tableExists(db, "learner_vocabulary_words")) {
+      db.prepare(
+        `INSERT OR IGNORE INTO learner_vocabulary_words
+          (learner_id, word_id, status, assigned_at, created_at, updated_at)
+         VALUES (?, ?, 'active', ?, ?, ?)`
+      ).run(DEFAULT_LEARNER_ID, row.id, now, now, now);
+    }
     db.prepare(
       `INSERT OR IGNORE INTO learner_word_state
         (id, learner_id, word_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?)`
     ).run(`state_${DEFAULT_LEARNER_ID}_${row.id}`, DEFAULT_LEARNER_ID, row.id, now, now);
+  }
+
+  if (tableExists(db, "learner_spelling_items")) {
+    const spellingRows = db.prepare("SELECT id FROM spelling_items WHERE status = 'active'").all() as Array<{ id: string }>;
+    for (const row of spellingRows) {
+      db.prepare(
+        `INSERT OR IGNORE INTO learner_spelling_items
+          (learner_id, item_id, status, assigned_at, created_at, updated_at)
+         VALUES (?, ?, 'active', ?, ?, ?)`
+      ).run(DEFAULT_LEARNER_ID, row.id, now, now, now);
+    }
   }
 }
 
@@ -124,6 +149,10 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
        VALUES (?, ?, ?, NULL, ?, ?)`
     ).run(`confusable_${wordId}_${index}`, wordId, confusable.trim(), now, now);
   }
+}
+
+function tableExists(db: DatabaseSync, tableName: string): boolean {
+  return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName));
 }
 
 function upsertSeedSpellingItem(db: DatabaseSync, entry: SpellingSeedEntry, now: string): void {

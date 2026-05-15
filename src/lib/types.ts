@@ -113,6 +113,7 @@ export type RoundSelectionReasonCode =
   | "near_green"
   | "mastered_comeback"
   | "stable_comeback"
+  | "parent_next_round"
   | "priority";
 
 export interface RoundSelectionReason {

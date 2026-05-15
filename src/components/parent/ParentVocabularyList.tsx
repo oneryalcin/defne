@@ -4,6 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
+import {
+  clearVocabularyWordPriorityAction,
+  requestVocabularyWordNextRoundAction,
+  unassignVocabularyWordAction
+} from "@/app/actions";
 import { MasteryBadge } from "@/components/MasteryBadge";
 import type { ParentWordListItem } from "@/lib/db/repository";
 
@@ -18,9 +23,11 @@ const MASTERY_LABELS: Record<NonNullable<ParentWordListItem["masteryColour"]>, s
 export function ParentVocabularyList({
   words,
   initialSearchQuery,
+  learnerId,
 }: {
   words: ParentWordListItem[];
   initialSearchQuery: string;
+  learnerId?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const pathname = usePathname();
@@ -39,13 +46,14 @@ export function ParentVocabularyList({
       if (normalized === currentQuery) return;
       const params = new URLSearchParams();
       if (normalized) params.set("q", normalized);
+      if (learnerId) params.set("learnerId", learnerId);
       const next = params.toString();
       const nextHref = next ? `${pathname}?${next}` : pathname;
       router.replace(nextHref);
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [pathname, router, searchQuery, currentQuery]);
+  }, [pathname, router, searchQuery, currentQuery, learnerId]);
 
   const filteredWords = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
@@ -96,7 +104,32 @@ export function ParentVocabularyList({
                 ) : (
                   <span className="empty-state vocabulary-word-status">Incomplete</span>
                 )}
-                <Link className="button-secondary vocabulary-word-edit" href={`/parent/words/${word.id}/edit`}>
+                {learnerId ? (
+                  word.priorityMode === "next_round_once" ? (
+                    <form action={clearVocabularyWordPriorityAction}>
+                      <input type="hidden" name="learnerId" value={learnerId} />
+                      <input type="hidden" name="wordId" value={word.id} />
+                      <button className="button-secondary vocabulary-word-priority" type="submit">Undo</button>
+                    </form>
+                  ) : (
+                    <form action={requestVocabularyWordNextRoundAction}>
+                      <input type="hidden" name="learnerId" value={learnerId} />
+                      <input type="hidden" name="wordId" value={word.id} />
+                      <button className="button-secondary vocabulary-word-priority" type="submit">Next round</button>
+                    </form>
+                  )
+                ) : null}
+                {learnerId ? (
+                  <form action={unassignVocabularyWordAction}>
+                    <input type="hidden" name="learnerId" value={learnerId} />
+                    <input type="hidden" name="wordId" value={word.id} />
+                    <button className="button-secondary vocabulary-word-pause" type="submit">Pause</button>
+                  </form>
+                ) : null}
+                <Link
+                  className="button-secondary vocabulary-word-edit"
+                  href={`/parent/words/${word.id}/edit${learnerId ? `?learnerId=${encodeURIComponent(learnerId)}` : ""}`}
+                >
                   <Pencil size={16} />
                   Edit
                 </Link>
@@ -106,8 +139,8 @@ export function ParentVocabularyList({
         ) : (
           <p className="empty-state" style={{ gridColumn: "1 / -1" }}>
             {searchQuery.trim()
-              ? `No vocabulary words match "${searchQuery.trim()}".`
-              : "No vocabulary words are available yet."}
+              ? `No assigned vocabulary words match "${searchQuery.trim()}".`
+              : "No vocabulary words are assigned to this child yet."}
           </p>
         )}
       </section>

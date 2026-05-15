@@ -1,15 +1,29 @@
 import { Footprints } from "lucide-react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { startMissionAction } from "@/app/actions";
 import { getMissionPreview } from "@/lib/db/repository";
+import { getLearnerAccessByCode } from "@/lib/db/learners";
+import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 import { GuideRail } from "@/components/GuideRail";
 import { WordPills } from "@/components/WordPills";
 import type { MasteryColour } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default function ChildVocabularyPage() {
-  const preview = getMissionPreview(12);
+export default async function ChildVocabularyPage() {
+  const cookieStore = await cookies();
+  const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
+  const learnerId = session?.learnerId ?? (session?.role === "child" ? getLearnerAccessByCode(session.accessCode)?.learnerId : undefined);
+  const preview = learnerId
+    ? (() => {
+        try {
+          return getMissionPreview(12, learnerId);
+        } catch {
+          return { targetQuestionCount: 0, words: [] };
+        }
+      })()
+    : { targetQuestionCount: 0, words: [] };
   const words = preview.words;
 
   const pills = words.map((word) => ({
@@ -32,9 +46,9 @@ export default function ChildVocabularyPage() {
             />
 
             <form action={startMissionAction} className="cover-actions">
-              <button className="ribbon" type="submit">
+              <button className="ribbon" type="submit" disabled={words.length === 0}>
                 <Footprints size={18} />
-                Start
+                {words.length === 0 ? "No words yet" : "Start"}
               </button>
               <Link className="ribbon ribbon--ghost" href="/child/words">
                 Words so far

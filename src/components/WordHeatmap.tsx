@@ -36,6 +36,7 @@ export function WordHeatmap({
   variant = "parent",
   basePath,
   pageParam = "p",
+  detailQuery = "",
 }: {
   words: ParentWordListItem[];
   page: number;
@@ -43,6 +44,7 @@ export function WordHeatmap({
   variant?: HeatmapVariant;
   basePath: string;
   pageParam?: string;
+  detailQuery?: string;
 }) {
   const sorted = [...words].sort((a, b) => {
     const aKey: MasteryColour | "untracked" = a.masteryColour ?? "untracked";
@@ -95,7 +97,7 @@ export function WordHeatmap({
               role="listitem"
               className="heatmap-cell"
               style={{ background: fill }}
-              href={`/parent/words/${word.id}`}
+              href={variant === "parent" ? `/parent/words/${word.id}${detailQuery}` : `/parent/words/${word.id}`}
               prefetch={false}
             >
               <span className="heatmap-cell__word">{word.word}</span>

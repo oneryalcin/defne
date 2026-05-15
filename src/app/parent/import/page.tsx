@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { importWordsAction } from "@/app/actions";
+import { resolveSelectedLearnerId } from "@/lib/db/learners";
 
-export default function ImportWordsPage() {
+type SearchParams = Promise<{ learnerId?: string }> | { learnerId?: string };
+
+export default async function ImportWordsPage({ searchParams }: { searchParams?: SearchParams }) {
+  const resolved = (await Promise.resolve(searchParams ?? {})) as { learnerId?: string };
+  const learnerId = resolveSelectedLearnerId(resolved.learnerId);
   return (
     <main className="page">
       <section className="page-title">
@@ -10,6 +15,7 @@ export default function ImportWordsPage() {
       </section>
 
       <form action={importWordsAction} className="mission-panel">
+        <input type="hidden" name="learnerId" value={learnerId} />
         <label>
           Vocabulary words
           <textarea
@@ -23,7 +29,7 @@ export default function ImportWordsPage() {
           <button className="button" type="submit">
             Import vocabulary
           </button>
-          <Link className="button-secondary" href="/parent/words">
+          <Link className="button-secondary" href={`/parent/words?learnerId=${encodeURIComponent(learnerId)}`}>
             Cancel
           </Link>
         </div>

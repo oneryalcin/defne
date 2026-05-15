@@ -1,6 +1,16 @@
 import { AddSpellingItemForm } from "@/components/parent/AddSpellingItemForm";
+import { resolveSelectedLearnerId } from "@/lib/db/learners";
 
-export default function NewSpellingItemPage() {
+type SearchParams = Promise<{ learnerId?: string }>;
+
+export default async function NewSpellingItemPage({
+  searchParams
+}: {
+  searchParams?: SearchParams;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const learnerId = resolveSelectedLearnerId(params.learnerId);
+
   return (
     <main className="page">
       <section className="page-title">
@@ -8,7 +18,7 @@ export default function NewSpellingItemPage() {
         <p>Save clean sentences. The child practice will create zero-or-one mistake versions from this reviewed content.</p>
       </section>
 
-      <AddSpellingItemForm />
+      <AddSpellingItemForm learnerId={learnerId} />
     </main>
   );
 }

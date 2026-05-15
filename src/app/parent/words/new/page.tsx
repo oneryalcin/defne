@@ -1,6 +1,11 @@
 import { AddWordForm } from "@/components/parent/AddWordForm";
+import { resolveSelectedLearnerId } from "@/lib/db/learners";
 
-export default function NewWordPage() {
+type SearchParams = Promise<{ learnerId?: string }>;
+
+export default async function NewWordPage({ searchParams }: { searchParams?: SearchParams }) {
+  const resolved = searchParams ? await searchParams : {};
+  const learnerId = resolveSelectedLearnerId(resolved.learnerId);
   return (
     <main className="page">
       <section className="page-title">
@@ -8,7 +13,11 @@ export default function NewWordPage() {
         <p>Review the wording before it enters practice.</p>
       </section>
 
-      <AddWordForm />
+      <AddWordForm
+        learnerId={learnerId}
+        cancelHref={`/parent/words?learnerId=${encodeURIComponent(learnerId)}`}
+        returnTo={`/parent/words?learnerId=${encodeURIComponent(learnerId)}`}
+      />
     </main>
   );
 }

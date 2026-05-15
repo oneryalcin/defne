@@ -18,6 +18,7 @@ interface FormValues {
 interface AddWordFormProps {
   mode?: "new" | "edit";
   wordId?: string;
+  learnerId?: string;
   initialValues?: Partial<FormValues>;
   cancelHref?: string;
   returnTo?: string;
@@ -52,6 +53,7 @@ function formValuesFromInitial(initialValues?: Partial<FormValues>): FormValues 
 export function AddWordForm({
   mode = "new",
   wordId,
+  learnerId,
   initialValues,
   cancelHref = "/parent/words",
   returnTo = "/parent/words",
@@ -112,6 +114,7 @@ export function AddWordForm({
       <form action={saveWordAction} className="parent-word-builder__editor">
         <input type="hidden" name="assistDraft" value={serialisedDraft} readOnly />
         <input type="hidden" name="returnTo" value={returnTo} readOnly />
+        {learnerId ? <input type="hidden" name="learnerId" value={learnerId} readOnly /> : null}
         {wordId ? <input type="hidden" name="wordId" value={wordId} readOnly /> : null}
         {mode === "new" ? <input type="hidden" name="word" value={values.word} readOnly /> : null}
 

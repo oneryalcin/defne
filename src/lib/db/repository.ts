@@ -525,8 +525,8 @@ function parentNextRoundReason(word: PracticeWord | null, wordId: string): Round
     wordId,
     word: word?.word ?? wordId,
     reason: "parent_next_round",
-    label: "Parent picked for next round",
-    detail: "A parent marked this active word to be tested once soon; mastery scoring was not changed."
+    label: "Picked for next round",
+    detail: "This active word was requested for one upcoming mission; mastery scoring was not changed."
   };
 }
 
@@ -1266,9 +1266,11 @@ export interface WordDetailView {
   word: string;
   definition: string | null;
   example: string | null;
+  examples: string[];
   synonyms: string[];
   antonyms: string[];
   confusables: string[];
+  priorityMode: "normal" | "next_round_once";
   /** State snapshot at read time. */
   state: LearnerWordState | null;
   /** Live colour from the algorithm. */
@@ -1325,21 +1327,25 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
                FROM word_examples e
                WHERE e.word_id = w.id AND e.status = 'approved'
                ORDER BY e.id ASC
-               LIMIT 1) AS example
+               LIMIT 1) AS example,
+              COALESCE(lvw.priority_mode, 'normal') AS priority_mode
        FROM words w
        LEFT JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       LEFT JOIN learner_vocabulary_words lvw ON lvw.word_id = w.id AND lvw.learner_id = ?
        WHERE w.id = ? AND w.status = 'active'`
     )
-    .get(wordId) as
+    .get(learnerId, wordId) as
     | {
         id: string;
         word: string;
         difficulty_level: number;
         definition: string | null;
         example: string | null;
+        priority_mode: "normal" | "next_round_once";
       }
     | undefined;
   if (!wordRow) return null;
+  const examples = getExamples(db, wordRow.id);
 
   const synonyms = db
     .prepare(`SELECT synonym AS lemma FROM word_synonyms WHERE word_id = ?`)
@@ -1421,7 +1427,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
       difficultyLevel: wordRow.difficulty_level,
       definition: wordRow.definition ?? "",
       example: wordRow.example ?? "",
-      examples: getExamples(db, wordRow.id),
+      examples,
       exampleRefs: getExampleRows(db, wordRow.id),
       synonyms: synonyms.map((s) => s.lemma),
       antonyms: antonyms.map((s) => s.lemma),
@@ -1500,9 +1506,11 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
     word: wordRow.word,
     definition: wordRow.definition,
     example: wordRow.example,
+    examples,
     synonyms: synonyms.map((s) => s.lemma),
     antonyms: antonyms.map((s) => s.lemma),
     confusables: confusables.map((s) => s.lemma ?? "").filter(Boolean),
+    priorityMode: wordRow.priority_mode,
     state,
     masteryColour,
     scoreReasons,

@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   createOrUpdateParentWord,
@@ -140,6 +141,24 @@ export async function startMeaningRecognitionAction(formData: FormData): Promise
   const sessionId = String(formData.get("sessionId") ?? "");
   startRoundMeaningRecognition(sessionId);
   redirect(`/child/session/${sessionId}`);
+}
+
+export async function requestChildVocabularyWordNextRoundAction(formData: FormData): Promise<void> {
+  const learnerId = await requireChildLearnerId();
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) requestVocabularyWordNextRound(learnerId, wordId);
+  revalidatePath("/child/words");
+  if (wordId) revalidatePath(`/child/words/${wordId}`);
+  redirect(wordId ? `/child/words/${encodeURIComponent(wordId)}` : "/child/words");
+}
+
+export async function clearChildVocabularyWordPriorityAction(formData: FormData): Promise<void> {
+  const learnerId = await requireChildLearnerId();
+  const wordId = String(formData.get("wordId") ?? "").trim();
+  if (wordId) clearVocabularyWordPriority(learnerId, wordId);
+  revalidatePath("/child/words");
+  if (wordId) revalidatePath(`/child/words/${wordId}`);
+  redirect(wordId ? `/child/words/${encodeURIComponent(wordId)}` : "/child/words");
 }
 
 export async function setVisualCuesAction(formData: FormData): Promise<void> {

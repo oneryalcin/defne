@@ -409,24 +409,26 @@ relax very-hard words before extra recovery.
 The green cap is explicitly relaxable. This matters for small decks or all-green
 decks, where the selector must still be able to fill a mission.
 
-## Parent Next-Round Intent
+## Next-Round Intent
 
-Parent "Next round" is an assignment-layer policy, not a change to the V2.1
-selection math. The core selector in `src/lib/learning/roundSelection.ts` still
-computes utility, caps, passes, and reason labels from learner state exactly as
-described above.
+A parent or child "Next round" request is an assignment-layer policy, not a
+change to the V2.1 selection math. The core selector in
+`src/lib/learning/roundSelection.ts` still computes utility, caps, passes, and
+reason labels from learner state exactly as described above.
 
-For a per-child assignment, the parent can mark an active vocabulary word or
-spelling item as `next_round_once`. When the next mission is created:
+For a per-child assignment, a parent can mark an active vocabulary word or
+spelling item as `next_round_once`. A child can also mark one of their active
+vocabulary words from the child word detail page. When the next mission is
+created:
 
-- vocabulary takes at most 3 parent-marked words at the front of a 6-12 word
+- vocabulary takes at most 3 requested words at the front of a 6-12 word
   mission;
 - spelling takes at most 2 parent-marked items at the front of the spelling
   mission;
 - those marked items are removed from the remaining candidate pool before the
   normal selector fills the rest of the mission;
-- selected vocabulary words get the reason code `parent_next_round` so the
-  parent can inspect why they appeared;
+- selected vocabulary words keep the existing reason code `parent_next_round`
+  with neutral copy so the parent can inspect why they appeared;
 - the assignment priority is consumed immediately after the mission is
   committed, so it is a one-time nudge;
 - pausing an assignment clears any pending priority.
@@ -434,8 +436,8 @@ spelling item as `next_round_once`. When the next mission is created:
 This deliberately does not mutate `learner_word_state`,
 `spelling_learner_state`, mastery colour, stability, recovery debt, review
 timestamps, or clean-retrieval evidence. The intent is to let a parent say
-"please include this soon" without pretending the child remembered, forgot, or
-changed mastery level.
+"please include this soon" or a child say "I want to practise this soon"
+without pretending the child remembered, forgot, or changed mastery level.
 
 ## Tie-Breaking
 

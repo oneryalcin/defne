@@ -97,7 +97,7 @@ export function WordHeatmap({
               role="listitem"
               className="heatmap-cell"
               style={{ background: fill }}
-              href={variant === "parent" ? `/parent/words/${word.id}${detailQuery}` : `/parent/words/${word.id}`}
+              href={variant === "parent" ? `/parent/words/${word.id}${detailQuery}` : `/child/words/${word.id}`}
               prefetch={false}
             >
               <span className="heatmap-cell__word">{word.word}</span>
@@ -121,7 +121,7 @@ export function WordHeatmap({
                     marginTop: 4,
                   }}
                 >
-                  Click for full history →
+                  Open word page →
                 </span>
               </span>
             </Link>

@@ -86,6 +86,18 @@ export function learnerExists(learnerId: string): boolean {
   return Boolean(getDb().prepare("SELECT id FROM learners WHERE id = ?").get(learnerId));
 }
 
+export function vocabularyWordIsActiveForLearner(learnerId: string, wordId: string): boolean {
+  return Boolean(
+    getDb()
+      .prepare(
+        `SELECT 1
+         FROM learner_vocabulary_words
+         WHERE learner_id = ? AND word_id = ? AND status = 'active'`
+      )
+      .get(learnerId, wordId)
+  );
+}
+
 export function getLearnerAccessByCode(accessCode: string): LearnerAccess | null {
   const code = normalizeAccessCode(accessCode);
   if (!code) return null;

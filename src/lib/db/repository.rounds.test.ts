@@ -24,6 +24,7 @@ import {
   createLearner,
   listAvailableVocabularyForLearner,
   requestVocabularyWordNextRound,
+  unassignVocabularyWordFromLearner,
 } from "./learners";
 import {
   assignSpellingItemToLearner,
@@ -150,6 +151,45 @@ describe("round repository orchestration", () => {
     expect(preview.words.map((word) => word.selectionReason.reason)).toEqual(
       view.round?.cards.map((card) => card.selectionReason?.reason)
     );
+  });
+
+  it("keeps an existing round usable after a parent pauses one of its words", () => {
+    const learnerId = createLearner({ displayName: "Lev", accessCode: "lev-test" });
+    const assigned = listAvailableVocabularyForLearner(learnerId)
+      .filter((word) => !word.assigned)
+      .slice(0, 8);
+    expect(assigned).toHaveLength(8);
+    assigned.forEach((word) => assignVocabularyWordToLearner(learnerId, word.id));
+
+    const sessionId = startRoundMission(6, learnerId);
+    const originalView = getSessionView(sessionId);
+    const pausedCard = originalView.round?.cards[0];
+    expect(pausedCard).toBeTruthy();
+    if (!pausedCard || !originalView.round) throw new Error("Expected a committed round card.");
+
+    unassignVocabularyWordFromLearner(learnerId, pausedCard.id);
+
+    const viewAfterPause = getSessionView(sessionId);
+    expect(viewAfterPause.round?.cards.map((card) => card.id)).toContain(pausedCard.id);
+    expect(getParentWords(learnerId).map((word) => word.id)).not.toContain(pausedCard.id);
+
+    for (const card of originalView.round.cards) {
+      recordRoundCardView(sessionId, card.id);
+      recordRoundCardView(sessionId, card.id);
+    }
+    startRoundMeaningRecognition(sessionId);
+
+    const scoringView = getSessionView(sessionId);
+    expect(scoringView.round?.word?.id).toBe(pausedCard.id);
+    expect(scoringView.question?.canonicalAnswer).toBeTruthy();
+    expect(() =>
+      submitSessionAnswer({
+        sessionId,
+        submittedAnswer: scoringView.question?.canonicalAnswer ?? "",
+        hintLevelUsed: 0,
+        responseTimeMs: 1200
+      })
+    ).not.toThrow();
   });
 
   it("does not let stale unfinished rounds override the current priority queue", () => {

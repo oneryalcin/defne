@@ -743,7 +743,8 @@ export function getSessionView(sessionId: string, selectedCardId?: string): Sess
 
   const plan = readSessionPlan(session);
   const attempts = getSessionAttemptCount(db, sessionId);
-  const words = getPracticeWords(session.learner_id);
+  const planWordIds = plan.map((item) => item.wordId);
+  const words = getCommittedPracticeWords(db, session.learner_id, planWordIds);
   const wordMap = new Map(words.map((word) => [word.id, word]));
 
   if (session.status !== "in_progress" || attempts >= plan.length) {
@@ -803,7 +804,7 @@ export function submitSessionAnswer(input: {
     return { completed: true, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
-  const words = getPracticeWords(session.learner_id);
+  const words = getCommittedPracticeWords(db, session.learner_id, plan.map((item) => item.wordId));
   const word = words.find((candidate) => candidate.id === current.wordId);
   if (!word) throw new Error(`Session word ${current.wordId} is not available.`);
 
@@ -1813,7 +1814,7 @@ function getRoundSessionView(
 ): SessionView {
   const wordIds = readRoundWordIds(round);
   const cardViewCounts = readCardViewCounts(round);
-  const words = getPracticeWords(session.learner_id);
+  const words = getCommittedPracticeWords(db, session.learner_id, wordIds);
   const wordMap = new Map(words.map((word) => [word.id, word]));
   const roundWords = wordIds.map((wordId) => {
     const word = wordMap.get(wordId);
@@ -1920,7 +1921,7 @@ function submitRoundAnswer(
     return { completed: false, attemptId: null, isCorrect: null, questionType: null, roundStep: null, passNumber: null };
   }
 
-  const words = getPracticeWords(session.learner_id);
+  const words = getCommittedPracticeWords(db, session.learner_id, wordIds);
   const word = words.find((candidate) => candidate.id === cursor.wordId);
   if (!word) throw new Error(`Round word ${cursor.wordId} is not available.`);
 
@@ -2044,7 +2045,7 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const contextByWord = new Map(contextProgress.statuses.map((status) => [status.wordId, status]));
   const nowPlusNearReview = new Date(new Date(completedAt).getTime() + 12 * 3_600_000).toISOString();
 
-  const words = getPracticeWords(round.learner_id);
+  const words = getCommittedPracticeWords(db, round.learner_id, wordIds);
   const wordMap = new Map(words.map((word) => [word.id, word]));
   const wordName = (wordId: string) => wordMap.get(wordId)?.word ?? wordId;
   const hasMistake = (wordId: string) => {
@@ -2071,7 +2072,7 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
   const mistakeWordIds = wordIds.filter((wordId) => hasMistake(wordId));
   updateNearReviewAfterRound(db, wordIds, mistakeWordIds, completedAt, nowPlusNearReview, round.learner_id);
 
-  const refreshedWords = getPracticeWords(round.learner_id);
+  const refreshedWords = getCommittedPracticeWords(db, round.learner_id, wordIds);
   const refreshedWordMap = new Map(refreshedWords.map((word) => [word.id, word]));
   const nearReviewWordIds = wordIds.filter((wordId) => refreshedWordMap.get(wordId)?.state.nearReview);
   const nearReviewWords = nearReviewWordIds.map(wordName);
@@ -2286,6 +2287,30 @@ function getPracticeWords(learnerId = defaultLearnerId()): PracticeWord[] {
     .all(learnerId) as unknown as WordRow[];
 
   return rows.map((row) => {
+    return practiceWordFromRow(db, learnerId, row);
+  });
+}
+
+function getCommittedPracticeWords(db: DatabaseSync, learnerId: string, wordIds: string[]): PracticeWord[] {
+  const uniqueWordIds = Array.from(new Set(wordIds));
+  if (uniqueWordIds.length === 0) return [];
+  const placeholders = uniqueWordIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `SELECT w.id, w.word, w.normalized_word, w.difficulty_level, d.definition
+       FROM words w
+       JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       WHERE w.id IN (${placeholders})
+         AND w.status = 'active'
+         AND EXISTS (SELECT 1 FROM word_examples e WHERE e.word_id = w.id AND e.status = 'approved')
+       ORDER BY w.word ASC`
+    )
+    .all(...uniqueWordIds) as unknown as WordRow[];
+
+  return rows.map((row) => practiceWordFromRow(db, learnerId, row));
+}
+
+function practiceWordFromRow(db: DatabaseSync, learnerId: string, row: WordRow): PracticeWord {
     const state = getStateForWord(db, row.id, learnerId);
     const exampleRefs = getExampleRows(db, row.id);
     const examples = exampleRefs.map((example) => example.sentence);
@@ -2303,7 +2328,6 @@ function getPracticeWords(learnerId = defaultLearnerId()): PracticeWord[] {
       confusables: getTextList(db, "word_confusables", "confusable_text", row.id),
       state
     };
-  });
 }
 
 function uniqueTexts(values: string[]): string[] {

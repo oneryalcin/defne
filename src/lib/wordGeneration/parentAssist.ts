@@ -7,6 +7,7 @@ import {
   type GeneratedExampleVisualCue
 } from "@/lib/imageGeneration/exampleVisualCues";
 import { deterministicWordId, normalizeWord } from "@/lib/db/seed";
+import { normaliseParentVocabularyWord } from "@/lib/normalization";
 import { generateDeepSeekJsonText, type DeepSeekJsonGenerationOptions } from "./deepSeek";
 
 const DRAFT_IMAGE_DIR = "public/assets/example-cues/drafts";
@@ -47,7 +48,7 @@ export async function generateParentWordAssistDraft(
   word: string,
   options: ParentWordAssistOptions = {}
 ): Promise<ParentWordAssistDraft> {
-  const cleanWord = word.trim();
+  const cleanWord = normaliseParentVocabularyWord(word);
   if (!cleanWord) {
     throw new Error("Enter a word before generating help.");
   }

@@ -35,6 +35,7 @@ import {
   submitSpellingAnswer,
   unassignSpellingItemFromLearner
 } from "@/lib/db/spellingRepository";
+import { normaliseParentVocabularyWord } from "@/lib/normalization";
 import {
   PILOT_SESSION_COOKIE,
   getSessionTtlSeconds,
@@ -244,7 +245,7 @@ export async function saveWordAction(formData: FormData): Promise<void> {
   await requireRole("parent");
   const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
   const existingWordId = String(formData.get("wordId") ?? "").trim();
-  const submittedWord = String(formData.get("word") ?? "");
+  const submittedWord = normaliseParentVocabularyWord(String(formData.get("word") ?? ""));
   const examples = formData
     .getAll("examples")
     .map((value) => String(value ?? "").trim())

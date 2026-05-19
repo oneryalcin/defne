@@ -1608,6 +1608,7 @@ export function createOrUpdateParentWord(input: WordFormInput, learnerId = defau
   const now = new Date().toISOString();
   const normalized = normalizeWord(input.word);
   if (!normalized) throw new Error("Word is required.");
+  const canonicalWord = normalized;
   const wordId = deterministicWordId(normalized);
   const existingWord = db
     .prepare("SELECT id FROM words WHERE normalized_word = ?")
@@ -1622,7 +1623,7 @@ export function createOrUpdateParentWord(input: WordFormInput, learnerId = defau
        status = 'active',
        content_version = words.content_version + 1,
        updated_at = excluded.updated_at`
-  ).run(wordId, input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, now);
+  ).run(wordId, canonicalWord, normalized, clampDifficulty(input.difficultyLevel ?? 2), now, now);
 
   replaceOptionalWordRows(db, wordId, input, now);
   assignVocabularyWordToLearnerInDb(db, learnerId, wordId, now);
@@ -1638,6 +1639,7 @@ export function updateParentWord(input: WordFormInput & { wordId: string }, lear
   const now = new Date().toISOString();
   const normalized = normalizeWord(input.word);
   if (!normalized) throw new Error("Word is required.");
+  const canonicalWord = normalized;
 
   const existingWord = db
     .prepare("SELECT id FROM words WHERE id = ? AND status = 'active'")
@@ -1647,7 +1649,7 @@ export function updateParentWord(input: WordFormInput & { wordId: string }, lear
   const duplicateWord = db
     .prepare("SELECT id FROM words WHERE normalized_word = ? AND id <> ?")
     .get(normalized, input.wordId) as { id: string } | undefined;
-  if (duplicateWord) throw new Error(`"${input.word.trim()}" is already in the vocabulary list.`);
+  if (duplicateWord) throw new Error(`"${canonicalWord}" is already in the vocabulary list.`);
 
   db.prepare(
     `UPDATE words
@@ -1657,7 +1659,7 @@ export function updateParentWord(input: WordFormInput & { wordId: string }, lear
          content_version = content_version + 1,
          updated_at = ?
      WHERE id = ?`
-  ).run(input.word.trim(), normalized, clampDifficulty(input.difficultyLevel ?? 2), now, input.wordId);
+  ).run(canonicalWord, normalized, clampDifficulty(input.difficultyLevel ?? 2), now, input.wordId);
 
   replaceOptionalWordRows(db, input.wordId, input, now);
   assignVocabularyWordToLearnerInDb(db, learnerId, input.wordId, now);

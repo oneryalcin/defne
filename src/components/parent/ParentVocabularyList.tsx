@@ -68,8 +68,6 @@ export function ParentVocabularyList({
       const params = new URLSearchParams(window.location.search);
       if (normalized) params.set("q", normalized);
       else params.delete("q");
-      if (learnerId) params.set("learnerId", learnerId);
-      else params.delete("learnerId");
       const next = params.toString();
       const nextHref = next ? `${window.location.pathname}?${next}` : window.location.pathname;
       if (nextHref !== `${window.location.pathname}${window.location.search}`) {
@@ -78,7 +76,7 @@ export function ParentVocabularyList({
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [searchQuery, learnerId]);
+  }, [searchQuery]);
 
   const filteredWords = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
@@ -155,7 +153,7 @@ export function ParentVocabularyList({
                   <form action={unassignVocabularyWordAction}>
                     <input type="hidden" name="learnerId" value={learnerId} />
                     <input type="hidden" name="wordId" value={word.id} />
-                    <button className="button-secondary vocabulary-word-pause" type="submit">Pause</button>
+                    <button className="button-secondary vocabulary-word-pause" type="submit">Unassign</button>
                   </form>
                 ) : null}
                 <Link
@@ -193,7 +191,7 @@ export function ParentVocabularyList({
                 <form action={unassignVocabularyWordAction}>
                   <input type="hidden" name="learnerId" value={learnerId} />
                   <input type="hidden" name="wordId" value={word.id} />
-                  <button className="button-secondary library-word-button" type="submit">Pause for child</button>
+                  <button className="button-secondary library-word-button" type="submit">Unassign from child</button>
                 </form>
               ) : (
                 <form action={assignVocabularyWordAction}>

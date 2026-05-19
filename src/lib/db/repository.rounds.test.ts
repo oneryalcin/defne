@@ -37,7 +37,8 @@ import {
   requestSpellingItemNextRound,
   startSpellingPractice,
   startSpellingMission,
-  submitSpellingAnswer
+  submitSpellingAnswer,
+  unassignSpellingItemFromLearner
 } from "./spellingRepository";
 
 let tempDir: string | null = null;
@@ -73,7 +74,7 @@ describe("round repository orchestration", () => {
     expect(findActiveWordByText(candidate.word)?.id).toBe(candidate.id);
   });
 
-  it("assigns a newly created parent word only to the selected child", () => {
+  it("assigns a newly created parent word only to the selected child, even after reseeding", () => {
     const learnerId = createLearner({ displayName: "Lina", accessCode: "lina" });
     const wordId = createOrUpdateParentWord(
       {
@@ -84,6 +85,11 @@ describe("round repository orchestration", () => {
       },
       learnerId
     );
+
+    expect(getParentWords(learnerId).map((word) => word.id)).toContain(wordId);
+    expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
+
+    seedInitialData(getDb());
 
     expect(getParentWords(learnerId).map((word) => word.id)).toContain(wordId);
     expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
@@ -153,7 +159,7 @@ describe("round repository orchestration", () => {
     );
   });
 
-  it("keeps an existing round usable after a parent pauses one of its words", () => {
+  it("keeps an existing round usable after a parent unassigns one of its words", () => {
     const learnerId = createLearner({ displayName: "Lev", accessCode: "lev-test" });
     const assigned = listAvailableVocabularyForLearner(learnerId)
       .filter((word) => !word.assigned)
@@ -163,15 +169,15 @@ describe("round repository orchestration", () => {
 
     const sessionId = startRoundMission(6, learnerId);
     const originalView = getSessionView(sessionId);
-    const pausedCard = originalView.round?.cards[0];
-    expect(pausedCard).toBeTruthy();
-    if (!pausedCard || !originalView.round) throw new Error("Expected a committed round card.");
+    const unassignedCard = originalView.round?.cards[0];
+    expect(unassignedCard).toBeTruthy();
+    if (!unassignedCard || !originalView.round) throw new Error("Expected a committed round card.");
 
-    unassignVocabularyWordFromLearner(learnerId, pausedCard.id);
+    unassignVocabularyWordFromLearner(learnerId, unassignedCard.id);
 
-    const viewAfterPause = getSessionView(sessionId);
-    expect(viewAfterPause.round?.cards.map((card) => card.id)).toContain(pausedCard.id);
-    expect(getParentWords(learnerId).map((word) => word.id)).not.toContain(pausedCard.id);
+    const viewAfterUnassign = getSessionView(sessionId);
+    expect(viewAfterUnassign.round?.cards.map((card) => card.id)).toContain(unassignedCard.id);
+    expect(getParentWords(learnerId).map((word) => word.id)).not.toContain(unassignedCard.id);
 
     for (const card of originalView.round.cards) {
       recordRoundCardView(sessionId, card.id);
@@ -180,7 +186,7 @@ describe("round repository orchestration", () => {
     startRoundMeaningRecognition(sessionId);
 
     const scoringView = getSessionView(sessionId);
-    expect(scoringView.round?.word?.id).toBe(pausedCard.id);
+    expect(scoringView.round?.word?.id).toBe(unassignedCard.id);
     expect(scoringView.question?.canonicalAnswer).toBeTruthy();
     expect(() =>
       submitSessionAnswer({
@@ -190,6 +196,18 @@ describe("round repository orchestration", () => {
         responseTimeMs: 1200
       })
     ).not.toThrow();
+  });
+
+  it("keeps an unassigned seed vocabulary word out of a child deck after reseeding", () => {
+    const wordId = getParentWords("learner_defne")[0]?.id;
+    expect(wordId).toBeTruthy();
+    if (!wordId) throw new Error("Expected seeded Defne vocabulary.");
+
+    unassignVocabularyWordFromLearner("learner_defne", wordId);
+    seedInitialData(getDb());
+
+    expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
+    expect(listAvailableVocabularyForLearner("learner_defne").find((word) => word.id === wordId)?.assigned).toBe(false);
   });
 
   it("does not let stale unfinished rounds override the current priority queue", () => {
@@ -718,6 +736,39 @@ describe("spelling repository orchestration", () => {
     const preview = getSpellingPreview(400);
     expect(preview.items.some((item) => item.target === "practise")).toBe(true);
     expect(preview.items.some((item) => item.target === "practice")).toBe(false);
+  });
+
+  it("assigns a newly created parent spelling item only to the selected child, even after reseeding", () => {
+    const learnerId = createLearner({ displayName: "Noa", accessCode: "noa" });
+    const itemId = createOrUpdateParentSpellingItem(
+      {
+        target: "glimmering",
+        usageLabel: "adjective",
+        teachingNote: "Glimmering means shining softly.",
+        sentences: ["The glimmering light helped Mina find the path."],
+        difficultyLevel: 2
+      },
+      learnerId
+    );
+
+    expect(getParentSpellingItems(learnerId).map((item) => item.id)).toContain(itemId);
+    expect(getParentSpellingItems("learner_defne").map((item) => item.id)).not.toContain(itemId);
+
+    seedInitialData(getDb());
+
+    expect(getParentSpellingItems(learnerId).map((item) => item.id)).toContain(itemId);
+    expect(getParentSpellingItems("learner_defne").map((item) => item.id)).not.toContain(itemId);
+  });
+
+  it("keeps an unassigned seed spelling item out of a child deck after reseeding", () => {
+    const itemId = getParentSpellingItems("learner_defne")[0]?.id;
+    expect(itemId).toBeTruthy();
+    if (!itemId) throw new Error("Expected seeded Defne spelling items.");
+
+    unassignSpellingItemFromLearner("learner_defne", itemId);
+    seedInitialData(getDb());
+
+    expect(getParentSpellingItems("learner_defne").map((item) => item.id)).not.toContain(itemId);
   });
 
   it("loads and updates existing spelling items without seed refresh overwriting parent edits", () => {

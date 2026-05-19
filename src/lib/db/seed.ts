@@ -66,7 +66,7 @@ export function seedInitialData(db: DatabaseSync): void {
     upsertSeedSpellingItem(db, entry, now);
   }
 
-  const wordRows = db.prepare("SELECT id FROM words WHERE status = 'active'").all() as Array<{ id: string }>;
+  const wordRows = db.prepare("SELECT id FROM words WHERE source = 'seed' AND status = 'active'").all() as Array<{ id: string }>;
   for (const row of wordRows) {
     if (tableExists(db, "learner_vocabulary_words")) {
       db.prepare(
@@ -83,7 +83,7 @@ export function seedInitialData(db: DatabaseSync): void {
   }
 
   if (tableExists(db, "learner_spelling_items")) {
-    const spellingRows = db.prepare("SELECT id FROM spelling_items WHERE status = 'active'").all() as Array<{ id: string }>;
+    const spellingRows = db.prepare("SELECT id FROM spelling_items WHERE source = 'seed' AND status = 'active'").all() as Array<{ id: string }>;
     for (const row of spellingRows) {
       db.prepare(
         `INSERT OR IGNORE INTO learner_spelling_items

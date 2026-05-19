@@ -39,6 +39,22 @@ const EMPTY_VALUES: FormValues = {
   sentences: ["", ""]
 };
 
+function lowercaseSpellingInput(value: string): string {
+  return value.normalize("NFKC").replace(/\u0130/g, "I").toLocaleLowerCase("en-GB");
+}
+
+function formValuesFromInitial(initialValues?: FormValues): FormValues {
+  const sentences = initialValues?.sentences ?? EMPTY_VALUES.sentences;
+
+  return {
+    target: normalizeTarget(initialValues?.target ?? EMPTY_VALUES.target),
+    pairedTarget: normalizeTarget(initialValues?.pairedTarget ?? EMPTY_VALUES.pairedTarget),
+    usageLabel: initialValues?.usageLabel ?? EMPTY_VALUES.usageLabel,
+    teachingNote: initialValues?.teachingNote ?? EMPTY_VALUES.teachingNote,
+    sentences: [...sentences, "", ""].slice(0, Math.max(2, sentences.length))
+  };
+}
+
 export function AddSpellingItemForm({
   initialValues,
   initialItemId,
@@ -46,13 +62,17 @@ export function AddSpellingItemForm({
   mode = "create"
 }: AddSpellingItemFormProps) {
   const [assistState, assistAction, assistPending] = useActionState(generateSpellingAssistAction, INITIAL_STATE);
-  const [values, setValues] = useState<FormValues>(initialValues ?? EMPTY_VALUES);
+  const [values, setValues] = useState<FormValues>(() => formValuesFromInitial(initialValues));
+
+  useEffect(() => {
+    setValues(formValuesFromInitial(initialValues));
+  }, [initialValues]);
 
   useEffect(() => {
     if (!assistState.draft) return;
     setValues({
-      target: assistState.draft.target,
-      pairedTarget: assistState.draft.pairedTarget,
+      target: normalizeTarget(assistState.draft.target),
+      pairedTarget: normalizeTarget(assistState.draft.pairedTarget),
       usageLabel: assistState.draft.usageLabel,
       teachingNote: assistState.draft.teachingNote,
       sentences: [assistState.draft.sentences[0] ?? "", assistState.draft.sentences[1] ?? ""]
@@ -74,7 +94,7 @@ export function AddSpellingItemForm({
                 name="target"
                 placeholder="advise"
                 value={values.target}
-                onChange={(event) => setValues((current) => ({ ...current, target: event.target.value }))}
+                onChange={(event) => setValues((current) => ({ ...current, target: lowercaseSpellingInput(event.target.value) }))}
                 onBlur={() => setValues((current) => ({ ...current, target: normalizeTarget(current.target) }))}
               />
               <button className="button" type="submit" disabled={assistPending}>
@@ -84,21 +104,7 @@ export function AddSpellingItemForm({
             </span>
           </label>
         </form>
-      ) : (
-        <label className="parent-word-builder__word-field">
-          Spelling word
-          <span className="parent-word-builder__generate-row">
-            <input
-              className="field"
-              required
-              name="target"
-              value={values.target}
-              onChange={(event) => setValues((current) => ({ ...current, target: event.target.value }))}
-              onBlur={() => setValues((current) => ({ ...current, target: normalizeTarget(current.target) }))}
-            />
-          </span>
-        </label>
-      )}
+      ) : null}
 
       {generationMessage && assistState.status !== "success" ? (
         <div className={assistState.status === "error" ? "empty-state parent-word-builder__status is-error" : "empty-state"}>
@@ -111,6 +117,22 @@ export function AddSpellingItemForm({
         {initialItemId ? <input type="hidden" name="itemId" value={initialItemId} readOnly /> : null}
         {learnerId ? <input type="hidden" name="learnerId" value={learnerId} readOnly /> : null}
 
+        {mode === "edit" ? (
+          <label className="parent-word-builder__word-field">
+            Spelling word
+            <span className="parent-word-builder__generate-row">
+              <input
+                className="field"
+                required
+                name="target"
+                value={values.target}
+                onChange={(event) => setValues((current) => ({ ...current, target: lowercaseSpellingInput(event.target.value) }))}
+                onBlur={() => setValues((current) => ({ ...current, target: normalizeTarget(current.target) }))}
+              />
+            </span>
+          </label>
+        ) : null}
+
         <div className="form-grid">
           <label>
             Pair or common confusion
@@ -119,7 +141,7 @@ export function AddSpellingItemForm({
               name="pairedTarget"
               placeholder="advice"
               value={values.pairedTarget}
-              onChange={(event) => setValues((current) => ({ ...current, pairedTarget: event.target.value }))}
+              onChange={(event) => setValues((current) => ({ ...current, pairedTarget: lowercaseSpellingInput(event.target.value) }))}
               onBlur={() => setValues((current) => ({ ...current, pairedTarget: normalizeTarget(current.pairedTarget) }))}
             />
           </label>

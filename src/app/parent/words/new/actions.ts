@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { findActiveWordByText, getVisualCueGenerationPreference } from "@/lib/db/repository";
 import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
+import { normaliseParentVocabularyWord } from "@/lib/normalization";
 import type { ParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
 import { generateParentWordAssistDraft } from "@/lib/wordGeneration/parentAssist";
 
@@ -29,7 +30,7 @@ export async function generateWordAssistAction(
     redirect("/");
   }
 
-  const word = String(formData.get("word") ?? "").trim();
+  const word = normaliseParentVocabularyWord(String(formData.get("word") ?? ""));
   if (!word) {
     return { status: "error", message: "Enter a word before generating.", draft: null };
   }

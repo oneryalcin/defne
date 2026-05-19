@@ -6,6 +6,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { LoaderCircle, Sparkles } from "lucide-react";
 import { saveWordAction } from "@/app/actions";
 import { generateWordAssistAction, type ParentWordAssistActionState } from "@/app/parent/words/new/actions";
+import { normaliseParentVocabularyWord as normalizeWordInput } from "@/lib/normalization";
 
 interface FormValues {
   word: string;
@@ -38,11 +39,15 @@ const EMPTY_VALUES: FormValues = {
   examples: ["", "", ""]
 };
 
+function lowercaseWordInput(value: string): string {
+  return value.normalize("NFKC").replace(/\u0130/g, "I").toLocaleLowerCase("en-GB");
+}
+
 function formValuesFromInitial(initialValues?: Partial<FormValues>): FormValues {
   const examples = initialValues?.examples ?? EMPTY_VALUES.examples;
 
   return {
-    word: initialValues?.word ?? EMPTY_VALUES.word,
+    word: normalizeWordInput(initialValues?.word ?? EMPTY_VALUES.word),
     definition: initialValues?.definition ?? EMPTY_VALUES.definition,
     synonyms: initialValues?.synonyms ?? EMPTY_VALUES.synonyms,
     antonyms: initialValues?.antonyms ?? EMPTY_VALUES.antonyms,
@@ -68,7 +73,7 @@ export function AddWordForm({
   useEffect(() => {
     if (!assistState.draft) return;
     setValues({
-      word: assistState.draft.word,
+      word: normalizeWordInput(assistState.draft.word),
       definition: assistState.draft.definition,
       synonyms: assistState.draft.synonyms.join(", "),
       antonyms: assistState.draft.antonyms.join(", "),
@@ -94,7 +99,8 @@ export function AddWordForm({
                 name="word"
                 placeholder="reluctant"
                 value={values.word}
-                onChange={(event) => setValues((current) => ({ ...current, word: event.target.value }))}
+                onChange={(event) => setValues((current) => ({ ...current, word: lowercaseWordInput(event.target.value) }))}
+                onBlur={() => setValues((current) => ({ ...current, word: normalizeWordInput(current.word) }))}
               />
               <button className="button" type="submit" disabled={assistPending}>
                 {assistPending ? <LoaderCircle size={18} className="spin" /> : <Sparkles size={18} />}
@@ -116,7 +122,7 @@ export function AddWordForm({
         <input type="hidden" name="returnTo" value={returnTo} readOnly />
         {learnerId ? <input type="hidden" name="learnerId" value={learnerId} readOnly /> : null}
         {wordId ? <input type="hidden" name="wordId" value={wordId} readOnly /> : null}
-        {mode === "new" ? <input type="hidden" name="word" value={values.word} readOnly /> : null}
+        {mode === "new" ? <input type="hidden" name="word" value={normalizeWordInput(values.word)} readOnly /> : null}
 
         <div className="form-grid">
           {mode === "edit" ? (
@@ -126,7 +132,8 @@ export function AddWordForm({
                 className="field"
                 name="word"
                 value={values.word}
-                onChange={(event) => setValues((current) => ({ ...current, word: event.target.value }))}
+                onChange={(event) => setValues((current) => ({ ...current, word: lowercaseWordInput(event.target.value) }))}
+                onBlur={() => setValues((current) => ({ ...current, word: normalizeWordInput(current.word) }))}
               />
             </label>
           ) : null}

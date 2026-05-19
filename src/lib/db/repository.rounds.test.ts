@@ -703,8 +703,27 @@ describe("round repository orchestration", () => {
       example: "Mina walked at a brisk pace and reached the gate before the bell."
     });
 
-    expect(findActiveWordByText("  brisk  ")?.word).toBe("Brisk");
+    expect(findActiveWordByText("  brisk  ")?.word).toBe("brisk");
     expect(findActiveWordByText("briskly")).toBeNull();
+  });
+
+  it("stores parent vocabulary words lowercased when creating or editing", () => {
+    const wordId = createOrUpdateParentWord({
+      word: "ImMense",
+      definition: "Extremely large.",
+      example: "The immense hall could fit the whole school."
+    });
+
+    expect(getParentWordForEdit(wordId)?.word).toBe("immense");
+
+    updateParentWord({
+      wordId,
+      word: "GLORMISH",
+      definition: "A made-up test word.",
+      examples: ["The glormish prop filled the whole test stage."]
+    });
+
+    expect(getParentWordForEdit(wordId)?.word).toBe("glormish");
   });
 });
 

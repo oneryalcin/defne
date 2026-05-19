@@ -21,6 +21,12 @@ export default async function WordsPage({
   const libraryWords = listAvailableVocabularyForLearner(learnerId);
   const initialQuery = resolvedSearchParams.q ?? "";
   const learnerName = selectedLearner?.displayName ?? "this child";
+  const learnerWordsHref = (targetLearnerId: string) => {
+    const params = new URLSearchParams({ learnerId: targetLearnerId });
+    const trimmedQuery = initialQuery.trim();
+    if (trimmedQuery) params.set("q", trimmedQuery);
+    return `/parent/words?${params.toString()}`;
+  };
 
   return (
     <main className="page">
@@ -36,7 +42,7 @@ export default async function WordsPage({
           <Link
             key={learner.id}
             className={learner.id === learnerId ? "button" : "button-secondary"}
-            href={`/parent/words?learnerId=${encodeURIComponent(learner.id)}`}
+            href={learnerWordsHref(learner.id)}
           >
             {learner.displayName}
           </Link>

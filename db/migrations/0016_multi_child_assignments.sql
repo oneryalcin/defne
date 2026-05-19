@@ -38,10 +38,12 @@ INSERT OR IGNORE INTO learner_vocabulary_words (learner_id, word_id, status, ass
 SELECT l.id, w.id, 'active', COALESCE(w.created_at, l.created_at), COALESCE(w.created_at, l.created_at), COALESCE(w.updated_at, l.updated_at)
 FROM learners l
 CROSS JOIN words w
-WHERE w.status = 'active';
+WHERE l.id = 'learner_defne'
+  AND w.status = 'active';
 
 INSERT OR IGNORE INTO learner_spelling_items (learner_id, item_id, status, assigned_at, created_at, updated_at)
 SELECT l.id, i.id, 'active', COALESCE(i.created_at, l.created_at), COALESCE(i.created_at, l.created_at), COALESCE(i.updated_at, l.updated_at)
 FROM learners l
 CROSS JOIN spelling_items i
-WHERE i.status = 'active';
+WHERE l.id = 'learner_defne'
+  AND i.status = 'active';

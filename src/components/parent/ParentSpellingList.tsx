@@ -136,7 +136,7 @@ export function ParentSpellingList({
                   <form action={unassignSpellingItemAction}>
                     <input type="hidden" name="learnerId" value={learnerId} />
                     <input type="hidden" name="itemId" value={item.id} />
-                    <button className="button-secondary spelling-word-pause" type="submit">Pause</button>
+                    <button className="button-secondary spelling-word-pause" type="submit">Unassign</button>
                   </form>
                 ) : null}
                 <Link
@@ -177,7 +177,7 @@ export function ParentSpellingList({
                 <form action={unassignSpellingItemAction}>
                   <input type="hidden" name="learnerId" value={learnerId} />
                   <input type="hidden" name="itemId" value={item.id} />
-                  <button className="button-secondary library-word-button" type="submit">Pause for child</button>
+                  <button className="button-secondary library-word-button" type="submit">Unassign from child</button>
                 </form>
               ) : (
                 <form action={assignSpellingItemAction}>

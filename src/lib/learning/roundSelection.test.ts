@@ -46,6 +46,58 @@ describe("round word selection v2.1", () => {
     expect(introCount).toBeLessThanOrEqual(3);
   });
 
+  it("reserves one slot for an eligible new word even when older words have higher utility", () => {
+    const introductions = [
+      word("untouched_1"),
+      word("introduced_1", { lastExposedAt: daysAgo(3) })
+    ];
+    const urgentOldWords = Array.from({ length: 12 }, (_, index) =>
+      word(`urgent_old_${index + 1}`, {
+        masteryColour: "red",
+        attemptCount: 4,
+        correctCount: 1,
+        wrongCount: 3,
+        recoveryDebt: 2,
+        lastWrongAt: hoursAgo(4),
+        lastPracticedAt: hoursAgo(4),
+        lastExposedAt: hoursAgo(4)
+      })
+    );
+
+    const selection = selectRoundWords([...urgentOldWords, ...introductions], NOW, 12, EMPTY_REMEDIATION);
+
+    expect(selection.reasons.some((reason) => reason.reason === "new_word")).toBe(true);
+    expect(selection.wordIds).toHaveLength(12);
+  });
+
+  it("uses parent bucket targets before normal utility backfill", () => {
+    const introductions = Array.from({ length: 5 }, (_, index) => word(`untouched_${index + 1}`));
+    const recovery = Array.from({ length: 4 }, (_, index) =>
+      word(`recovery_${index + 1}`, {
+        masteryColour: "red",
+        attemptCount: 4,
+        correctCount: 1,
+        wrongCount: 3,
+        recoveryDebt: 2,
+        lastWrongAt: hoursAgo(4),
+        lastPracticedAt: hoursAgo(4),
+        lastExposedAt: hoursAgo(4)
+      })
+    );
+    const review = retrievalWords(6);
+
+    const selection = selectRoundWords(
+      [...recovery, ...review, ...introductions],
+      NOW,
+      12,
+      EMPTY_REMEDIATION,
+      { bucketTargets: { new: 5, recovery: 2, review: 5, stable: 0 } }
+    );
+
+    expect(selection.reasons.filter((reason) => reason.reason === "new_word")).toHaveLength(5);
+    expect(selection.reasons.filter((reason) => reason.reason === "mistake_recovery")).toHaveLength(2);
+  });
+
   it("relaxes the green cap when the available deck is all mastered words", () => {
     const selection = selectRoundWords(
       Array.from({ length: 8 }, (_, index) =>

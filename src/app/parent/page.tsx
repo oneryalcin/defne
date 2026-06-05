@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ListChecks, Plus } from "lucide-react";
-import { createChildAction, setVisualCuesAction } from "@/app/actions";
+import { createChildAction, setNextRoundMixAction, setVisualCuesAction } from "@/app/actions";
 import {
   getMissionPreview,
   getParentDashboard,
@@ -331,6 +331,50 @@ export default async function ParentDashboardPage({
                 Pause stressful words or pull from a school list. Defne keeps the round at 12 words
                 with three comeback spaces for stable and mastered words.
               </p>
+              <form action={setNextRoundMixAction} className="queue-mix-form">
+                <input type="hidden" name="learnerId" value={learnerId} />
+                <label>
+                  <span>Not started</span>
+                  <input
+                    type="number"
+                    name="nextRoundNew"
+                    min="0"
+                    max="12"
+                    defaultValue={dashboard.nextRoundMix.new}
+                  />
+                </label>
+                <label>
+                  <span>Mistake recovery</span>
+                  <input
+                    type="number"
+                    name="nextRoundRecovery"
+                    min="0"
+                    max="12"
+                    defaultValue={dashboard.nextRoundMix.recovery}
+                  />
+                </label>
+                <label>
+                  <span>Review</span>
+                  <input
+                    type="number"
+                    name="nextRoundReview"
+                    min="0"
+                    max="12"
+                    defaultValue={dashboard.nextRoundMix.review}
+                  />
+                </label>
+                <label>
+                  <span>Reliable</span>
+                  <input
+                    type="number"
+                    name="nextRoundStable"
+                    min="0"
+                    max="12"
+                    defaultValue={dashboard.nextRoundMix.stable}
+                  />
+                </label>
+                <button className="button-secondary" type="submit">Save mix</button>
+              </form>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Link className="ribbon" href={`/parent/words/new?learnerId=${encodeURIComponent(learnerId)}`}>
                   <Plus size={16} aria-hidden="true" />

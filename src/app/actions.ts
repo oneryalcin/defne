@@ -7,6 +7,7 @@ import {
   createOrUpdateParentWord,
   importWordShells,
   recordRoundCardView,
+  setNextRoundMixPreference,
   setVisualCuePreference,
   startRoundMeaningRecognition,
   startRoundMission,
@@ -171,6 +172,19 @@ export async function setVisualCuesAction(formData: FormData): Promise<void> {
     meaningQuestions: formData.get("visualCueMeaningQuestions") === "on",
     contextQuestions: formData.get("visualCueContextQuestions") === "on"
   }, learnerId);
+  redirect(`/parent?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function setNextRoundMixAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  setNextRoundMixPreference({
+    new: Number(formData.get("nextRoundNew") ?? 0),
+    recovery: Number(formData.get("nextRoundRecovery") ?? 0),
+    review: Number(formData.get("nextRoundReview") ?? 0),
+    stable: Number(formData.get("nextRoundStable") ?? 0)
+  }, learnerId);
+  revalidatePath("/parent");
   redirect(`/parent?learnerId=${encodeURIComponent(learnerId)}`);
 }
 

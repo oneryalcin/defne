@@ -384,7 +384,10 @@ export function setNextRoundMixPreference(
   learnerId = defaultLearnerId()
 ): void {
   const db = getDb();
+  const previous = getNextRoundMixPreferenceFromDb(db, learnerId);
   const normalized = normalizeNextRoundMix(preference);
+  const changed = !nextRoundMixEquals(previous, normalized);
+
   db.prepare(
     `UPDATE learner_profiles
      SET next_round_new_count = ?,
@@ -401,7 +404,9 @@ export function setNextRoundMixPreference(
     new Date().toISOString(),
     learnerId
   );
-  abandonUnstartedPreviewRound(db, learnerId);
+  if (changed) {
+    abandonActiveVocabularyRoundsForMixChange(db, learnerId);
+  }
 }
 
 export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultLearnerId()): MissionPreview {
@@ -799,39 +804,31 @@ function learnerHasUnpracticedWords(db: DatabaseSync, learnerId: string): boolea
   return Boolean(row);
 }
 
-function abandonUnstartedPreviewRound(db: DatabaseSync, learnerId: string): void {
-  const liveRound = db
+function abandonActiveVocabularyRoundsForMixChange(db: DatabaseSync, learnerId: string): void {
+  const liveRounds = db
     .prepare(
-      `SELECT pr.id, pr.session_id, pr.card_view_counts_json
+      `SELECT pr.id, pr.session_id
        FROM practice_rounds pr
        WHERE pr.learner_id = ?
          AND pr.status = 'in_progress'
-         AND pr.current_step = 'learn_cards'
-         AND NOT EXISTS (
-           SELECT 1 FROM practice_attempts pa WHERE pa.session_id = pr.session_id
-         )
-       ORDER BY pr.started_at DESC, pr.created_at DESC
-       LIMIT 1`
+       ORDER BY pr.started_at DESC, pr.created_at DESC`
     )
-    .get(learnerId) as
-    | { id: string; session_id: string; card_view_counts_json: string }
-    | undefined;
-  if (!liveRound) return;
-
-  const cardViewCounts = JSON.parse(liveRound.card_view_counts_json) as Record<string, number>;
-  if (Object.values(cardViewCounts).some((count) => count > 0)) return;
+    .all(learnerId) as Array<{ id: string; session_id: string }>;
+  if (liveRounds.length === 0) return;
 
   const now = new Date().toISOString();
-  db.prepare(
-    `UPDATE practice_rounds
-     SET status = 'abandoned', ended_at = ?, updated_at = ?
-     WHERE id = ? AND status = 'in_progress'`
-  ).run(now, now, liveRound.id);
-  db.prepare(
-    `UPDATE practice_sessions
-     SET status = 'abandoned', ended_at = ?, updated_at = ?
-     WHERE id = ? AND status = 'in_progress'`
-  ).run(now, now, liveRound.session_id);
+  for (const liveRound of liveRounds) {
+    db.prepare(
+      `UPDATE practice_rounds
+       SET status = 'abandoned', ended_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'in_progress'`
+    ).run(now, now, liveRound.id);
+    db.prepare(
+      `UPDATE practice_sessions
+       SET status = 'abandoned', ended_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'in_progress'`
+    ).run(now, now, liveRound.session_id);
+  }
 }
 
 function abandonUnstartedPreviewRoundForPendingParentPriority(db: DatabaseSync, learnerId: string): void {
@@ -2846,6 +2843,10 @@ function normalizeNextRoundMix(preference: Partial<NextRoundMixPreference>): Nex
     if (overflow === 0) break;
   }
   return values;
+}
+
+function nextRoundMixEquals(a: NextRoundMixPreference, b: NextRoundMixPreference): boolean {
+  return a.new === b.new && a.recovery === b.recovery && a.review === b.review && a.stable === b.stable;
 }
 
 function getVisualCueForQuestion(db: DatabaseSync, question: PracticeQuestion, word: string): VisualCue | null {

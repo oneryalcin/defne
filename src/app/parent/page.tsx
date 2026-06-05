@@ -6,29 +6,21 @@ import {
   getParentDashboard,
   getParentWords,
 } from "@/lib/db/repository";
+import { getChildSpellingWords } from "@/lib/db/spellingRepository";
 import { listLearners, resolveSelectedLearnerId } from "@/lib/db/learners";
 import type { MasteryColour } from "@/lib/types";
 import { WordHeatmap } from "@/components/WordHeatmap";
+import {
+  MASTERY_KEY,
+  MASTERY_LABELS,
+  ProgressDistribution,
+  spellingProgressBuckets,
+  vocabularyProgressBuckets,
+} from "@/components/ProgressDistribution";
 
 const HEATMAP_PAGE_SIZE = 200;
 
 export const dynamic = "force-dynamic";
-
-const MASTERY_LABELS: Record<MasteryColour, string> = {
-  red: "Needs work",
-  orange: "Building",
-  yellow: "Nearly steady",
-  light_green: "Reliable",
-  green: "Mastered",
-};
-
-const MASTERY_KEY: Record<MasteryColour, string> = {
-  red: "is-red",
-  orange: "is-orange",
-  yellow: "is-yellow",
-  light_green: "is-light_green",
-  green: "is-green",
-};
 
 type SearchParams = Promise<{ p?: string; learnerId?: string }>;
 
@@ -60,13 +52,9 @@ export default async function ParentDashboardPage({
 
   // True deck-wide distribution from the actual learner state (one row per word).
   const allWords = getParentWords(learnerId);
-  const distribution = countMastery(
-    allWords
-      .map((w) => w.masteryColour)
-      .filter((c): c is MasteryColour => Boolean(c))
-  );
-  const untracked = allWords.filter((w) => !w.masteryColour).length;
-  const distTotal = Object.values(distribution).reduce((a, b) => a + b, 0) || 1;
+  const spellingWords = getChildSpellingWords(learnerId);
+  const vocabularyBuckets = vocabularyProgressBuckets(allWords);
+  const spellingBuckets = spellingProgressBuckets(spellingWords);
 
   const todayLabel = new Date().toLocaleDateString("en-GB", {
     weekday: "short",
@@ -186,11 +174,19 @@ export default async function ParentDashboardPage({
           <div className="bento-grid">
             <div className="bento col-4 bento--accent">
               <span className="bento__eyebrow">Mastery snapshot</span>
-              <h3>Where the deck sits</h3>
-              <Distribution
-                distribution={distribution}
-                total={distTotal}
-                untracked={untracked}
+              <h3>Where vocabulary sits</h3>
+              <ProgressDistribution
+                buckets={vocabularyBuckets}
+                ariaLabel="Vocabulary mastery distribution"
+              />
+            </div>
+
+            <div className="bento col-4">
+              <span className="bento__eyebrow">Spelling snapshot</span>
+              <h3>Where spellings sit</h3>
+              <ProgressDistribution
+                buckets={spellingBuckets}
+                ariaLabel="Spelling progress distribution"
               />
             </div>
 
@@ -506,77 +502,6 @@ export default async function ParentDashboardPage({
   );
 }
 
-function Distribution({
-  distribution,
-  total,
-  untracked,
-}: {
-  distribution: Record<MasteryColour, number>;
-  total: number;
-  untracked: number;
-}) {
-  const order: MasteryColour[] = ["red", "orange", "yellow", "light_green", "green"];
-  const palette: Record<MasteryColour, string> = {
-    red: "var(--mastery-red)",
-    orange: "var(--mastery-orange)",
-    yellow: "var(--mastery-yellow)",
-    light_green: "var(--mastery-light)",
-    green: "var(--mastery-green)",
-  };
-  return (
-    <div className="dist">
-      <div className="dist__bar" role="presentation">
-        {untracked > 0 ? (
-          <span
-            className="dist__seg"
-            style={{
-              width: `${(untracked / (total + untracked)) * 100}%`,
-              background: "rgba(31,41,55,0.18)",
-              minWidth: 6,
-            }}
-          />
-        ) : null}
-        {order.map((colour) => {
-          const ratio = (distribution[colour] / (total + untracked)) * 100;
-          return (
-            <span
-              key={colour}
-              className="dist__seg"
-              style={{
-                width: `${ratio}%`,
-                background: palette[colour],
-                minWidth: distribution[colour] > 0 ? 6 : 0,
-              }}
-            />
-          );
-        })}
-      </div>
-      <ul className="dist__legend">
-        {untracked > 0 ? (
-          <li>
-            <span
-              className="dist__dot"
-              style={{ background: "rgba(31,41,55,0.18)" }}
-            />
-            <span className="dist__label">Not started</span>
-            <span className="dist__count">{untracked}</span>
-          </li>
-        ) : null}
-        {order.map((colour) => (
-          <li key={colour}>
-            <span
-              className="dist__dot"
-              style={{ background: palette[colour] }}
-            />
-            <span className="dist__label">{MASTERY_LABELS[colour]}</span>
-            <span className="dist__count">{distribution[colour]}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function RoundsTimelineDemo() {
   const days = [
     { day: "Mon", val: 12 },
@@ -648,16 +573,4 @@ function RoundList({ title, items }: { title: string; items: string[] }) {
 
 function DemoTag() {
   return <span className="demo-tag" title="Backend hookup pending">demo</span>;
-}
-
-function countMastery(colours: MasteryColour[]): Record<MasteryColour, number> {
-  const dist: Record<MasteryColour, number> = {
-    red: 0,
-    orange: 0,
-    yellow: 0,
-    light_green: 0,
-    green: 0,
-  };
-  for (const c of colours) dist[c] += 1;
-  return dist;
 }

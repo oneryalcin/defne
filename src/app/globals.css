@@ -451,6 +451,35 @@ button, input, textarea, select { font: inherit; }
   line-height: 1.45;
 }
 
+.child-progress-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.child-progress-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.child-progress-panel h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  line-height: 1.2;
+  color: var(--graphite-ink);
+}
+
+.child-progress-panel__link {
+  color: var(--forest-green);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .mode-panel h2,
 .panel h2,
 .mission-panel h2 {
@@ -2305,6 +2334,7 @@ button, input, textarea, select { font: inherit; }
   .two-column,
   .question-shell,
   .mode-grid,
+  .child-progress-grid,
   .dashboard-grid,
   .card-support-grid,
   .round-evidence-grid,

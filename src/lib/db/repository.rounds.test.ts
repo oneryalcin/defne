@@ -13,6 +13,7 @@ import {
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
+  setNextRoundMixPreference,
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer,
@@ -141,6 +142,23 @@ describe("round repository orchestration", () => {
       .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
       .get(originalSessionId) as { status: string };
     expect(oldRound.status).toBe("abandoned");
+  });
+
+  it("rebuilds an unstarted preview round when the parent changes the next-round mix", () => {
+    const learnerId = createLearner({ displayName: "Mira", accessCode: "mira" });
+    const assigned = listAvailableVocabularyForLearner(learnerId).filter((word) => !word.assigned).slice(0, 8);
+    expect(assigned).toHaveLength(8);
+    assigned.forEach((word) => assignVocabularyWordToLearner(learnerId, word.id));
+
+    const originalSessionId = startRoundMission(6, learnerId);
+    setNextRoundMixPreference({ new: 5, recovery: 0, review: 1, stable: 0 }, learnerId);
+    const preview = getMissionPreview(6, learnerId);
+
+    const oldRound = getDb()
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(originalSessionId) as { status: string };
+    expect(oldRound.status).toBe("abandoned");
+    expect(preview.words.some((word) => word.selectionReason.reason === "new_word")).toBe(true);
   });
 
   it("previews the in-progress round once it has been started", () => {
@@ -273,6 +291,110 @@ describe("round repository orchestration", () => {
     expect(staleRound.status).toBe("abandoned");
     expect(staleSession.status).toBe("abandoned");
     expect(activeRounds.map((row) => row.id)).not.toContain("round_stale");
+  });
+
+  it("abandons old unstarted preview rounds before rendering a new preview", () => {
+    const db = getDb();
+    const wordIds = (
+      db.prepare("SELECT id FROM words WHERE status = 'active' ORDER BY word LIMIT 12").all() as Array<{
+        id: string;
+      }>
+    ).map((row) => row.id);
+    const oldStartedAt = new Date(Date.now() - 25 * 3_600_000).toISOString();
+    const staleSummary = {
+      plan: [],
+      round: {
+        roundId: "round_old_preview",
+        firstAttemptSecureWords: [],
+        eventuallyCorrectWords: [],
+        revealAndMoveOnWords: [],
+        nearReviewWords: [],
+        selectionReasons: [],
+        mistakeEvidence: [],
+        explanation: "old preview"
+      }
+    };
+
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
+       VALUES ('session_old_preview', 'learner_defne', 'daily_mission', 'in_progress', 12, 0, ?, ?, ?, ?)`
+    ).run(oldStartedAt, JSON.stringify(staleSummary), oldStartedAt, oldStartedAt);
+    db.prepare(
+      `INSERT INTO practice_rounds
+        (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
+         card_view_counts_json, started_at, summary_json, created_at, updated_at)
+       VALUES ('round_old_preview', 'session_old_preview', 'learner_defne', 'in_progress', 'learn_cards', 3, ?, '{}', ?, ?, ?, ?)`
+    ).run(JSON.stringify(wordIds), oldStartedAt, JSON.stringify(staleSummary), oldStartedAt, oldStartedAt);
+
+    const preview = getMissionPreview(12);
+
+    const oldRound = db
+      .prepare("SELECT status FROM practice_rounds WHERE id = 'round_old_preview'")
+      .get() as { status: string };
+    const activeRounds = db
+      .prepare("SELECT id FROM practice_rounds WHERE learner_id = 'learner_defne' AND status = 'in_progress'")
+      .all() as Array<{ id: string }>;
+
+    expect(oldRound.status).toBe("abandoned");
+    expect(activeRounds.map((row) => row.id)).not.toContain("round_old_preview");
+    expect(preview.targetQuestionCount).toBe(12);
+  });
+
+  it("abandons an unstarted preview that lacks a new word when unpracticed words exist", () => {
+    const db = getDb();
+    const wordIds = (
+      db.prepare(
+        `SELECT w.id
+         FROM words w
+         JOIN learner_vocabulary_words lvw ON lvw.word_id = w.id AND lvw.learner_id = 'learner_defne'
+         JOIN learner_word_state s ON s.word_id = w.id AND s.learner_id = 'learner_defne'
+         WHERE w.status = 'active' AND lvw.status = 'active' AND s.attempt_count > 0
+         ORDER BY w.word
+         LIMIT 12`
+      ).all() as Array<{ id: string }>
+    ).map((row) => row.id);
+    const startedAt = new Date().toISOString();
+    const staleSummary = {
+      plan: [],
+      round: {
+        roundId: "round_no_new_word_preview",
+        firstAttemptSecureWords: [],
+        eventuallyCorrectWords: [],
+        revealAndMoveOnWords: [],
+        nearReviewWords: [],
+        selectionReasons: wordIds.map((wordId) => ({
+          wordId,
+          word: wordId,
+          reason: "useful_practice",
+          label: "Useful practice",
+          detail: "Existing preview"
+        })),
+        mistakeEvidence: [],
+        explanation: "preview without an introduction"
+      }
+    };
+
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, summary_json, created_at, updated_at)
+       VALUES ('session_no_new_word_preview', 'learner_defne', 'daily_mission', 'in_progress', 12, 0, ?, ?, ?, ?)`
+    ).run(startedAt, JSON.stringify(staleSummary), startedAt, startedAt);
+    db.prepare(
+      `INSERT INTO practice_rounds
+        (id, session_id, learner_id, status, current_step, max_retry_passes, word_ids_json,
+         card_view_counts_json, started_at, summary_json, created_at, updated_at)
+       VALUES ('round_no_new_word_preview', 'session_no_new_word_preview', 'learner_defne', 'in_progress', 'learn_cards', 3, ?, '{}', ?, ?, ?, ?)`
+    ).run(JSON.stringify(wordIds), startedAt, JSON.stringify(staleSummary), startedAt, startedAt);
+
+    const preview = getMissionPreview(12);
+
+    const oldRound = db
+      .prepare("SELECT status FROM practice_rounds WHERE id = 'round_no_new_word_preview'")
+      .get() as { status: string };
+
+    expect(oldRound.status).toBe("abandoned");
+    expect(preview.words.some((word) => word.selectionReason.reason === "new_word")).toBe(true);
   });
 
   it("abandons an in-progress round when the requested round size changes", () => {

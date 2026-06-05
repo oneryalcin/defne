@@ -48,9 +48,10 @@ The selector is a constrained utility scheduler:
 ```text
 1. Compute a bounded learning-utility score for every word.
 2. Sort words by utility plus tiny deterministic jitter.
-3. Select the best words while obeying mission-shape caps.
-4. Relax caps in a known fallback order only when needed to fill the mission.
-5. Store reason labels so the parent can inspect why each word was selected.
+3. Reserve one eligible introduction slot when available.
+4. Select the best remaining words while obeying mission-shape caps.
+5. Relax caps in a known fallback order only when needed to fill the mission.
+6. Store reason labels so the parent can inspect why each word was selected.
 ```
 
 This is not a claim of theoretical optimality. It is a transparent, tunable,
@@ -382,10 +383,17 @@ very low recall:             max 2
 `introduction_cap` applies to both untouched and introduced-only words. This
 prevents learn-card-only words from flooding the mission.
 
+When at least one untouched or introduced-only word is eligible under the normal
+recency gates, the selector reserves one introduction slot before filling the
+rest of the mission by utility. This is the anti-starvation guarantee. The cap
+still applies after that reserved pick, so a 12-word mission usually has one to
+three introductions rather than letting novelty flood the mission.
+
 ## Selection Passes
 
-The selector greedily scans candidates sorted by utility, adding each word if
-it is allowed under the current pass.
+The selector first reserves the highest-utility eligible introduction candidate,
+if one exists. It then greedily scans candidates sorted by utility, adding each
+word if it is allowed under the current pass.
 
 ```text
 passes = [

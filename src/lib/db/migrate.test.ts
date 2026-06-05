@@ -31,7 +31,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(17);
+    expect(migrations.count).toBe(18);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -73,10 +73,16 @@ describe("SQLite setup", () => {
     expect(profileColumns.some((column) => column.name === "visual_cues_on_learn_cards")).toBe(true);
     expect(profileColumns.some((column) => column.name === "visual_cues_on_meaning_questions")).toBe(true);
     expect(profileColumns.some((column) => column.name === "visual_cues_on_context_questions")).toBe(true);
+    expect(profileColumns.some((column) => column.name === "next_round_new_count")).toBe(true);
+    expect(profileColumns.some((column) => column.name === "next_round_recovery_count")).toBe(true);
+    expect(profileColumns.some((column) => column.name === "next_round_review_count")).toBe(true);
+    expect(profileColumns.some((column) => column.name === "next_round_stable_count")).toBe(true);
     const profile = db
       .prepare(
         `SELECT visual_cues_enabled, visual_cue_generation_enabled, visual_cues_on_learn_cards,
-                visual_cues_on_meaning_questions, visual_cues_on_context_questions
+                visual_cues_on_meaning_questions, visual_cues_on_context_questions,
+                next_round_new_count, next_round_recovery_count,
+                next_round_review_count, next_round_stable_count
          FROM learner_profiles
          LIMIT 1`
       )
@@ -86,13 +92,21 @@ describe("SQLite setup", () => {
       visual_cues_on_learn_cards: number;
       visual_cues_on_meaning_questions: number;
       visual_cues_on_context_questions: number;
+      next_round_new_count: number;
+      next_round_recovery_count: number;
+      next_round_review_count: number;
+      next_round_stable_count: number;
     };
     expect(profile).toMatchObject({
       visual_cues_enabled: 1,
       visual_cue_generation_enabled: 0,
       visual_cues_on_learn_cards: 1,
       visual_cues_on_meaning_questions: 0,
-      visual_cues_on_context_questions: 0
+      visual_cues_on_context_questions: 0,
+      next_round_new_count: 3,
+      next_round_recovery_count: 4,
+      next_round_review_count: 4,
+      next_round_stable_count: 1
     });
 
     const accessCode = db

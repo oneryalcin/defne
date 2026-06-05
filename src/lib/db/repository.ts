@@ -10,7 +10,12 @@ import {
   rankFor,
   type DayProjection,
 } from "../learning/projection";
-import { selectRoundWords, type RoundWordSelection } from "../learning/roundSelection";
+import {
+  selectRoundWords,
+  selectionBucketForWord,
+  type RoundSelectionBucketTargets,
+  type RoundWordSelection
+} from "../learning/roundSelection";
 import {
   DEFAULT_NEAR_REVIEW_SPACING,
   DEFAULT_ROUND_MAX_RETRY_PASSES,
@@ -38,6 +43,17 @@ import type {
 import { getDb } from "./index";
 import { defaultLearnerId, deterministicWordId, normalizeWord } from "./seed";
 import { assignVocabularyWordToLearnerInDb } from "./learners";
+
+const UNSTARTED_PREVIEW_STALE_HOURS = 20;
+
+export interface NextRoundMixPreference extends RoundSelectionBucketTargets {}
+
+export const DEFAULT_NEXT_ROUND_MIX: NextRoundMixPreference = {
+  new: 3,
+  recovery: 4,
+  review: 4,
+  stable: 1
+};
 
 export interface VisualCue {
   src: string;
@@ -272,6 +288,7 @@ export interface ParentDashboard {
   visualCuesEnabled: boolean;
   visualCueGenerationEnabled: boolean;
   visualCuePreferences: VisualCuePreferences;
+  nextRoundMix: NextRoundMixPreference;
   latestSession: {
     startedAt: string;
     actualQuestionCount: number;
@@ -360,6 +377,31 @@ export function setVisualCuePreference(
     new Date().toISOString(),
     learnerId
   );
+}
+
+export function setNextRoundMixPreference(
+  preference: Partial<NextRoundMixPreference>,
+  learnerId = defaultLearnerId()
+): void {
+  const db = getDb();
+  const normalized = normalizeNextRoundMix(preference);
+  db.prepare(
+    `UPDATE learner_profiles
+     SET next_round_new_count = ?,
+         next_round_recovery_count = ?,
+         next_round_review_count = ?,
+         next_round_stable_count = ?,
+         updated_at = ?
+     WHERE learner_id = ?`
+  ).run(
+    normalized.new,
+    normalized.recovery,
+    normalized.review,
+    normalized.stable,
+    new Date().toISOString(),
+    learnerId
+  );
+  abandonUnstartedPreviewRound(db, learnerId);
 }
 
 export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultLearnerId()): MissionPreview {
@@ -485,13 +527,20 @@ function selectRoundWordsWithParentPriority(
     .filter((wordId) => byId.has(wordId))
     .slice(0, Math.min(3, count));
   const prioritySet = new Set(priorityIds);
+  const bucketTargets = getAdjustedBucketTargetsForFill(
+    getNextRoundMixPreferenceFromDb(db, learnerId),
+    priorityIds.map((wordId) => byId.get(wordId)).filter((word): word is PracticeWord => Boolean(word)),
+    nowIso
+  );
+  const fillCount = count - priorityIds.length;
   const remainingSelection = selectRoundWords(
     words.filter((word) => !prioritySet.has(word.id)),
     nowIso,
-    count,
-    getRemediationWordIds(db, learnerId)
+    fillCount,
+    getRemediationWordIds(db, learnerId),
+    { bucketTargets, allowPartialCount: true }
   );
-  const fillIds = remainingSelection.wordIds.filter((wordId) => !prioritySet.has(wordId)).slice(0, count - priorityIds.length);
+  const fillIds = remainingSelection.wordIds.filter((wordId) => !prioritySet.has(wordId)).slice(0, fillCount);
   const fillIdSet = new Set(fillIds);
 
   return {
@@ -501,6 +550,19 @@ function selectRoundWordsWithParentPriority(
       ...remainingSelection.reasons.filter((reason) => fillIdSet.has(reason.wordId))
     ]
   };
+}
+
+function getAdjustedBucketTargetsForFill(
+  mix: NextRoundMixPreference,
+  priorityWords: PracticeWord[],
+  nowIso: string
+): NextRoundMixPreference {
+  const adjusted = { ...mix };
+  for (const word of priorityWords) {
+    const bucket = selectionBucketForWord(word, nowIso);
+    adjusted[bucket] = Math.max(0, adjusted[bucket] - 1);
+  }
+  return adjusted;
 }
 
 function getVocabularyNextRoundPriorityWordIds(db: DatabaseSync, learnerId: string): string[] {
@@ -625,7 +687,9 @@ function abandonStaleInProgressRounds(
 ): void {
   const rows = db
     .prepare(
-      `SELECT id, session_id, started_at, json_array_length(word_ids_json) AS word_count
+      `SELECT id, session_id, started_at, current_step, card_view_counts_json, summary_json,
+              json_array_length(word_ids_json) AS word_count,
+              EXISTS (SELECT 1 FROM practice_attempts pa WHERE pa.session_id = practice_rounds.session_id) AS has_attempts
        FROM practice_rounds
        WHERE learner_id = ? AND status = 'in_progress'
        ORDER BY started_at DESC, created_at DESC`
@@ -634,7 +698,11 @@ function abandonStaleInProgressRounds(
       id: string;
       session_id: string;
       started_at: string;
+      current_step: string;
+      card_view_counts_json: string;
+      summary_json: string;
       word_count: number;
+      has_attempts: number;
     }>;
   if (rows.length === 0) return;
 
@@ -651,6 +719,10 @@ function abandonStaleInProgressRounds(
 
   const stillCurrent = rows.filter((row) => {
     if (row.word_count !== expectedWordCount) return false;
+    if (isStaleUnstartedPreviewRound(row, Date.now())) return false;
+    if (isUnstartedPreviewRound(row) && lacksNewWordPick(row) && learnerHasUnpracticedWords(db, learnerId)) {
+      return false;
+    }
     if (!latestCompletedAt) return true;
     const startedAt = new Date(row.started_at).getTime();
     return Number.isFinite(startedAt) && startedAt > latestCompletedAt;
@@ -672,6 +744,94 @@ function abandonStaleInProgressRounds(
        WHERE id = ? AND status = 'in_progress'`
     ).run(now, now, row.session_id);
   }
+}
+
+function isStaleUnstartedPreviewRound(
+  row: {
+    started_at: string;
+    current_step: string;
+    card_view_counts_json: string;
+    has_attempts: number;
+  },
+  nowMs: number
+): boolean {
+  if (!isUnstartedPreviewRound(row)) return false;
+
+  const startedAt = new Date(row.started_at).getTime();
+  if (!Number.isFinite(startedAt)) return true;
+  const ageHours = (nowMs - startedAt) / 3_600_000;
+  return ageHours >= UNSTARTED_PREVIEW_STALE_HOURS;
+}
+
+function isUnstartedPreviewRound(row: {
+  current_step: string;
+  card_view_counts_json: string;
+  has_attempts: number;
+}): boolean {
+  if (row.current_step !== "learn_cards") return false;
+  if (row.has_attempts) return false;
+
+  const cardViewCounts = JSON.parse(row.card_view_counts_json) as Record<string, number>;
+  return !Object.values(cardViewCounts).some((count) => count > 0);
+}
+
+function lacksNewWordPick(row: { summary_json: string }): boolean {
+  const summary = JSON.parse(row.summary_json) as SessionSummary;
+  return !(summary.round?.selectionReasons ?? []).some((reason) => reason.reason === "new_word");
+}
+
+function learnerHasUnpracticedWords(db: DatabaseSync, learnerId: string): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS x
+       FROM learner_vocabulary_words lvw
+       JOIN words w ON w.id = lvw.word_id AND w.status = 'active'
+       JOIN word_definitions d ON d.word_id = w.id AND d.is_primary = 1
+       JOIN learner_word_state s ON s.word_id = w.id AND s.learner_id = lvw.learner_id
+       WHERE lvw.learner_id = ?
+         AND lvw.status = 'active'
+         AND s.attempt_count = 0
+         AND s.last_exposed_at IS NULL
+         AND EXISTS (SELECT 1 FROM word_examples e WHERE e.word_id = w.id AND e.status = 'approved')
+       LIMIT 1`
+    )
+    .get(learnerId) as { x: number } | undefined;
+  return Boolean(row);
+}
+
+function abandonUnstartedPreviewRound(db: DatabaseSync, learnerId: string): void {
+  const liveRound = db
+    .prepare(
+      `SELECT pr.id, pr.session_id, pr.card_view_counts_json
+       FROM practice_rounds pr
+       WHERE pr.learner_id = ?
+         AND pr.status = 'in_progress'
+         AND pr.current_step = 'learn_cards'
+         AND NOT EXISTS (
+           SELECT 1 FROM practice_attempts pa WHERE pa.session_id = pr.session_id
+         )
+       ORDER BY pr.started_at DESC, pr.created_at DESC
+       LIMIT 1`
+    )
+    .get(learnerId) as
+    | { id: string; session_id: string; card_view_counts_json: string }
+    | undefined;
+  if (!liveRound) return;
+
+  const cardViewCounts = JSON.parse(liveRound.card_view_counts_json) as Record<string, number>;
+  if (Object.values(cardViewCounts).some((count) => count > 0)) return;
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE practice_rounds
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.id);
+  db.prepare(
+    `UPDATE practice_sessions
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.session_id);
 }
 
 function abandonUnstartedPreviewRoundForPendingParentPriority(db: DatabaseSync, learnerId: string): void {
@@ -1041,6 +1201,7 @@ export function getParentDashboard(learnerId = defaultLearnerId()): ParentDashbo
   const words = getParentWords(learnerId);
   const visualCuePreferences = getVisualCuePreferenceFromDb(db, learnerId);
   const visualCueGenerationEnabled = getVisualCueGenerationPreferenceFromDb(db, learnerId);
+  const nextRoundMix = getNextRoundMixPreferenceFromDb(db, learnerId);
   const learner = db.prepare("SELECT display_name FROM learners WHERE id = ?").get(learnerId) as
     | { display_name: string }
     | undefined;
@@ -1090,6 +1251,7 @@ export function getParentDashboard(learnerId = defaultLearnerId()): ParentDashbo
     visualCuesEnabled: visualCuePreferences.enabled,
     visualCueGenerationEnabled,
     visualCuePreferences,
+    nextRoundMix,
     latestSession: latest
       ? {
           startedAt: latest.started_at,
@@ -2625,6 +2787,60 @@ function getVisualCueGenerationPreferenceFromDb(db: DatabaseSync, learnerId = de
     )
     .get(learnerId) as { visual_cue_generation_enabled: number } | undefined;
   return row ? row.visual_cue_generation_enabled === 1 : false;
+}
+
+function getNextRoundMixPreferenceFromDb(db: DatabaseSync, learnerId = defaultLearnerId()): NextRoundMixPreference {
+  const row = db
+    .prepare(
+      `SELECT next_round_new_count,
+              next_round_recovery_count,
+              next_round_review_count,
+              next_round_stable_count
+       FROM learner_profiles
+       WHERE learner_id = ?`
+    )
+    .get(learnerId) as
+    | {
+        next_round_new_count: number;
+        next_round_recovery_count: number;
+        next_round_review_count: number;
+        next_round_stable_count: number;
+      }
+    | undefined;
+  return normalizeNextRoundMix(
+    row
+      ? {
+          new: row.next_round_new_count,
+          recovery: row.next_round_recovery_count,
+          review: row.next_round_review_count,
+          stable: row.next_round_stable_count
+        }
+      : DEFAULT_NEXT_ROUND_MIX
+  );
+}
+
+function normalizeNextRoundMix(preference: Partial<NextRoundMixPreference>): NextRoundMixPreference {
+  const count = (value: number | undefined, fallback: number) => {
+    const rounded = Math.round(value ?? fallback);
+    return Number.isFinite(rounded) ? Math.max(0, Math.min(12, rounded)) : fallback;
+  };
+  const values = {
+    new: count(preference.new, DEFAULT_NEXT_ROUND_MIX.new),
+    recovery: count(preference.recovery, DEFAULT_NEXT_ROUND_MIX.recovery),
+    review: count(preference.review, DEFAULT_NEXT_ROUND_MIX.review),
+    stable: count(preference.stable, DEFAULT_NEXT_ROUND_MIX.stable)
+  };
+  const total = values.new + values.recovery + values.review + values.stable;
+  if (total <= 12) return values;
+
+  let overflow = total - 12;
+  for (const bucket of ["stable", "review", "recovery", "new"] as const) {
+    const reduction = Math.min(values[bucket], overflow);
+    values[bucket] -= reduction;
+    overflow -= reduction;
+    if (overflow === 0) break;
+  }
+  return values;
 }
 
 function getVisualCueForQuestion(db: DatabaseSync, question: PracticeQuestion, word: string): VisualCue | null {

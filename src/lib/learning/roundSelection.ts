@@ -27,6 +27,20 @@ export interface RoundWordSelection {
   reasons: RoundSelectionReason[];
 }
 
+export type RoundSelectionBucket = "new" | "recovery" | "review" | "stable";
+
+export interface RoundSelectionBucketTargets {
+  new: number;
+  recovery: number;
+  review: number;
+  stable: number;
+}
+
+export interface RoundSelectionOptions {
+  bucketTargets?: Partial<RoundSelectionBucketTargets>;
+  allowPartialCount?: boolean;
+}
+
 interface SelectionCaps {
   stableCap: number;
   greenCap: number;
@@ -78,9 +92,13 @@ export function selectRoundWords(
   words: PracticeWord[],
   nowIso: string,
   targetCount: number,
-  _remediation: RoundRemediationEvidence
+  _remediation: RoundRemediationEvidence,
+  options: RoundSelectionOptions = {}
 ): RoundWordSelection {
-  const count = Math.max(6, Math.min(12, Math.round(targetCount)));
+  const count = options.allowPartialCount
+    ? Math.max(0, Math.min(12, Math.round(targetCount)))
+    : Math.max(6, Math.min(12, Math.round(targetCount)));
+  if (count === 0) return { wordIds: [], reasons: [] };
   const caps = scaledCaps(count);
   const candidates = words
     .map((word) => {
@@ -95,6 +113,19 @@ export function selectRoundWords(
     .sort(compareCandidates);
 
   const selected = new Map<string, Candidate>();
+  const bucketTargets = normalizeBucketTargets(options.bucketTargets, count);
+  if (bucketTargets) {
+    for (const bucket of ["new", "recovery", "review", "stable"] as const) {
+      fillBucket(bucket, bucketTargets[bucket], candidates, selected, caps);
+    }
+  } else {
+    const introduction = candidates.find(
+      (candidate) =>
+        (candidate.features.untouched || candidate.features.introducedOnly) &&
+        allowedUnderPass(candidate, [], caps, "strict_caps")
+    );
+    if (introduction) selected.set(introduction.word.id, introduction);
+  }
   const passes: SelectionPass[] = [
     "strict_caps",
     "relax_stable",
@@ -122,6 +153,67 @@ export function selectRoundWords(
     wordIds: picked.map((candidate) => candidate.word.id),
     reasons: picked.map((candidate) => candidate.reason)
   };
+}
+
+export function selectionBucketForWord(word: PracticeWord, nowIso: string): RoundSelectionBucket {
+  return bucketForFeatures(computeFeatures(word, nowIso));
+}
+
+function normalizeBucketTargets(
+  targets: Partial<RoundSelectionBucketTargets> | undefined,
+  count: number
+): RoundSelectionBucketTargets | null {
+  if (!targets) return null;
+  const normalized = {
+    new: Math.max(0, Math.round(targets.new ?? 0)),
+    recovery: Math.max(0, Math.round(targets.recovery ?? 0)),
+    review: Math.max(0, Math.round(targets.review ?? 0)),
+    stable: Math.max(0, Math.round(targets.stable ?? 0))
+  };
+  let remaining = count;
+  for (const bucket of ["new", "recovery", "review", "stable"] as const) {
+    const value = Math.min(normalized[bucket], remaining);
+    normalized[bucket] = value;
+    remaining -= value;
+  }
+  return normalized;
+}
+
+function fillBucket(
+  bucket: RoundSelectionBucket,
+  target: number,
+  candidates: Candidate[],
+  selected: Map<string, Candidate>,
+  caps: SelectionCaps
+): void {
+  if (target <= 0) return;
+  let picked = [...selected.values()].filter((candidate) => bucketForFeatures(candidate.features) === bucket).length;
+  const passes: SelectionPass[] =
+    bucket === "new"
+      ? ["strict_caps", "relax_new"]
+      : bucket === "recovery"
+        ? ["strict_caps", "relax_recovery"]
+        : bucket === "stable"
+          ? ["strict_caps", "relax_stable", "relax_green_if_needed"]
+          : ["strict_caps"];
+  for (const pass of passes) {
+    for (const candidate of candidates) {
+      if (picked >= target) break;
+      if (selected.has(candidate.word.id)) continue;
+      if (bucketForFeatures(candidate.features) !== bucket) continue;
+      if (!allowedUnderPass(candidate, [...selected.values()], caps, pass)) continue;
+      selected.set(candidate.word.id, candidate);
+      picked += 1;
+    }
+    if (picked >= target) break;
+  }
+}
+
+function bucketForFeatures(features: SelectionFeatures): RoundSelectionBucket {
+  if (features.untouched || features.introducedOnly) return "new";
+  if (features.activeRecovery) return "recovery";
+  if (features.stableOrMastered) return "stable";
+  return "review";
 }
 
 function scaledCaps(count: number): SelectionCaps {

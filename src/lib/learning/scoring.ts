@@ -56,6 +56,8 @@ const MASTERED_STABILITY_DAYS = 7;
 const MASTERED_MIN_CORRECT = 4;
 const MINUTES_TOO_RECENT = 12;
 const RECENT_WRONG_KNOCKDOWN_HOURS = 36;
+const MIN_EVIDENCE_N = 0.3;
+const BUILDING_LOWER = 0.3;
 
 function daysBetween(fromIso: string | null, toIso: string): number {
   if (!fromIso) return Number.POSITIVE_INFINITY;
@@ -85,6 +87,17 @@ function firstAttemptsClean(state: LearnerWordState): boolean {
     state.wrongCount === 0 &&
     state.averageHintLevelUsed <= 0.5
   );
+}
+
+function hasCleanSuccessHistory(state: LearnerWordState): boolean {
+  return state.correctCount >= 2 && state.wrongCount === 0 && state.averageHintLevelUsed <= 0.5;
+}
+
+function hasSmallSlipInStrongHistory(state: LearnerWordState): boolean {
+  if (state.attemptCount < 5) return false;
+  if (state.wrongCount === 0) return false;
+  const wrongRatio = state.wrongCount / state.attemptCount;
+  return state.correctCount / state.attemptCount >= 0.8 && wrongRatio <= 0.15 && state.averageHintLevelUsed <= 0.5;
 }
 
 interface WeightedTotals {
@@ -208,8 +221,18 @@ export function scoreFromState(
       : 1;
   const freshness = 0.6 + 0.4 * recall;
 
-  if (totals.effectiveN < 0.3) {
-    reasons.push("No clean evidence yet — colour starts at red.");
+  if (totals.effectiveN < MIN_EVIDENCE_N) {
+    if (hasCleanSuccessHistory(state)) {
+      reasons.push("Clean success evidence is old, so this needs a refresh rather than being treated as a failure.");
+      return {
+        colour: "orange",
+        pHat: 1,
+        lowerBound: BUILDING_LOWER,
+        effectiveN: totals.effectiveN,
+        reasons,
+      };
+    }
+    reasons.push("Not enough clean evidence yet — colour starts at red.");
     return {
       colour: "red",
       pHat: 0,
@@ -223,7 +246,7 @@ export function scoreFromState(
     totals.effectiveCorrect /
     Math.max(0.001, totals.effectiveCorrect + totals.wrongs);
   const wilson = wilsonLower(pHat, totals.effectiveN);
-  const lowerBound = wilson * freshness;
+  let lowerBound = wilson * freshness;
   reasons.push(
     `Confidence (Wilson 80% lower): ${(wilson * 100).toFixed(0)}% on n_eff=${totals.effectiveN.toFixed(2)}.`
   );
@@ -237,6 +260,10 @@ export function scoreFromState(
     reasons.push(
       `Recent wrong still in recovery — knocked down one bucket until ${DEFAULT_NEAR_REVIEW_SPACING} clean follow-up questions clear it.`
     );
+  }
+  if (!unresolvedRecentWrong && hasSmallSlipInStrongHistory(state) && lowerBound < BUILDING_LOWER) {
+    lowerBound = BUILDING_LOWER;
+    reasons.push("One small slip inside a strong history is treated as a refresh need, not Needs work.");
   }
 
   const clean = firstAttemptsClean(state);
@@ -266,7 +293,7 @@ export function scoreFromState(
         );
       }
     }
-  } else if (lowerBound < 0.3) {
+  } else if (lowerBound < BUILDING_LOWER) {
     colour = "red";
   } else if (lowerBound < 0.55) {
     colour = "orange";

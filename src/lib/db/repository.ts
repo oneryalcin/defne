@@ -1442,6 +1442,8 @@ export interface WordDetailView {
   scoreReasons: string[];
   /** Wilson lower bound used for the colour. */
   scoreLowerBound: number;
+  /** Recency-weighted effective sample size used by the scorer. */
+  scoreEffectiveN: number;
   /** Selection-priority breakdown. */
   priorityScore: number;
   priorityFactors: Array<{
@@ -1566,6 +1568,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
     "Not started yet — first practice will set the colour.",
   ];
   let scoreLowerBound = 0;
+  let scoreEffectiveN = 0;
   let priorityScore = 0;
   let priorityFactors: WordDetailView["priorityFactors"] = [];
 
@@ -1582,6 +1585,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
     masteryColour = breakdown.colour ?? "red";
     scoreReasons = breakdown.reasons;
     scoreLowerBound = breakdown.lowerBound;
+    scoreEffectiveN = breakdown.effectiveN;
 
     const word: PracticeWord = {
       id: wordRow.id,
@@ -1678,6 +1682,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
     masteryColour,
     scoreReasons,
     scoreLowerBound,
+    scoreEffectiveN,
     priorityScore,
     priorityFactors,
     attempts: attemptRows.map((row) => ({

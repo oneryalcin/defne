@@ -121,6 +121,55 @@ describe("mastery scoring", () => {
     expect(unresolved.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(true);
   });
 
+  it("treats old clean success as refresh work instead of red failure", () => {
+    const state = makeState({
+      attemptCount: 4,
+      correctCount: 4,
+      wrongCount: 0,
+      averageHintLevelUsed: 0,
+      stabilityDays: 2.37,
+      lastSeenAt: "2026-05-09T09:25:09.853Z",
+      lastCorrectAt: "2026-05-09T09:25:09.853Z"
+    });
+    const attempts: AttemptRecord[] = [
+      { answeredAt: "2026-05-01T20:25:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-01T20:28:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-09T09:22:00.000Z", isCorrect: true, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-09T09:25:09.853Z", isCorrect: true, hintLevelUsed: 0 }
+    ];
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-05T12:00:00.000Z");
+
+    expect(breakdown.effectiveN).toBeLessThan(0.3);
+    expect(breakdown.colour).toBe("orange");
+    expect(breakdown.reasons.some((reason) => reason.includes("needs a refresh"))).toBe(true);
+  });
+
+  it("does not mark one old slip in a strong history as red", () => {
+    const state = makeState({
+      attemptCount: 10,
+      correctCount: 9,
+      wrongCount: 1,
+      averageHintLevelUsed: 0,
+      stabilityDays: 2,
+      lastSeenAt: "2026-05-09T09:25:09.853Z",
+      lastCorrectAt: "2026-05-09T09:25:09.853Z",
+      lastWrongAt: "2026-05-01T20:25:00.000Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 3
+    });
+    const attempts: AttemptRecord[] = Array.from({ length: 10 }, (_, index) => ({
+      answeredAt: new Date(Date.parse("2026-05-01T20:25:00.000Z") + index * 86_400_000).toISOString(),
+      isCorrect: index !== 0,
+      hintLevelUsed: 0
+    }));
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-05T12:00:00.000Z");
+
+    expect(breakdown.colour).not.toBe("red");
+    expect(breakdown.reasons.some((reason) => reason.includes("One small slip"))).toBe(true);
+  });
+
   it("uses attempt history to clear stale near-review state after three clean follow-ups", () => {
     const now = "2026-05-01T22:50:00.000Z";
     const state = makeState({

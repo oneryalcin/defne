@@ -161,6 +161,73 @@ describe("round repository orchestration", () => {
     expect(preview.words.some((word) => word.selectionReason.reason === "new_word")).toBe(true);
   });
 
+  it("resets an active attempted round when the parent changes the next-round mix", () => {
+    const learnerId = createLearner({ displayName: "Nehir", accessCode: "nehir" });
+    const assigned = listAvailableVocabularyForLearner(learnerId).filter((word) => !word.assigned).slice(0, 8);
+    expect(assigned).toHaveLength(8);
+    assigned.forEach((word) => assignVocabularyWordToLearner(learnerId, word.id));
+
+    const originalSessionId = startRoundMission(6, learnerId);
+    completeLearnCards(originalSessionId);
+    startRoundMeaningRecognition(originalSessionId);
+    const activeView = getSessionView(originalSessionId);
+    expect(activeView.question?.canonicalAnswer).toBeTruthy();
+    submitSessionAnswer({
+      sessionId: originalSessionId,
+      submittedAnswer: activeView.question?.canonicalAnswer ?? "",
+      hintLevelUsed: 0,
+      responseTimeMs: 1000
+    });
+
+    setNextRoundMixPreference({ new: 5, recovery: 0, review: 1, stable: 0 }, learnerId);
+    const preview = getMissionPreview(6, learnerId);
+
+    const oldRound = getDb()
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(originalSessionId) as { status: string };
+    const oldSession = getDb()
+      .prepare("SELECT status FROM practice_sessions WHERE id = ?")
+      .get(originalSessionId) as { status: string };
+    const activeRounds = getDb()
+      .prepare("SELECT session_id FROM practice_rounds WHERE learner_id = ? AND status = 'in_progress'")
+      .all(learnerId) as Array<{ session_id: string }>;
+
+    expect(oldRound.status).toBe("abandoned");
+    expect(oldSession.status).toBe("abandoned");
+    expect(activeRounds.map((row) => row.session_id)).not.toContain(originalSessionId);
+    expect(preview.words.some((word) => word.selectionReason.reason === "new_word")).toBe(true);
+  });
+
+  it("keeps an active attempted round when the parent saves the same next-round mix", () => {
+    const learnerId = createLearner({ displayName: "Ela", accessCode: "ela" });
+    const assigned = listAvailableVocabularyForLearner(learnerId).filter((word) => !word.assigned).slice(0, 8);
+    expect(assigned).toHaveLength(8);
+    assigned.forEach((word) => assignVocabularyWordToLearner(learnerId, word.id));
+
+    const originalSessionId = startRoundMission(6, learnerId);
+    completeLearnCards(originalSessionId);
+    startRoundMeaningRecognition(originalSessionId);
+    const activeView = getSessionView(originalSessionId);
+    submitSessionAnswer({
+      sessionId: originalSessionId,
+      submittedAnswer: activeView.question?.canonicalAnswer ?? "",
+      hintLevelUsed: 0,
+      responseTimeMs: 1000
+    });
+
+    setNextRoundMixPreference({ new: 3, recovery: 4, review: 4, stable: 1 }, learnerId);
+
+    const oldRound = getDb()
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(originalSessionId) as { status: string };
+    const oldSession = getDb()
+      .prepare("SELECT status FROM practice_sessions WHERE id = ?")
+      .get(originalSessionId) as { status: string };
+
+    expect(oldRound.status).toBe("in_progress");
+    expect(oldSession.status).toBe("in_progress");
+  });
+
   it("previews the in-progress round once it has been started", () => {
     // Once a round is committed, the cover preview must reflect that
     // round's word list — not run a fresh selection that could drift

@@ -200,7 +200,7 @@ export default async function WordDetailPage({
             <ConfidenceGauge
               lowerBound={detail.scoreLowerBound}
               pHat={pHat}
-              effectiveN={detail.attempts.length}
+              effectiveN={detail.scoreEffectiveN}
             />
             {detail.nextBucket ? (
               <p

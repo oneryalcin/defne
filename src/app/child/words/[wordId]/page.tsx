@@ -138,6 +138,13 @@ export default async function ChildWordDetailPage({
             ) : null}
           </section>
 
+          <section className="child-word-card child-word-card--wide" aria-labelledby="child-word-journey-title">
+            <span className="metric-label">How to move up</span>
+            <h2 id="child-word-journey-title">What this word needs next</h2>
+            <p className="child-word-action-note">{nextStepMessage(detail)}</p>
+            <MasteryJourney detail={detail} />
+          </section>
+
           <section className="child-word-card" aria-labelledby="child-word-next-title">
             <span className="metric-label">Next round</span>
             <h2 id="child-word-next-title">Want to practise this soon?</h2>
@@ -166,6 +173,130 @@ export default async function ChildWordDetailPage({
       </article>
     </main>
   );
+}
+
+function MasteryJourney({ detail }: { detail: NonNullable<ReturnType<typeof getWordDetail>> }) {
+  const currentRank = stageRank(detail.masteryColour);
+  const state = detail.state;
+  const correctCount = detail.attempts.filter((attempt) => attempt.isCorrect).length;
+  const recoveryOpen = Boolean(state && (state.recoveryDebt > 0 || state.nearReview));
+  const masteredReady =
+    detail.scoreLowerBound >= 0.8 &&
+    (state?.stabilityDays ?? 0) >= 7 &&
+    correctCount >= 4 &&
+    (state?.averageHintLevelUsed ?? 0) <= 0.5 &&
+    !recoveryOpen;
+
+  return (
+    <div className="child-mastery-journey">
+      {MASTERY_STAGES.map((stage, index) => {
+        const reached = currentRank >= index || (stage.colour === "green" && masteredReady);
+        const current = currentRank === index;
+        return (
+          <div
+            key={stage.label}
+            className={`child-mastery-step${reached ? " is-reached" : ""}${current ? " is-current" : ""}`}
+          >
+            <span className={`child-mastery-step__dot ${stage.className}`} aria-hidden="true" />
+            <div>
+              <strong>{stage.label}</strong>
+              <span>{stage.description}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const MASTERY_STAGES: Array<{
+  colour: MasteryColour | null;
+  label: string;
+  description: string;
+  className: string;
+}> = [
+  {
+    colour: null,
+    label: "Not started",
+    description: "Try it once to begin.",
+    className: "is-not_started",
+  },
+  {
+    colour: "red",
+    label: "Needs work",
+    description: "Start repairing it with careful answers.",
+    className: "is-red",
+  },
+  {
+    colour: "orange",
+    label: "Building",
+    description: "Get a few more answers right without lots of help.",
+    className: "is-orange",
+  },
+  {
+    colour: "yellow",
+    label: "Nearly steady",
+    description: "Keep it correct after some time has passed.",
+    className: "is-yellow",
+  },
+  {
+    colour: "light_green",
+    label: "Reliable",
+    description: "Show strong confidence and no open mistake repair.",
+    className: "is-light_green",
+  },
+  {
+    colour: "green",
+    label: "Mastered",
+    description: "High confidence, steady for 7 days, 4+ correct, no recovery debt.",
+    className: "is-green",
+  },
+];
+
+function stageRank(colour: MasteryColour | null): number {
+  if (!colour) return 0;
+  const index = MASTERY_STAGES.findIndex((stage) => stage.colour === colour);
+  return index >= 0 ? index : 0;
+}
+
+function nextStepMessage(detail: NonNullable<ReturnType<typeof getWordDetail>>): string {
+  if (!detail.masteryColour) {
+    return "Answer this word in a practice round to start its colour.";
+  }
+
+  const state = detail.state;
+  const correctCount = detail.attempts.filter((attempt) => attempt.isCorrect).length;
+  const confidence = Math.round(detail.scoreLowerBound * 100);
+  const recoveryOpen = Boolean(state && (state.recoveryDebt > 0 || state.nearReview));
+
+  if (recoveryOpen) {
+    return "First repair the recent miss: answer it cleanly a few times so the mistake is closed.";
+  }
+  if (detail.scoreLowerBound < 0.3) {
+    return `To reach Building, aim for about 30% confidence. This word is at ${confidence}% now.`;
+  }
+  if (detail.scoreLowerBound < 0.55) {
+    return `To reach Nearly steady, aim for about 55% confidence. This word is at ${confidence}% now.`;
+  }
+  if (detail.scoreLowerBound < 0.7) {
+    return `To reach Reliable, aim for about 70% confidence. This word is at ${confidence}% now.`;
+  }
+  if (detail.scoreLowerBound < 0.8) {
+    return `To reach Mastered, aim for about 80% confidence. This word is at ${confidence}% now.`;
+  }
+  if ((state?.stabilityDays ?? 0) < 7) {
+    return `To reach Mastered, keep it steady for 7 days. It is steady for ${(state?.stabilityDays ?? 0).toFixed(1)} days now.`;
+  }
+  if (correctCount < 4) {
+    return `To reach Mastered, get at least 4 correct answers. You have ${correctCount} so far.`;
+  }
+  if ((state?.averageHintLevelUsed ?? 0) > 0.5) {
+    return "To reach Mastered, answer with less help from hints.";
+  }
+  if (detail.masteryColour === "green") {
+    return "This word is Mastered. It will come back only sometimes so it stays fresh.";
+  }
+  return "This word has the evidence for Mastered. One more clean refresh should keep it strong.";
 }
 
 async function resolveChildLearnerId(): Promise<string | null> {

@@ -44,6 +44,30 @@ const scenarios: Scenario[] = [
     stabilityDays: 1
   },
   {
+    name: "building_two_correct_one_wrong",
+    description: "Early mixed evidence: 2 correct, 1 wrong",
+    attempts: sequence([
+      ["correct", -2],
+      ["wrong", -1],
+      ["correct", 0]
+    ]),
+    stabilityDays: 1.5,
+    recoveryDebt: 1,
+    nearReview: true
+  },
+  {
+    name: "nearly_steady_five_correct_two_wrong",
+    description: "Middle evidence: 5 correct, 2 wrong",
+    attempts: [
+      ...repeatedCorrects(5, -7, 0),
+      attempt("wrong", -5),
+      attempt("wrong", -2)
+    ].sort(byAnsweredAt),
+    stabilityDays: 3,
+    recoveryDebt: 1,
+    nearReview: true
+  },
+  {
     name: "four_clean_two_days",
     description: "Four clean corrects spread over two days",
     attempts: sequence([
@@ -159,6 +183,10 @@ function main(): void {
     console.log(`  cautious prior: ${label(cautious.colour)} at ${percent(cautious.confidence)}`);
     console.log(`  note: ${light.note}`);
   }
+
+  console.log("\nConfidence ladder probe");
+  console.log("Colour should follow confidence; repair prompts should follow recent mistakes.");
+  console.table(confidenceLadderRows());
 }
 
 function evidenceModel(
@@ -202,6 +230,116 @@ function colourFromConfidence(confidence: number): ColourOrNone {
   if (confidence >= 0.55) return "yellow";
   if (confidence >= 0.35) return "orange";
   return "red";
+}
+
+function confidenceLadderRows(): Array<{
+  scenario: string;
+  evidence: string;
+  confidence: string;
+  colour: string;
+  repairPrompts: number;
+  interpretation: string;
+}> {
+  const rows: Array<{
+    scenario: string;
+    evidence: string;
+    confidence: string;
+    colour: string;
+    repairPrompts: number;
+    interpretation: string;
+  }> = [];
+
+  const ladderScenarios: Scenario[] = [
+    {
+      name: "low_confidence",
+      description: "Mostly misses",
+      attempts: sequence([
+        ["wrong", -3],
+        ["wrong", -2],
+        ["correct", -1],
+        ["wrong", 0]
+      ]),
+      stabilityDays: 1,
+      recoveryDebt: 2,
+      nearReview: true
+    },
+    {
+      name: "building_confidence",
+      description: "Some correct, still uncertain",
+      attempts: sequence([
+        ["wrong", -4],
+        ["correct", -3],
+        ["correct", -2],
+        ["wrong", -1],
+        ["correct", 0]
+      ]),
+      stabilityDays: 1.5,
+      recoveryDebt: 1,
+      nearReview: true
+    },
+    {
+      name: "nearly_steady_confidence",
+      description: "More correct than wrong",
+      attempts: [
+        ...repeatedCorrects(7, -7, 0),
+        attempt("wrong", -5),
+        attempt("wrong", -3)
+      ].sort(byAnsweredAt),
+      stabilityDays: 3,
+      recoveryDebt: 0,
+      nearReview: false
+    },
+    {
+      name: "reliable_confidence",
+      description: "Deep mostly-correct history",
+      attempts: [
+        ...repeatedCorrects(14, -12, 0),
+        attempt("wrong", -10),
+        attempt("wrong", -6)
+      ].sort(byAnsweredAt),
+      stabilityDays: 8,
+      recoveryDebt: 0,
+      nearReview: false
+    },
+    {
+      name: "mastered_confidence",
+      description: "Deep clean recent history",
+      attempts: [
+        attempt("wrong", -20),
+        ...repeatedCorrects(20, -14, 0)
+      ].sort(byAnsweredAt),
+      stabilityDays: 20,
+      recoveryDebt: 0,
+      nearReview: false
+    },
+    {
+      name: "reliable_with_fresh_repair",
+      description: "Reliable evidence, fresh slip",
+      attempts: [
+        ...repeatedCorrects(14, -12, -1),
+        attempt("wrong", 0)
+      ].sort(byAnsweredAt),
+      stabilityDays: 8,
+      recoveryDebt: 2,
+      nearReview: true
+    }
+  ];
+
+  for (const scenario of ladderScenarios) {
+    const model = evidenceModel(scenario.attempts, modelVariants[0]);
+    rows.push({
+      scenario: scenario.name,
+      evidence: summary(scenario.attempts),
+      confidence: percent(model.confidence),
+      colour: label(model.colour),
+      repairPrompts: model.repairPrompts,
+      interpretation:
+        model.repairPrompts > 0
+          ? "schedule repair without manual colour punishment"
+          : "colour follows confidence"
+    });
+  }
+  return rows;
 }
 
 function weightedTotals(attempts: AttemptRecord[]): { correct: number; wrong: number } {

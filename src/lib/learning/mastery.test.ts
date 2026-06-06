@@ -65,6 +65,81 @@ describe("mastery scoring", () => {
     expect(scoreFromState(survived, null, "2026-05-01T20:00:00.000Z").colour).toBe("green");
   });
 
+  it("allows old mistakes to be outgrown into mastered", () => {
+    const state = makeState({
+      attemptCount: 28,
+      correctCount: 26,
+      wrongCount: 2,
+      averageHintLevelUsed: 0,
+      stabilityDays: 30.8,
+      lastSeenAt: "2026-06-06T10:00:07.378Z",
+      lastCorrectAt: "2026-06-06T10:00:07.378Z",
+      lastWrongAt: "2026-05-24T09:00:00.000Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 20,
+      recoveryDebt: 0
+    });
+    const attempts: AttemptRecord[] = [
+      { answeredAt: "2026-05-18T09:00:00.000Z", isCorrect: false, hintLevelUsed: 0 },
+      { answeredAt: "2026-05-24T09:00:00.000Z", isCorrect: false, hintLevelUsed: 0 },
+      ...Array.from({ length: 26 }, (_, index) => ({
+        answeredAt: new Date(Date.parse("2026-05-25T09:00:00.000Z") + index * 11 * 3_600_000).toISOString(),
+        isCorrect: true,
+        hintLevelUsed: 0
+      }))
+    ];
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-06T10:00:07.378Z");
+
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.8);
+    expect(breakdown.colour).toBe("green");
+    expect(breakdown.reasons.some((reason) => reason.includes("Old mistakes"))).toBe(true);
+  });
+
+  it("does not mark old mistakes mastered until recovery is cleared", () => {
+    const state = makeState({
+      attemptCount: 28,
+      correctCount: 26,
+      wrongCount: 2,
+      averageHintLevelUsed: 0,
+      stabilityDays: 30.8,
+      lastSeenAt: "2026-06-06T10:00:07.378Z",
+      lastCorrectAt: "2026-06-06T10:00:07.378Z",
+      lastWrongAt: "2026-05-24T09:00:00.000Z",
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 1,
+      recoveryDebt: 1
+    });
+
+    const breakdown = scoreFromState(state, null, "2026-06-06T10:00:07.378Z");
+
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.8);
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.reasons.some((reason) => reason.includes("mistake recovery cleared"))).toBe(true);
+  });
+
+  it("keeps a strong-history word reliable after one fresh slip", () => {
+    const state = makeState({
+      attemptCount: 26,
+      correctCount: 22,
+      wrongCount: 4,
+      averageHintLevelUsed: 0,
+      stabilityDays: 18,
+      lastSeenAt: "2026-06-06T10:00:00.000Z",
+      lastCorrectAt: "2026-06-05T10:00:00.000Z",
+      lastWrongAt: "2026-06-06T10:00:00.000Z",
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 0,
+      recoveryDebt: 2
+    });
+
+    const breakdown = scoreFromState(state, null, "2026-06-06T10:05:00.000Z");
+
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.7);
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.reasons.some((reason) => reason.includes("long record stays Reliable"))).toBe(true);
+  });
+
   it("does not knock down a recent wrong after clean recovery proof", () => {
     const now = "2026-05-01T19:30:00.000Z";
     const state = makeState({

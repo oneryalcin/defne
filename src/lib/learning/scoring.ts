@@ -89,6 +89,22 @@ function firstAttemptsClean(state: LearnerWordState): boolean {
   );
 }
 
+function hasMasteredEvidence(
+  state: LearnerWordState,
+  lowerBound: number,
+  unresolvedRecentWrong: boolean
+): boolean {
+  return (
+    lowerBound >= MASTERED_LOWER &&
+    state.stabilityDays >= MASTERED_STABILITY_DAYS &&
+    state.correctCount >= MASTERED_MIN_CORRECT &&
+    state.averageHintLevelUsed <= 0.5 &&
+    state.recoveryDebt <= 0 &&
+    !state.nearReview &&
+    !unresolvedRecentWrong
+  );
+}
+
 function hasCleanSuccessHistory(state: LearnerWordState): boolean {
   return state.correctCount >= 2 && state.wrongCount === 0 && state.averageHintLevelUsed <= 0.5;
 }
@@ -98,6 +114,11 @@ function hasSmallSlipInStrongHistory(state: LearnerWordState): boolean {
   if (state.wrongCount === 0) return false;
   const wrongRatio = state.wrongCount / state.attemptCount;
   return state.correctCount / state.attemptCount >= 0.8 && wrongRatio <= 0.15 && state.averageHintLevelUsed <= 0.5;
+}
+
+function hasStrongReliableHistory(state: LearnerWordState): boolean {
+  if (state.attemptCount < 10) return false;
+  return state.correctCount / state.attemptCount >= 0.8 && state.averageHintLevelUsed <= 0.5;
 }
 
 interface WeightedTotals {
@@ -177,8 +198,9 @@ function computeWeightedTotals(
  *   2. Discount each correct by the hint level used during that attempt.
  *   3. Compute Wilson 90% lower bound on the weighted ratio.
  *   4. Bucket the lower bound + apply gates:
- *        Reliable requires 2 clean firsts; Mastered requires Reliable +
- *        ≥7d stability + ≥4 corrects.
+ *        Reliable requires 2 clean firsts as a floor; Mastered requires
+ *        strong current evidence, stability, low hint dependency, and no
+ *        active recovery debt. Old mistakes can be outgrown.
  *   5. Knock-down rule: an unresolved recent wrong forces colour down at most
  *      one bucket. A mistake stops dragging the colour down after enough clean
  *      follow-up questions clear near-review.
@@ -267,31 +289,32 @@ export function scoreFromState(
   }
 
   const clean = firstAttemptsClean(state);
+  const masteredEvidence = hasMasteredEvidence(state, lowerBound, unresolvedRecentWrong);
   let colour: MasteryColour;
-  if (clean) {
+  if (masteredEvidence) {
+    colour = "green";
+    if (!clean && state.wrongCount > 0) {
+      reasons.push("Old mistakes have been outweighed by stable clean evidence — marked Mastered.");
+    }
+  } else if (clean) {
     // Spec: 2 first attempts both clean → Reliable as a floor.
-    // From there, Mastered requires lower-bound + stability + correct count.
-    if (
-      lowerBound >= MASTERED_LOWER &&
-      state.stabilityDays >= MASTERED_STABILITY_DAYS &&
-      state.correctCount >= MASTERED_MIN_CORRECT
-    ) {
-      colour = "green";
-    } else {
-      colour = "light_green";
-      if (lowerBound < MASTERED_LOWER) {
-        reasons.push(
-          `First-pair clean → Reliable; needs ≥${(MASTERED_LOWER * 100).toFixed(0)}% confidence for Mastered.`
-        );
-      } else if (state.stabilityDays < MASTERED_STABILITY_DAYS) {
-        reasons.push(
-          `First-pair clean → Reliable; needs ${MASTERED_STABILITY_DAYS}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
-        );
-      } else if (state.correctCount < MASTERED_MIN_CORRECT) {
-        reasons.push(
-          `First-pair clean → Reliable; needs ${MASTERED_MIN_CORRECT} correct attempts for Mastered (currently ${state.correctCount}).`
-        );
-      }
+    colour = "light_green";
+    if (lowerBound < MASTERED_LOWER) {
+      reasons.push(
+        `First-pair clean → Reliable; needs ≥${(MASTERED_LOWER * 100).toFixed(0)}% confidence for Mastered.`
+      );
+    } else if (state.stabilityDays < MASTERED_STABILITY_DAYS) {
+      reasons.push(
+        `First-pair clean → Reliable; needs ${MASTERED_STABILITY_DAYS}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+      );
+    } else if (state.correctCount < MASTERED_MIN_CORRECT) {
+      reasons.push(
+        `First-pair clean → Reliable; needs ${MASTERED_MIN_CORRECT} correct attempts for Mastered (currently ${state.correctCount}).`
+      );
+    } else if (state.averageHintLevelUsed > 0.5) {
+      reasons.push("First-pair clean → Reliable; needs lower hint dependency for Mastered.");
+    } else if (state.recoveryDebt > 0 || state.nearReview) {
+      reasons.push("First-pair clean → Reliable; needs mistake recovery cleared for Mastered.");
     }
   } else if (lowerBound < BUILDING_LOWER) {
     colour = "red";
@@ -300,18 +323,35 @@ export function scoreFromState(
   } else if (lowerBound < RELIABLE_LOWER) {
     colour = "yellow";
   } else {
-    // High score but the first-pair was not clean — keep Reliable as the
-    // ceiling, never Mastered without clean firsts.
     colour = "light_green";
-    reasons.push(
-      "Score is high but the first two attempts were not clean — capped at Reliable."
-    );
+    if (lowerBound >= MASTERED_LOWER) {
+      if (state.stabilityDays < MASTERED_STABILITY_DAYS) {
+        reasons.push(
+          `Score is high; needs ${MASTERED_STABILITY_DAYS}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+        );
+      } else if (state.correctCount < MASTERED_MIN_CORRECT) {
+        reasons.push(
+          `Score is high; needs ${MASTERED_MIN_CORRECT} correct attempts for Mastered (currently ${state.correctCount}).`
+        );
+      } else if (state.averageHintLevelUsed > 0.5) {
+        reasons.push("Score is high; needs lower hint dependency for Mastered.");
+      } else if (state.recoveryDebt > 0 || state.nearReview) {
+        reasons.push("Score is high; needs mistake recovery cleared for Mastered.");
+      }
+    }
   }
 
-  // Recent-wrong knockdown: a fresh failure should never sit at
-  // light_green / green just because old corrects remain in the average.
+  // Recent-wrong knockdown: a fresh failure should block Mastered and
+  // trigger recovery, but a strong long-run record should not collapse
+  // below Reliable because of one slip.
   if (unresolvedRecentWrong) {
-    colour = stepDown(colour);
+    const nextColour = stepDown(colour);
+    if (hasStrongReliableHistory(state) && (colour === "green" || colour === "light_green")) {
+      colour = "light_green";
+      reasons.push("One recent slip is queued for repair, but the long record stays Reliable.");
+    } else {
+      colour = nextColour;
+    }
   }
 
   return { colour, pHat, lowerBound, effectiveN: totals.effectiveN, reasons };

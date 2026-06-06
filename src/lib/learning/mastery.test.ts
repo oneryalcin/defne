@@ -118,6 +118,28 @@ describe("mastery scoring", () => {
     expect(breakdown.reasons.some((reason) => reason.includes("mistake recovery cleared"))).toBe(true);
   });
 
+  it("keeps a strong-history word reliable after one fresh slip", () => {
+    const state = makeState({
+      attemptCount: 26,
+      correctCount: 22,
+      wrongCount: 4,
+      averageHintLevelUsed: 0,
+      stabilityDays: 18,
+      lastSeenAt: "2026-06-06T10:00:00.000Z",
+      lastCorrectAt: "2026-06-05T10:00:00.000Z",
+      lastWrongAt: "2026-06-06T10:00:00.000Z",
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 0,
+      recoveryDebt: 2
+    });
+
+    const breakdown = scoreFromState(state, null, "2026-06-06T10:05:00.000Z");
+
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.7);
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.reasons.some((reason) => reason.includes("long record stays Reliable"))).toBe(true);
+  });
+
   it("does not knock down a recent wrong after clean recovery proof", () => {
     const now = "2026-05-01T19:30:00.000Z";
     const state = makeState({

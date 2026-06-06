@@ -116,6 +116,11 @@ function hasSmallSlipInStrongHistory(state: LearnerWordState): boolean {
   return state.correctCount / state.attemptCount >= 0.8 && wrongRatio <= 0.15 && state.averageHintLevelUsed <= 0.5;
 }
 
+function hasStrongReliableHistory(state: LearnerWordState): boolean {
+  if (state.attemptCount < 10) return false;
+  return state.correctCount / state.attemptCount >= 0.8 && state.averageHintLevelUsed <= 0.5;
+}
+
 interface WeightedTotals {
   effectiveCorrect: number;
   wrongs: number;
@@ -336,10 +341,17 @@ export function scoreFromState(
     }
   }
 
-  // Recent-wrong knockdown: a fresh failure should never sit at
-  // light_green / green just because old corrects remain in the average.
+  // Recent-wrong knockdown: a fresh failure should block Mastered and
+  // trigger recovery, but a strong long-run record should not collapse
+  // below Reliable because of one slip.
   if (unresolvedRecentWrong) {
-    colour = stepDown(colour);
+    const nextColour = stepDown(colour);
+    if (hasStrongReliableHistory(state) && (colour === "green" || colour === "light_green")) {
+      colour = "light_green";
+      reasons.push("One recent slip is queued for repair, but the long record stays Reliable.");
+    } else {
+      colour = nextColour;
+    }
   }
 
   return { colour, pHat, lowerBound, effectiveN: totals.effectiveN, reasons };

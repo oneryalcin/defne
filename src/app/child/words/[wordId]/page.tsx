@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ArrowLeft, RotateCcw } from "lucide-react";
 import {
   clearChildVocabularyWordPriorityAction,
@@ -16,6 +16,8 @@ import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 import type { MasteryColour } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+type WordDetail = NonNullable<ReturnType<typeof getWordDetail>>;
 
 const COLOUR_KEY: Record<MasteryColour, string> = {
   red: "is-red",
@@ -56,6 +58,7 @@ export default async function ChildWordDetailPage({
   const activeRecentWrong = detail.scoreReasons.some((reason) =>
     reason.startsWith("Recent wrong still in recovery")
   );
+  const learningPlan = buildLearningPlan(detail);
 
   return (
     <main className="spread">
@@ -126,13 +129,13 @@ export default async function ChildWordDetailPage({
                 label="Wrong"
                 value={detail.attempts.filter((attempt) => !attempt.isCorrect).length.toString()}
               />
-              <SmallStat label="Confidence" value={`${Math.round(detail.scoreLowerBound * 100)}%`} />
+              <SmallStat label="Trust" value={trustLabel(Math.round(detail.scoreLowerBound * 100))} />
             </div>
             <p className="child-word-action-note">{progressMessage(colour, activeRecentWrong)}</p>
-            {detail.scoreReasons.length > 0 ? (
+            {learningPlan.evidence.length > 0 ? (
               <ul className="child-word-reasons">
-                {detail.scoreReasons.slice(0, 3).map((reason) => (
-                  <li key={reason}>{childFriendlyReason(reason)}</li>
+                {learningPlan.evidence.map((reason) => (
+                  <li key={reason}>{reason}</li>
                 ))}
               </ul>
             ) : null}
@@ -141,7 +144,9 @@ export default async function ChildWordDetailPage({
           <section className="child-word-card child-word-card--wide" aria-labelledby="child-word-journey-title">
             <span className="metric-label">How to move up</span>
             <h2 id="child-word-journey-title">What this word needs next</h2>
-            <p className="child-word-action-note">{nextStepMessage(detail)}</p>
+            <p className="child-word-action-note">{learningPlan.message}</p>
+            <LearningProgressGraph detail={detail} plan={learningPlan} />
+            <LearningPlanCards plan={learningPlan} />
             <MasteryJourney detail={detail} />
           </section>
 
@@ -175,7 +180,70 @@ export default async function ChildWordDetailPage({
   );
 }
 
-function MasteryJourney({ detail }: { detail: NonNullable<ReturnType<typeof getWordDetail>> }) {
+function LearningProgressGraph({ detail, plan }: { detail: WordDetail; plan: LearningPlan }) {
+  const currentRank = stageRank(detail.masteryColour);
+  const maxRank = MASTERY_STAGES.length - 1;
+  const progress = `${Math.round((currentRank / maxRank) * 100)}%`;
+  const nextStage = MASTERY_STAGES[Math.min(currentRank + 1, maxRank)];
+  const confidence = Math.round(detail.scoreLowerBound * 100);
+  const trust = trustLabel(confidence);
+  const confidenceStyle = { "--confidence": `${confidence * 3.6}deg` } as CSSProperties;
+
+  return (
+    <div className="child-progress-graph" aria-label="Word progress graph">
+      <div className="child-progress-graph__top">
+        <div>
+          <span className="child-progress-graph__label">Path</span>
+          <strong>{plan.now}</strong>
+          <p>Next stop: {detail.masteryColour === "green" ? "keep it fresh" : nextStage.label}</p>
+        </div>
+        <div className="child-confidence-ring" style={confidenceStyle} aria-label={`Trust level: ${trust}`}>
+          <strong>{trust}</strong>
+          <span>trust</span>
+        </div>
+      </div>
+      <div className="child-progress-graph__rail" aria-hidden="true">
+        <span className="child-progress-graph__fill" style={{ width: progress }} />
+        {MASTERY_STAGES.map((stage, index) => {
+          const reached = index <= currentRank;
+          return (
+            <span
+              key={stage.label}
+              className={`child-progress-graph__dot${reached ? " is-reached" : ""}`}
+              style={{ left: `${Math.round((index / maxRank) * 100)}%` }}
+            />
+          );
+        })}
+      </div>
+      <div className="child-progress-graph__footer">
+        <span>Start</span>
+        <span>{plan.when}</span>
+        <span>Mastered</span>
+      </div>
+    </div>
+  );
+}
+
+function LearningPlanCards({ plan }: { plan: LearningPlan }) {
+  return (
+    <div className="child-learning-plan" aria-label="Learning plan">
+      <div className="child-learning-plan__item">
+        <span>Now</span>
+        <strong>{plan.now}</strong>
+      </div>
+      <div className="child-learning-plan__item">
+        <span>Next</span>
+        <strong>{plan.next}</strong>
+      </div>
+      <div className="child-learning-plan__item">
+        <span>When</span>
+        <strong>{plan.when}</strong>
+      </div>
+    </div>
+  );
+}
+
+function MasteryJourney({ detail }: { detail: WordDetail }) {
   const currentRank = stageRank(detail.masteryColour);
   const state = detail.state;
   const correctCount = detail.attempts.filter((attempt) => attempt.isCorrect).length;
@@ -224,31 +292,31 @@ const MASTERY_STAGES: Array<{
   {
     colour: "red",
     label: "Needs work",
-    description: "Start repairing it with careful answers.",
+    description: "Practise slowly with the examples.",
     className: "is-red",
   },
   {
     colour: "orange",
     label: "Building",
-    description: "Get a few more answers right without lots of help.",
+    description: "Clean answers are starting to build trust.",
     className: "is-orange",
   },
   {
     colour: "yellow",
     label: "Nearly steady",
-    description: "Keep it correct after some time has passed.",
+    description: "You are close. Check it again later.",
     className: "is-yellow",
   },
   {
     colour: "light_green",
     label: "Reliable",
-    description: "Show strong confidence and no open mistake repair.",
+    description: "You usually know it.",
     className: "is-light_green",
   },
   {
     colour: "green",
     label: "Mastered",
-    description: "High confidence, steady for 7 days, 4+ correct, no recovery debt.",
+    description: "You know it well. Only rare check-ins now.",
     className: "is-green",
   },
 ];
@@ -259,44 +327,182 @@ function stageRank(colour: MasteryColour | null): number {
   return index >= 0 ? index : 0;
 }
 
-function nextStepMessage(detail: NonNullable<ReturnType<typeof getWordDetail>>): string {
-  if (!detail.masteryColour) {
-    return "Answer this word in a practice round to start its colour.";
-  }
+interface LearningPlan {
+  message: string;
+  now: string;
+  next: string;
+  when: string;
+  evidence: string[];
+}
 
-  const state = detail.state;
+const MASTERED_CONFIDENCE = 0.8;
+const MASTERED_STABILITY_DAYS = 7;
+const MASTERED_MIN_CORRECT = 4;
+const SPACED_CORRECT_STABILITY_MULTIPLIER = 1.4;
+
+function buildLearningPlan(detail: WordDetail): LearningPlan {
   const correctCount = detail.attempts.filter((attempt) => attempt.isCorrect).length;
+  const wrongCount = detail.attempts.length - correctCount;
   const confidence = Math.round(detail.scoreLowerBound * 100);
+  const state = detail.state;
   const recoveryOpen = Boolean(state && (state.recoveryDebt > 0 || state.nearReview));
+  const status = detail.masteryColour ? COLOUR_LABEL[detail.masteryColour] : "Not started";
+  const evidence = childEvidence(confidence, correctCount, wrongCount, recoveryOpen);
+
+  if (!detail.masteryColour) {
+    return {
+      message: "This word has not started yet. Try it once in a mission and the app will learn where it belongs.",
+      now: "Ready to begin",
+      next: "Try it once",
+      when: "Today",
+      evidence,
+    };
+  }
 
   if (recoveryOpen) {
-    return "First repair the recent miss: answer it cleanly a few times so the mistake is closed.";
+    const cleanNeeded = Math.max(1, Math.min(2, state?.recoveryDebt ?? 1));
+    return {
+      message: `A recent slip needs ${cleanNeeded} careful clean answer${cleanNeeded === 1 ? "" : "s"}. It does not erase what you already know.`,
+      now: status,
+      next: `${cleanNeeded} careful answer${cleanNeeded === 1 ? "" : "s"}`,
+      when: nextUsefulCheckLabel(detail),
+      evidence,
+    };
   }
+
   if (detail.scoreLowerBound < 0.3) {
-    return `To reach Building, aim for about 30% confidence. This word is at ${confidence}% now.`;
+    return planForConfidence(detail, status, "Building", evidence);
   }
   if (detail.scoreLowerBound < 0.55) {
-    return `To reach Nearly steady, aim for about 55% confidence. This word is at ${confidence}% now.`;
+    return planForConfidence(detail, status, "Nearly steady", evidence);
   }
   if (detail.scoreLowerBound < 0.7) {
-    return `To reach Reliable, aim for about 70% confidence. This word is at ${confidence}% now.`;
+    return planForConfidence(detail, status, "Reliable", evidence);
   }
-  if (detail.scoreLowerBound < 0.8) {
-    return `To reach Mastered, aim for about 80% confidence. This word is at ${confidence}% now.`;
+  if (detail.scoreLowerBound < MASTERED_CONFIDENCE) {
+    return planForConfidence(detail, status, "Mastered", evidence);
   }
-  if ((state?.stabilityDays ?? 0) < 7) {
-    return `To reach Mastered, keep it steady for 7 days. It is steady for ${(state?.stabilityDays ?? 0).toFixed(1)} days now.`;
+
+  const stabilityDays = state?.stabilityDays ?? 0;
+  if (stabilityDays < MASTERED_STABILITY_DAYS) {
+    const checks = spacedChecksNeeded(stabilityDays);
+    const when = nextUsefulCheckLabel(detail);
+    return {
+      message:
+        checks <= 1
+          ? `This word is very close. Come back around ${when.toLocaleLowerCase("en-GB")} and one clean answer may be enough for Mastered.`
+          : `This word is close. It likely needs ${checks} clean checks on different days to show it still sticks.`,
+      now: status,
+      next: checks <= 1 ? "One spaced clean answer" : `${checks} spaced clean answers`,
+      when,
+      evidence,
+    };
   }
-  if (correctCount < 4) {
-    return `To reach Mastered, get at least 4 correct answers. You have ${correctCount} so far.`;
+  if (correctCount < MASTERED_MIN_CORRECT) {
+    const remaining = MASTERED_MIN_CORRECT - correctCount;
+    return {
+      message: `This word needs ${remaining} more correct answer${remaining === 1 ? "" : "s"} before it can be Mastered.`,
+      now: status,
+      next: `${remaining} correct answer${remaining === 1 ? "" : "s"}`,
+      when: "Next mission",
+      evidence,
+    };
   }
   if ((state?.averageHintLevelUsed ?? 0) > 0.5) {
-    return "To reach Mastered, answer with less help from hints.";
+    return {
+      message: "This word is strong. To Master it, try answering without much hint help.",
+      now: status,
+      next: "Try without hints",
+      when: "Next mission",
+      evidence,
+    };
   }
   if (detail.masteryColour === "green") {
-    return "This word is Mastered. It will come back only sometimes so it stays fresh.";
+    return {
+      message: "This word is Mastered. It will only come back sometimes so it stays fresh.",
+      now: "Mastered",
+      next: "Keep it fresh",
+      when: state?.nextReviewAt ? friendlyDate(state.nextReviewAt) : "Later",
+      evidence,
+    };
   }
-  return "This word has the evidence for Mastered. One more clean refresh should keep it strong.";
+  return {
+    message: "This word looks strong. One clean refresh should keep it moving up.",
+    now: status,
+    next: "One clean refresh",
+    when: nextUsefulCheckLabel(detail),
+    evidence,
+  };
+}
+
+function planForConfidence(
+  detail: WordDetail,
+  status: string,
+  target: string,
+  evidence: string[]
+): LearningPlan {
+  return {
+    message: `This word is heading toward ${target}. Clean answers tell the app you still know it.`,
+    now: status,
+    next: "Clean answers",
+    when: nextUsefulCheckLabel(detail),
+    evidence,
+  };
+}
+
+function childEvidence(confidence: number, correctCount: number, wrongCount: number, recoveryOpen: boolean): string[] {
+  const evidence = [
+    `${correctCount} correct and ${wrongCount} ${wrongCount === 1 ? "miss" : "misses"} so far.`,
+    trustEvidence(confidence, correctCount, wrongCount),
+  ];
+  if (recoveryOpen) {
+    evidence.push("There is a recent slip to repair.");
+  } else {
+    evidence.push("No recent slip is waiting for repair.");
+  }
+  return evidence;
+}
+
+function trustLabel(confidence: number): string {
+  if (confidence >= 80) return "Strong";
+  if (confidence >= 60) return "Steady";
+  if (confidence >= 35) return "Growing";
+  return "Fresh check";
+}
+
+function trustEvidence(confidence: number, correctCount: number, wrongCount: number): string {
+  if (confidence >= 80) return "The app has strong trust in this word.";
+  if (confidence >= 60) return "The app trusts it, and a clean answer can make it stronger.";
+  if (confidence >= 35) return "The app is starting to trust it.";
+  if (correctCount > wrongCount) return "The app wants a fresh clean answer to trust it again.";
+  return "Clean answers will help the app trust it.";
+}
+
+function spacedChecksNeeded(stabilityDays: number): number {
+  if (stabilityDays >= MASTERED_STABILITY_DAYS) return 0;
+  if (stabilityDays <= 0) return 1;
+  return Math.max(
+    1,
+    Math.ceil(Math.log(MASTERED_STABILITY_DAYS / stabilityDays) / Math.log(SPACED_CORRECT_STABILITY_MULTIPLIER))
+  );
+}
+
+function nextUsefulCheckLabel(detail: WordDetail): string {
+  const state = detail.state;
+  if (!state?.lastSeenAt) return "Today";
+  const lastSeen = new Date(state.lastSeenAt).getTime();
+  if (!Number.isFinite(lastSeen)) return "Next mission";
+  const oneDayAfterLastSeen = lastSeen + 86_400_000;
+  if (Date.now() >= oneDayAfterLastSeen) return "Today";
+  return friendlyDate(new Date(oneDayAfterLastSeen).toISOString());
+}
+
+function friendlyDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(iso));
 }
 
 async function resolveChildLearnerId(): Promise<string | null> {
@@ -333,7 +539,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 
 function progressMessage(colour: MasteryColour | null, activeRecentWrong: boolean): string {
   if (activeRecentWrong) {
-    return "A recent miss pulled this word down. Clean answers will help it recover.";
+    return "A recent slip is queued for repair. It does not erase what you already know.";
   }
   switch (colour) {
     case "red":
@@ -349,14 +555,6 @@ function progressMessage(colour: MasteryColour | null, activeRecentWrong: boolea
     default:
       return "This word has not been practised yet. One real attempt will start its colour.";
   }
-}
-
-function childFriendlyReason(reason: string): string {
-  if (reason.startsWith("Not started")) return "No practice answers yet.";
-  if (reason.startsWith("Seen")) return reason.replace("Seen", "You have seen it");
-  if (reason.startsWith("Confidence")) return reason.replace("Confidence", "Confidence score");
-  if (reason.startsWith("Recent wrong")) return "A recent miss is still being repaired.";
-  return reason;
 }
 
 function highlightWordInText(text: string, word: string) {

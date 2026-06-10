@@ -98,6 +98,46 @@ describe("round word selection v2.1", () => {
     expect(selection.reasons.filter((reason) => reason.reason === "mistake_recovery")).toHaveLength(2);
   });
 
+  it("does not backfill zero-stable parent mixes with reliable words while new words are available", () => {
+    const introductions = Array.from({ length: 9 }, (_, index) => word(`untouched_${index + 1}`));
+    const recovery = Array.from({ length: 3 }, (_, index) =>
+      word(`recovery_${index + 1}`, {
+        masteryColour: "red",
+        attemptCount: 4,
+        correctCount: 1,
+        wrongCount: 3,
+        recoveryDebt: 2,
+        lastWrongAt: hoursAgo(4),
+        lastPracticedAt: hoursAgo(4),
+        lastExposedAt: hoursAgo(4)
+      })
+    );
+    const stable = Array.from({ length: 4 }, (_, index) =>
+      word(`stable_${index + 1}`, {
+        masteryColour: "green",
+        attemptCount: 8,
+        correctCount: 8,
+        wrongCount: 0,
+        stabilityDays: 12,
+        lastCleanRetrievalAt: daysAgo(14),
+        lastPracticedAt: daysAgo(14),
+        lastExposedAt: daysAgo(14)
+      })
+    );
+
+    const selection = selectRoundWords(
+      [...stable, ...recovery, ...introductions],
+      NOW,
+      12,
+      EMPTY_REMEDIATION,
+      { bucketTargets: { new: 8, recovery: 3, review: 1, stable: 0 } }
+    );
+
+    expect(selection.reasons.filter((reason) => reason.reason === "new_word")).toHaveLength(9);
+    expect(selection.reasons.filter((reason) => reason.reason === "mistake_recovery")).toHaveLength(3);
+    expect(selection.wordIds.some((id) => id.includes("stable"))).toBe(false);
+  });
+
   it("relaxes the green cap when the available deck is all mastered words", () => {
     const selection = selectRoundWords(
       Array.from({ length: 8 }, (_, index) =>
@@ -145,6 +185,24 @@ describe("round word selection v2.1", () => {
     const selection = selectRoundWords([...recentIntroductions, ...retrievalWords(12)], NOW, 12, EMPTY_REMEDIATION);
 
     expect(selection.wordIds.some((id) => id.includes("recent_intro"))).toBe(false);
+  });
+
+  it("does not schedule stable words before their next review when other words can fill the round", () => {
+    const earlyStable = word("early_stable", {
+      masteryColour: "green",
+      attemptCount: 20,
+      correctCount: 18,
+      wrongCount: 2,
+      stabilityDays: 10,
+      lastCleanRetrievalAt: daysAgo(3),
+      lastPracticedAt: daysAgo(3),
+      lastExposedAt: daysAgo(3),
+      nextReviewAt: daysFromNow(4)
+    });
+
+    const selection = selectRoundWords([earlyStable, ...retrievalWords(12)], NOW, 12, EMPTY_REMEDIATION);
+
+    expect(selection.wordIds).not.toContain("word_early_stable");
   });
 });
 
@@ -215,6 +273,10 @@ function state(wordId: string, overrides: Partial<LearnerWordState>): LearnerWor
 
 function daysAgo(days: number): string {
   return new Date(Date.parse(NOW) - days * 86_400_000).toISOString();
+}
+
+function daysFromNow(days: number): string {
+  return new Date(Date.parse(NOW) + days * 86_400_000).toISOString();
 }
 
 function hoursAgo(hours: number): string {

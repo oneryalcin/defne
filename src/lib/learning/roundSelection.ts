@@ -64,6 +64,7 @@ interface SelectionFeatures {
   veryLowRecall: boolean;
   stableOrMastered: boolean;
   greenMastered: boolean;
+  tooEarlyStableReview: boolean;
   tooRecentOrdinary: boolean;
   tooRecentIntroduction: boolean;
   tooRecentRecovery: boolean;
@@ -118,6 +119,7 @@ export function selectRoundWords(
     for (const bucket of ["new", "recovery", "review", "stable"] as const) {
       fillBucket(bucket, bucketTargets[bucket], candidates, selected, caps);
     }
+    fillParentPreferredBackfill(bucketTargets, candidates, selected, caps, count);
   } else {
     const introduction = candidates.find(
       (candidate) =>
@@ -142,10 +144,23 @@ export function selectRoundWords(
     for (const candidate of candidates) {
       if (selected.size >= count) break;
       if (selected.has(candidate.word.id)) continue;
+      if (bucketTargets && bucketTargets[bucketForFeatures(candidate.features)] === 0) continue;
       if (!allowedUnderPass(candidate, [...selected.values()], caps, pass)) continue;
       selected.set(candidate.word.id, candidate);
     }
     if (selected.size >= count) break;
+  }
+
+  if (bucketTargets && selected.size < count) {
+    for (const pass of passes) {
+      for (const candidate of candidates) {
+        if (selected.size >= count) break;
+        if (selected.has(candidate.word.id)) continue;
+        if (!allowedUnderPass(candidate, [...selected.values()], caps, pass)) continue;
+        selected.set(candidate.word.id, candidate);
+      }
+      if (selected.size >= count) break;
+    }
   }
 
   const picked = [...selected.values()];
@@ -209,6 +224,20 @@ function fillBucket(
   }
 }
 
+function fillParentPreferredBackfill(
+  bucketTargets: RoundSelectionBucketTargets,
+  candidates: Candidate[],
+  selected: Map<string, Candidate>,
+  caps: SelectionCaps,
+  count: number
+): void {
+  for (const bucket of ["new", "recovery", "review", "stable"] as const) {
+    if (selected.size >= count) break;
+    if (bucketTargets[bucket] <= 0) continue;
+    fillBucket(bucket, count, candidates, selected, caps);
+  }
+}
+
 function bucketForFeatures(features: SelectionFeatures): RoundSelectionBucket {
   if (features.untouched || features.introducedOnly) return "new";
   if (features.activeRecovery) return "recovery";
@@ -241,6 +270,7 @@ function allowedUnderPass(
   if (candidate.features.tooRecentRecovery && pass !== "emergency_too_recent") return false;
   if (candidate.features.tooRecentOrdinary && pass !== "emergency_too_recent") return false;
   if (candidate.features.tooRecentIntroduction && pass !== "emergency_too_recent") return false;
+  if (candidate.features.tooEarlyStableReview && pass !== "emergency_too_recent") return false;
 
   const next = [...selected, candidate];
   const stable = next.filter((item) => item.features.stableOrMastered).length;
@@ -272,6 +302,10 @@ export function computeFeatures(word: PracticeWord, nowIso: string): SelectionFe
   const recovery = activeRecovery ? Math.min(rawRecoveryDebt, 3) / 3 : 0;
   const stableOrMastered = STABLE_COLOURS.has(state.masteryColour);
   const greenMastered = state.masteryColour === "green";
+  const tooEarlyStableReview =
+    stableOrMastered &&
+    Boolean(state.nextReviewAt) &&
+    new Date(state.nextReviewAt as string).getTime() > new Date(nowIso).getTime();
 
   let recall: number | null = null;
   let targetRecall: number | null = null;
@@ -327,6 +361,7 @@ export function computeFeatures(word: PracticeWord, nowIso: string): SelectionFe
     veryLowRecall,
     stableOrMastered,
     greenMastered,
+    tooEarlyStableReview,
     tooRecentOrdinary,
     tooRecentIntroduction,
     tooRecentRecovery,

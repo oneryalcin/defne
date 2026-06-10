@@ -109,16 +109,25 @@ function hasCleanSuccessHistory(state: LearnerWordState): boolean {
   return state.correctCount >= 2 && state.wrongCount === 0 && state.averageHintLevelUsed <= 0.5;
 }
 
-function hasSmallSlipInStrongHistory(state: LearnerWordState): boolean {
-  if (state.attemptCount < 5) return false;
+function hasMostlyCorrectPracticeHistory(state: LearnerWordState): boolean {
+  if (state.attemptCount < 10) return false;
   if (state.wrongCount === 0) return false;
   const wrongRatio = state.wrongCount / state.attemptCount;
-  return state.correctCount / state.attemptCount >= 0.8 && wrongRatio <= 0.15 && state.averageHintLevelUsed <= 0.5;
+  return state.correctCount / state.attemptCount >= 0.75 && wrongRatio <= 0.25 && state.averageHintLevelUsed <= 0.5;
 }
 
 function hasStrongReliableHistory(state: LearnerWordState): boolean {
   if (state.attemptCount < 10) return false;
   return state.correctCount / state.attemptCount >= 0.8 && state.averageHintLevelUsed <= 0.5;
+}
+
+function hasEarnedReliableHistory(state: LearnerWordState): boolean {
+  return (
+    (state.masteryColour === "light_green" || state.masteryColour === "green") &&
+    hasStrongReliableHistory(state) &&
+    state.recoveryDebt <= 0 &&
+    !state.nearReview
+  );
 }
 
 interface WeightedTotals {
@@ -283,9 +292,12 @@ export function scoreFromState(
       `Recent wrong still in recovery — knocked down one bucket until ${DEFAULT_NEAR_REVIEW_SPACING} clean follow-up questions clear it.`
     );
   }
-  if (!unresolvedRecentWrong && hasSmallSlipInStrongHistory(state) && lowerBound < BUILDING_LOWER) {
+  if (!unresolvedRecentWrong && hasEarnedReliableHistory(state) && lowerBound < RELIABLE_LOWER) {
+    lowerBound = RELIABLE_LOWER;
+    reasons.push("Strong earned history is stale, so this stays Reliable and is scheduled as a refresh.");
+  } else if (!unresolvedRecentWrong && hasMostlyCorrectPracticeHistory(state) && lowerBound < BUILDING_LOWER) {
     lowerBound = BUILDING_LOWER;
-    reasons.push("One small slip inside a strong history is treated as a refresh need, not Needs work.");
+    reasons.push("Mostly correct history is stale, so this is treated as a refresh need, not Needs work.");
   }
 
   const clean = firstAttemptsClean(state);

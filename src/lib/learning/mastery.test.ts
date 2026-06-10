@@ -242,7 +242,76 @@ describe("mastery scoring", () => {
     const breakdown = scoreFromState(state, attempts, "2026-06-05T12:00:00.000Z");
 
     expect(breakdown.colour).not.toBe("red");
-    expect(breakdown.reasons.some((reason) => reason.includes("One small slip"))).toBe(true);
+    expect(breakdown.reasons.some((reason) => reason.includes("refresh need"))).toBe(true);
+  });
+
+  it("treats stale 80-percent histories as refresh work rather than red", () => {
+    const state = makeState({
+      attemptCount: 24,
+      correctCount: 20,
+      wrongCount: 4,
+      masteryColour: "yellow",
+      averageHintLevelUsed: 0,
+      stabilityDays: 3,
+      lastSeenAt: "2026-05-05T18:52:48.393Z",
+      lastCorrectAt: "2026-05-05T18:52:48.393Z",
+      lastWrongAt: "2026-05-04T18:48:45.761Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 5,
+      recoveryDebt: 0
+    });
+    const attempts: AttemptRecord[] = [
+      ...Array.from({ length: 4 }, (_, index) => ({
+        answeredAt: new Date(Date.parse("2026-05-04T18:48:45.761Z") + index * 30 * 60_000).toISOString(),
+        isCorrect: false,
+        hintLevelUsed: 0
+      })),
+      ...Array.from({ length: 20 }, (_, index) => ({
+        answeredAt: new Date(Date.parse("2026-05-05T18:52:48.393Z") + index * 6 * 60 * 60_000).toISOString(),
+        isCorrect: true,
+        hintLevelUsed: 0
+      }))
+    ];
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-10T12:00:00.000Z");
+
+    expect(breakdown.colour).toBe("orange");
+    expect(breakdown.reasons.some((reason) => reason.includes("refresh need"))).toBe(true);
+  });
+
+  it("keeps stale earned reliable words reliable instead of turning them red", () => {
+    const state = makeState({
+      attemptCount: 24,
+      correctCount: 20,
+      wrongCount: 4,
+      masteryColour: "light_green",
+      averageHintLevelUsed: 0,
+      stabilityDays: 4.42,
+      lastSeenAt: "2026-05-15T17:59:55.934Z",
+      lastCorrectAt: "2026-05-15T17:59:55.934Z",
+      lastWrongAt: "2026-05-06T15:37:24.645Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 10,
+      recoveryDebt: 0
+    });
+    const attempts: AttemptRecord[] = [
+      ...Array.from({ length: 4 }, (_, index) => ({
+        answeredAt: new Date(Date.parse("2026-05-04T10:23:12.652Z") + index * 30 * 60_000).toISOString(),
+        isCorrect: false,
+        hintLevelUsed: 0
+      })),
+      ...Array.from({ length: 20 }, (_, index) => ({
+        answeredAt: new Date(Date.parse("2026-05-05T16:19:24.419Z") + index * 12 * 60 * 60_000).toISOString(),
+        isCorrect: true,
+        hintLevelUsed: 0
+      }))
+    ];
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-10T12:00:00.000Z");
+
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.7);
+    expect(breakdown.reasons.some((reason) => reason.includes("stays Reliable"))).toBe(true);
   });
 
   it("uses attempt history to clear stale near-review state after three clean follow-ups", () => {

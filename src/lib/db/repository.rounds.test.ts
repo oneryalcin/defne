@@ -10,6 +10,7 @@ import {
   getMissionPreview,
   getParentWords,
   getParentWordForEdit,
+  getWordDetail,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
@@ -35,7 +36,9 @@ import {
   getParentSpellingItems,
   getSpellingPreview,
   getSpellingSessionView,
+  getSpellingRoundMixPreference,
   requestSpellingItemNextRound,
+  setSpellingRoundMixPreference,
   startSpellingPractice,
   startSpellingMission,
   submitSpellingAnswer,
@@ -293,6 +296,44 @@ describe("round repository orchestration", () => {
 
     expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
     expect(listAvailableVocabularyForLearner("learner_defne").find((word) => word.id === wordId)?.assigned).toBe(false);
+  });
+
+  it("keeps the word detail badge on the earned colour while live confidence decays", () => {
+    const learnerId = createLearner({ displayName: "Lev", accessCode: "lev-detail" });
+    const word = listAvailableVocabularyForLearner(learnerId).find((candidate) => !candidate.assigned);
+    expect(word).toBeTruthy();
+    if (!word) throw new Error("Expected an available vocabulary word.");
+    assignVocabularyWordToLearner(learnerId, word.id);
+
+    const db = getDb();
+    const oldSeenAt = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO learner_word_state
+        (id, learner_id, word_id, stability_days, mastery_colour, last_seen_at, last_correct_at,
+         attempt_count, correct_count, wrong_count, average_hint_level_used, average_response_time_ms,
+         created_at, updated_at)
+       VALUES (?, ?, ?, 10, 'green', ?, ?, 4, 4, 0, 0, 1000, ?, ?)`
+    ).run(`state_${learnerId}_${word.id}`, learnerId, word.id, oldSeenAt, oldSeenAt, now, now);
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, ended_at, summary_json, created_at, updated_at)
+       VALUES ('session_old_mastery_detail', ?, 'daily_mission', 'completed', 4, 4, ?, ?, '{}', ?, ?)`
+    ).run(learnerId, oldSeenAt, oldSeenAt, oldSeenAt, oldSeenAt);
+    const insertAttempt = db.prepare(
+      `INSERT INTO practice_attempts
+        (id, session_id, learner_id, word_id, question_type, prompt_json, expected_answer_json,
+         submitted_answer, is_correct, hint_level_used, max_hint_level_available, response_time_ms, failure_type, created_at)
+       VALUES (?, 'session_old_mastery_detail', ?, ?, 'definition_choice', '{}', '{}', 'correct', 1, 0, 0, 1000, 'none', ?)`
+    );
+    for (let idx = 0; idx < 4; idx += 1) {
+      insertAttempt.run(`attempt_old_mastery_detail_${idx}`, learnerId, word.id, oldSeenAt);
+    }
+
+    const detail = getWordDetail(word.id, learnerId);
+
+    expect(detail?.masteryColour).toBe("green");
+    expect(detail?.scoreLowerBound).toBeLessThan(0.8);
   });
 
   it("does not let stale unfinished rounds override the current priority queue", () => {
@@ -1091,6 +1132,37 @@ describe("spelling repository orchestration", () => {
     expect(preview.items[0].target).toBe("advice");
   });
 
+  it("uses per-child spelling bucket targets for the normal spelling mission", () => {
+    insertSpellingAttemptHistory("spelling_advice", [false, false, true]);
+    insertSpellingAttemptHistory("spelling_possible", [true, true]);
+    const reviewAt = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    getDb()
+      .prepare(
+        `UPDATE spelling_learner_state
+         SET last_seen_at = ?,
+             last_correct_at = ?,
+             last_practiced_at = ?,
+             last_clean_retrieval_at = ?,
+             updated_at = ?
+         WHERE learner_id = 'learner_defne' AND item_id = 'spelling_possible'`
+      )
+      .run(reviewAt, reviewAt, reviewAt, reviewAt, reviewAt);
+    setSpellingRoundMixPreference({ new: 6, recovery: 1, review: 1, stable: 0 }, "learner_defne");
+
+    const preview = getSpellingPreview(8);
+
+    expect(getSpellingRoundMixPreference("learner_defne")).toEqual({
+      new: 6,
+      recovery: 1,
+      review: 1,
+      stable: 0
+    });
+    expect(preview.items).toHaveLength(8);
+    expect(preview.items.filter((item) => item.attemptCount === 0)).toHaveLength(6);
+    expect(preview.items.some((item) => item.target === "advice")).toBe(true);
+    expect(preview.items.some((item) => item.target === "possible")).toBe(true);
+  });
+
   it("lets parent priority place an assigned spelling word in the next spelling mission once", () => {
     const learnerId = createLearner({ displayName: "Ozan", accessCode: "ozan" });
     const items = getDb()
@@ -1254,7 +1326,8 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   if (!prompt) throw new Error(`Expected a spelling prompt for ${itemId}`);
 
   const sessionId = `test_spelling_session_${itemId}_${outcomes.length}`;
-  const now = "2026-05-10T10:00:00.000Z";
+  const baseTime = Date.now() - 3_600_000;
+  const now = new Date(baseTime).toISOString();
   db.prepare(
     `INSERT INTO spelling_sessions
       (id, learner_id, status, target_item_count, actual_question_count, item_ids_json, started_at, ended_at, summary_json, created_at, updated_at)
@@ -1262,7 +1335,7 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   ).run(sessionId, JSON.stringify([itemId]), now, now, now, now);
 
   outcomes.forEach((isCorrect, index) => {
-    const createdAt = `2026-05-10T10:${String(index).padStart(2, "0")}:00.000Z`;
+    const createdAt = new Date(baseTime + index * 60_000).toISOString();
     db.prepare(
       `INSERT INTO spelling_attempts
         (id, session_id, learner_id, item_id, prompt_id, prompt_json, expected_answer_json, submitted_answer, is_correct, response_time_ms, created_at)
@@ -1282,11 +1355,11 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   const wrongCount = outcomes.length - correctCount;
   const lastCorrectIndex = outcomes.map((value, index) => (value ? index : -1)).filter((index) => index >= 0).at(-1);
   const lastWrongIndex = outcomes.map((value, index) => (!value ? index : -1)).filter((index) => index >= 0).at(-1);
-  const lastAttemptAt = `2026-05-10T10:${String(outcomes.length - 1).padStart(2, "0")}:00.000Z`;
+  const lastAttemptAt = new Date(baseTime + (outcomes.length - 1) * 60_000).toISOString();
   const lastCorrectAt =
-    lastCorrectIndex === undefined ? null : `2026-05-10T10:${String(lastCorrectIndex).padStart(2, "0")}:00.000Z`;
+    lastCorrectIndex === undefined ? null : new Date(baseTime + lastCorrectIndex * 60_000).toISOString();
   const lastWrongAt =
-    lastWrongIndex === undefined ? null : `2026-05-10T10:${String(lastWrongIndex).padStart(2, "0")}:00.000Z`;
+    lastWrongIndex === undefined ? null : new Date(baseTime + lastWrongIndex * 60_000).toISOString();
 
   db.prepare(
     `INSERT INTO spelling_learner_state
@@ -1322,7 +1395,7 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
     Math.max(0, wrongCount - correctCount),
     sessionId,
     outcomes.length,
-    "2026-05-10T10:00:00.000Z",
+    now,
     lastAttemptAt
   );
 }

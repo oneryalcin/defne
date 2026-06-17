@@ -39,6 +39,7 @@ export interface RoundSelectionBucketTargets {
 export interface RoundSelectionOptions {
   bucketTargets?: Partial<RoundSelectionBucketTargets>;
   allowPartialCount?: boolean;
+  reserveIntroduction?: boolean;
 }
 
 interface SelectionCaps {
@@ -117,10 +118,10 @@ export function selectRoundWords(
   const bucketTargets = normalizeBucketTargets(options.bucketTargets, count);
   if (bucketTargets) {
     for (const bucket of ["new", "recovery", "review", "stable"] as const) {
-      fillBucket(bucket, bucketTargets[bucket], candidates, selected, caps);
+      fillBucket(bucket, bucketTargets[bucket], candidates, selected, caps, count);
     }
     fillParentPreferredBackfill(bucketTargets, candidates, selected, caps, count);
-  } else {
+  } else if (options.reserveIntroduction !== false) {
     const introduction = candidates.find(
       (candidate) =>
         (candidate.features.untouched || candidate.features.introducedOnly) &&
@@ -199,7 +200,8 @@ function fillBucket(
   target: number,
   candidates: Candidate[],
   selected: Map<string, Candidate>,
-  caps: SelectionCaps
+  caps: SelectionCaps,
+  maxSelected: number
 ): void {
   if (target <= 0) return;
   let picked = [...selected.values()].filter((candidate) => bucketForFeatures(candidate.features) === bucket).length;
@@ -210,9 +212,10 @@ function fillBucket(
         ? ["strict_caps", "relax_recovery"]
         : bucket === "stable"
           ? ["strict_caps", "relax_stable", "relax_green_if_needed"]
-          : ["strict_caps"];
+          : ["strict_caps", "relax_very_hard"];
   for (const pass of passes) {
     for (const candidate of candidates) {
+      if (selected.size >= maxSelected) break;
       if (picked >= target) break;
       if (selected.has(candidate.word.id)) continue;
       if (bucketForFeatures(candidate.features) !== bucket) continue;
@@ -220,7 +223,7 @@ function fillBucket(
       selected.set(candidate.word.id, candidate);
       picked += 1;
     }
-    if (picked >= target) break;
+    if (selected.size >= maxSelected || picked >= target) break;
   }
 }
 
@@ -234,7 +237,7 @@ function fillParentPreferredBackfill(
   for (const bucket of ["new", "recovery", "review", "stable"] as const) {
     if (selected.size >= count) break;
     if (bucketTargets[bucket] <= 0) continue;
-    fillBucket(bucket, count, candidates, selected, caps);
+    fillBucket(bucket, count, candidates, selected, caps, count);
   }
 }
 

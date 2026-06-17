@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { setSpellingRoundMixAction } from "@/app/actions";
 import { ParentSpellingList } from "@/components/parent/ParentSpellingList";
 import {
+  getSpellingRoundMixPreference,
   getParentSpellingItems,
   listAvailableSpellingItemsForLearner
 } from "@/lib/db/spellingRepository";
@@ -22,6 +24,7 @@ export default async function ParentSpellingPage({
   const selectedLearner = learners.find((learner) => learner.id === learnerId);
   const items = getParentSpellingItems(learnerId);
   const libraryItems = listAvailableSpellingItemsForLearner(learnerId);
+  const spellingMix = getSpellingRoundMixPreference(learnerId);
   const initialQuery = resolvedSearchParams.q ?? "";
   const learnerName = selectedLearner?.displayName ?? "this child";
 
@@ -47,6 +50,34 @@ export default async function ParentSpellingPage({
           Add spelling word
         </Link>
       </div>
+
+      <section className="dash-section" aria-labelledby="spelling-mix">
+        <header className="section-head">
+          <span className="section-head__label">Next spelling round</span>
+          <h2 id="spelling-mix" className="section-head__title">Choose the spelling mix.</h2>
+          <p className="section-head__sub">Targets are per child. If a bucket is short, Defne fills with the next useful spelling item.</p>
+        </header>
+        <form action={setSpellingRoundMixAction} className="queue-mix-form">
+          <input type="hidden" name="learnerId" value={learnerId} />
+          <label>
+            <span>Not started</span>
+            <input type="number" name="spellingRoundNew" min="0" max="8" defaultValue={spellingMix.new} />
+          </label>
+          <label>
+            <span>Mistake recovery</span>
+            <input type="number" name="spellingRoundRecovery" min="0" max="8" defaultValue={spellingMix.recovery} />
+          </label>
+          <label>
+            <span>Review</span>
+            <input type="number" name="spellingRoundReview" min="0" max="8" defaultValue={spellingMix.review} />
+          </label>
+          <label>
+            <span>Reliable</span>
+            <input type="number" name="spellingRoundStable" min="0" max="8" defaultValue={spellingMix.stable} />
+          </label>
+          <button className="button-secondary" type="submit">Save spelling mix</button>
+        </form>
+      </section>
 
       <ParentSpellingList
         items={items}

@@ -7,7 +7,11 @@ import {
   type SpellingQuestion
 } from "../learning/spelling";
 import { applyPracticeEventToSelectionState, updateStateAfterAttempt } from "../learning/mastery";
-import { selectRoundWords } from "../learning/roundSelection";
+import {
+  selectRoundWords,
+  selectionBucketForWord,
+  type RoundSelectionBucketTargets
+} from "../learning/roundSelection";
 import type { FailureType, LearnerWordState, PracticeAttemptOutcome, PracticeWord } from "../types";
 import { getDb } from "./index";
 import { defaultLearnerId, normalizeWord } from "./seed";
@@ -61,6 +65,15 @@ interface SpellingStateRow {
   learner_state_content_version: number;
 }
 
+export interface SpellingRoundMixPreference extends RoundSelectionBucketTargets {}
+
+export const DEFAULT_SPELLING_ROUND_MIX: SpellingRoundMixPreference = {
+  new: 3,
+  recovery: 3,
+  review: 2,
+  stable: 0
+};
+
 export interface SpellingPreview {
   targetItemCount: number;
   items: Array<{
@@ -71,6 +84,38 @@ export interface SpellingPreview {
     correctCount: number;
     wrongCount: number;
   }>;
+}
+
+export function getSpellingRoundMixPreference(learnerId = defaultLearnerId()): SpellingRoundMixPreference {
+  return getSpellingRoundMixPreferenceFromDb(getDb(), learnerId);
+}
+
+export function setSpellingRoundMixPreference(
+  preference: Partial<SpellingRoundMixPreference>,
+  learnerId = defaultLearnerId()
+): void {
+  const db = getDb();
+  const previous = getSpellingRoundMixPreferenceFromDb(db, learnerId);
+  const normalized = normalizeSpellingRoundMix(preference);
+  const changed = !spellingRoundMixEquals(previous, normalized);
+
+  db.prepare(
+    `UPDATE learner_profiles
+     SET spelling_round_new_count = ?,
+         spelling_round_recovery_count = ?,
+         spelling_round_review_count = ?,
+         spelling_round_stable_count = ?,
+         updated_at = ?
+     WHERE learner_id = ?`
+  ).run(
+    normalized.new,
+    normalized.recovery,
+    normalized.review,
+    normalized.stable,
+    new Date().toISOString(),
+    learnerId
+  );
+  if (changed) abandonActiveSpellingSessions(db, learnerId);
 }
 
 export interface ParentSpellingItemInput {
@@ -812,12 +857,116 @@ function selectSpellingItems(db: DatabaseSync, limit: number, learnerId: string)
     return getSpellingItemsByIds(db, itemIds);
   }
 
-  const selection = selectRoundWords(words, nowIso, Math.max(6, limit), {
+  const priorityWords = priorityIds.map((itemId) => words.find((word) => word.id === itemId)).filter((word): word is PracticeWord => Boolean(word));
+  const bucketTargets =
+    limit >= 8
+      ? getAdjustedSpellingBucketTargetsForFill(
+          getSpellingRoundMixPreferenceFromDb(db, learnerId),
+          priorityWords,
+          nowIso
+        )
+      : undefined;
+  const fillCount = limit - priorityIds.length;
+  const selection = selectRoundWords(words.filter((word) => !prioritySet.has(word.id)), nowIso, fillCount, {
     revealAndMoveOnWordIds: [],
     eventuallyCorrectNotFirstAttemptWordIds: []
-  });
-  const fillIds = selection.wordIds.filter((itemId) => !prioritySet.has(itemId)).slice(0, limit - priorityIds.length);
+  }, { bucketTargets, allowPartialCount: true, reserveIntroduction: limit >= 8 });
+  const fillIds = selection.wordIds.filter((itemId) => !prioritySet.has(itemId)).slice(0, fillCount);
   return getSpellingItemsByIds(db, [...priorityIds, ...fillIds]);
+}
+
+function getAdjustedSpellingBucketTargetsForFill(
+  mix: SpellingRoundMixPreference,
+  priorityWords: PracticeWord[],
+  nowIso: string
+): SpellingRoundMixPreference {
+  const adjusted = { ...mix };
+  for (const word of priorityWords) {
+    const bucket = selectionBucketForWord(word, nowIso);
+    adjusted[bucket] = Math.max(0, adjusted[bucket] - 1);
+  }
+  return adjusted;
+}
+
+function getSpellingRoundMixPreferenceFromDb(
+  db: DatabaseSync,
+  learnerId = defaultLearnerId()
+): SpellingRoundMixPreference {
+  const row = db
+    .prepare(
+      `SELECT spelling_round_new_count,
+              spelling_round_recovery_count,
+              spelling_round_review_count,
+              spelling_round_stable_count
+       FROM learner_profiles
+       WHERE learner_id = ?`
+    )
+    .get(learnerId) as
+    | {
+        spelling_round_new_count: number;
+        spelling_round_recovery_count: number;
+        spelling_round_review_count: number;
+        spelling_round_stable_count: number;
+      }
+    | undefined;
+  return normalizeSpellingRoundMix(
+    row
+      ? {
+          new: row.spelling_round_new_count,
+          recovery: row.spelling_round_recovery_count,
+          review: row.spelling_round_review_count,
+          stable: row.spelling_round_stable_count
+        }
+      : DEFAULT_SPELLING_ROUND_MIX
+  );
+}
+
+function normalizeSpellingRoundMix(preference: Partial<SpellingRoundMixPreference>): SpellingRoundMixPreference {
+  const count = (value: number | undefined, fallback: number) => {
+    const rounded = Math.round(value ?? fallback);
+    return Number.isFinite(rounded) ? Math.max(0, Math.min(8, rounded)) : fallback;
+  };
+  const values = {
+    new: count(preference.new, DEFAULT_SPELLING_ROUND_MIX.new),
+    recovery: count(preference.recovery, DEFAULT_SPELLING_ROUND_MIX.recovery),
+    review: count(preference.review, DEFAULT_SPELLING_ROUND_MIX.review),
+    stable: count(preference.stable, DEFAULT_SPELLING_ROUND_MIX.stable)
+  };
+  const total = values.new + values.recovery + values.review + values.stable;
+  if (total <= 8) return values;
+
+  let overflow = total - 8;
+  for (const bucket of ["stable", "review", "recovery", "new"] as const) {
+    const reduction = Math.min(values[bucket], overflow);
+    values[bucket] -= reduction;
+    overflow -= reduction;
+    if (overflow === 0) break;
+  }
+  return values;
+}
+
+function spellingRoundMixEquals(a: SpellingRoundMixPreference, b: SpellingRoundMixPreference): boolean {
+  return a.new === b.new && a.recovery === b.recovery && a.review === b.review && a.stable === b.stable;
+}
+
+function abandonActiveSpellingSessions(db: DatabaseSync, learnerId: string): void {
+  const sessions = db
+    .prepare(
+      `SELECT id
+       FROM spelling_sessions
+       WHERE learner_id = ? AND status = 'in_progress'`
+    )
+    .all(learnerId) as Array<{ id: string }>;
+  if (sessions.length === 0) return;
+
+  const now = new Date().toISOString();
+  for (const session of sessions) {
+    db.prepare(
+      `UPDATE spelling_sessions
+       SET status = 'abandoned', ended_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'in_progress'`
+    ).run(now, now, session.id);
+  }
 }
 
 function getSpellingNextRoundPriorityItemIds(db: DatabaseSync, learnerId: string): string[] {

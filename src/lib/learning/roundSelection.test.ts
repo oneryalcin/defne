@@ -96,6 +96,50 @@ describe("round word selection v2.1", () => {
 
     expect(selection.reasons.filter((reason) => reason.reason === "new_word")).toHaveLength(5);
     expect(selection.reasons.filter((reason) => reason.reason === "mistake_recovery")).toHaveLength(2);
+    expect(selection.wordIds).toHaveLength(12);
+    expect(selection.wordIds.filter((id) => id.includes("retrieval"))).toHaveLength(5);
+  });
+
+  it("honours parent review targets before backfilling more new words", () => {
+    const introductions = Array.from({ length: 12 }, (_, index) => word(`untouched_${index + 1}`));
+    const recovery = Array.from({ length: 3 }, (_, index) =>
+      word(`recovery_${index + 1}`, {
+        masteryColour: "red",
+        attemptCount: 4,
+        correctCount: 1,
+        wrongCount: 3,
+        recoveryDebt: 2,
+        lastCleanRetrievalAt: hoursAgo(5),
+        lastWrongAt: hoursAgo(4),
+        lastPracticedAt: hoursAgo(4),
+        lastExposedAt: hoursAgo(4)
+      })
+    );
+    const staleReview = Array.from({ length: 5 }, (_, index) =>
+      word(`stale_review_${index + 1}`, {
+        masteryColour: "yellow",
+        attemptCount: 5,
+        correctCount: 4,
+        wrongCount: 1,
+        stabilityDays: 1,
+        lastCleanRetrievalAt: daysAgo(10),
+        lastPracticedAt: daysAgo(10),
+        lastExposedAt: daysAgo(10)
+      })
+    );
+
+    const selection = selectRoundWords(
+      [...introductions, ...recovery, ...staleReview],
+      NOW,
+      12,
+      EMPTY_REMEDIATION,
+      { bucketTargets: { new: 6, recovery: 3, review: 3, stable: 0 } }
+    );
+
+    expect(selection.wordIds).toHaveLength(12);
+    expect(selection.reasons.filter((reason) => reason.reason === "new_word")).toHaveLength(6);
+    expect(selection.reasons.filter((reason) => reason.reason === "mistake_recovery")).toHaveLength(3);
+    expect(selection.wordIds.filter((id) => id.includes("stale_review"))).toHaveLength(3);
   });
 
   it("does not backfill zero-stable parent mixes with reliable words while new words are available", () => {

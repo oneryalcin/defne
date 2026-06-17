@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { assessAnswer, generateQuestion, type PracticeQuestion } from "../learning/questions";
-import { applyPracticeEventToSelectionState, masteryColourForState, updateStateAfterAttempt } from "../learning/mastery";
+import { applyPracticeEventToSelectionState, updateStateAfterAttempt } from "../learning/mastery";
 import { priorityBreakdownForState, scoreFromState } from "../learning/scoring";
 import {
   deckPriorities,
@@ -45,6 +45,7 @@ import { defaultLearnerId, deterministicWordId, normalizeWord } from "./seed";
 import { assignVocabularyWordToLearnerInDb } from "./learners";
 
 const UNSTARTED_PREVIEW_STALE_HOURS = 20;
+const ROUND_SELECTION_VERSION = 2;
 
 export interface NextRoundMixPreference extends RoundSelectionBucketTargets {}
 
@@ -467,13 +468,12 @@ export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultL
         id: word.id,
         word: word.word,
         definition: word.definition,
-        // Recompute live so child surfaces match the parent dashboard.
-        // Only treat the word as "started" when a real attempt exists in
-        // practice_attempts — legacy state stubs are ignored.
+        // Display the earned badge. Live decay still feeds priorityFactors,
+        // but it should not demote a child-facing colour without a new answer.
         masteryColour:
           realAttempts === 0
             ? null
-            : masteryColourForState(word.state, wordAttempts),
+            : word.state.masteryColour,
         selectionReason,
         priorityFactors: priority.factors,
         priorityScore: priority.score,
@@ -647,6 +647,7 @@ export function startRoundMission(roundWordCount = 12, learnerId = defaultLearne
     plan,
     round: {
       roundId,
+      selectionVersion: ROUND_SELECTION_VERSION,
       firstAttemptSecureWords: [],
       eventuallyCorrectWords: [],
       revealAndMoveOnWords: [],
@@ -725,6 +726,7 @@ function abandonStaleInProgressRounds(
   const stillCurrent = rows.filter((row) => {
     if (row.word_count !== expectedWordCount) return false;
     if (isStaleUnstartedPreviewRound(row, Date.now())) return false;
+    if (isAnswerlessLearnCardRound(row) && !hasCurrentRoundSelectionVersion(row)) return false;
     if (isUnstartedPreviewRound(row) && lacksNewWordPick(row) && learnerHasUnpracticedWords(db, learnerId)) {
       return false;
     }
@@ -780,9 +782,21 @@ function isUnstartedPreviewRound(row: {
   return !Object.values(cardViewCounts).some((count) => count > 0);
 }
 
+function isAnswerlessLearnCardRound(row: {
+  current_step: string;
+  has_attempts: number;
+}): boolean {
+  return row.current_step === "learn_cards" && !row.has_attempts;
+}
+
 function lacksNewWordPick(row: { summary_json: string }): boolean {
   const summary = JSON.parse(row.summary_json) as SessionSummary;
   return !(summary.round?.selectionReasons ?? []).some((reason) => reason.reason === "new_word");
+}
+
+function hasCurrentRoundSelectionVersion(row: { summary_json: string }): boolean {
+  const summary = JSON.parse(row.summary_json) as SessionSummary;
+  return summary.round?.selectionVersion === ROUND_SELECTION_VERSION;
 }
 
 function learnerHasUnpracticedWords(db: DatabaseSync, learnerId: string): boolean {
@@ -1279,6 +1293,10 @@ export function getParentWords(learnerId = defaultLearnerId()): ParentWordListIt
               s.last_wrong_at, s.next_review_at, s.failure_types_json,
               s.confused_with_word_ids_json, s.near_review,
               s.eligible_questions_since_last_mistake, s.mastery_colour,
+              s.recovery_debt, s.last_practiced_at, s.last_clean_retrieval_at,
+              s.last_supported_success_at, s.last_revealed_at, s.last_exposed_at,
+              s.last_practiced_session_id, s.last_practiced_interaction_index,
+              s.learner_state_content_version,
               (SELECT COUNT(*) FROM practice_attempts pa
                  WHERE pa.word_id = w.id AND pa.learner_id = ?) AS real_attempts,
               (SELECT COUNT(*) FROM practice_attempts pa
@@ -1315,6 +1333,15 @@ export function getParentWords(learnerId = defaultLearnerId()): ParentWordListIt
     near_review: number | null;
     eligible_questions_since_last_mistake: number | null;
     mastery_colour: LearnerWordState["masteryColour"] | null;
+    recovery_debt: number | null;
+    last_practiced_at: string | null;
+    last_clean_retrieval_at: string | null;
+    last_supported_success_at: string | null;
+    last_revealed_at: string | null;
+    last_exposed_at: string | null;
+    last_practiced_session_id: string | null;
+    last_practiced_interaction_index: number | null;
+    learner_state_content_version: number | null;
     real_attempts: number;
     real_correct: number;
     real_wrong: number;
@@ -1358,18 +1385,18 @@ export function getParentWords(learnerId = defaultLearnerId()): ParentWordListIt
           : [],
         nearReview: row.near_review === 1,
         eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake ?? 0,
-        recoveryDebt: 0,
-        lastPracticedAt: row.last_seen_at,
-        lastCleanRetrievalAt: row.last_correct_at,
-        lastSupportedSuccessAt: null,
-        lastRevealedAt: null,
-        lastExposedAt: row.last_seen_at,
-        lastPracticedSessionId: null,
-        lastPracticedInteractionIndex: null,
-        learnerStateContentVersion: 1
+        recoveryDebt: row.recovery_debt ?? 0,
+        lastPracticedAt: row.last_practiced_at,
+        lastCleanRetrievalAt: row.last_clean_retrieval_at,
+        lastSupportedSuccessAt: row.last_supported_success_at,
+        lastRevealedAt: row.last_revealed_at,
+        lastExposedAt: row.last_exposed_at,
+        lastPracticedSessionId: row.last_practiced_session_id,
+        lastPracticedInteractionIndex: row.last_practiced_interaction_index,
+        learnerStateContentVersion: row.learner_state_content_version ?? 1
       };
       const breakdown = scoreFromState(state, attemptsByWordId.get(row.id) ?? null);
-      masteryColour = breakdown.colour ?? "red";
+      masteryColour = row.mastery_colour ?? "red";
       scoreReasons = breakdown.reasons;
       scoreLowerBound = breakdown.lowerBound;
     }
@@ -1729,18 +1756,7 @@ function loadAttemptHistoryByWord(db: DatabaseSync, learnerId = defaultLearnerId
 }
 
 function getPracticeWordsForSelection(db: DatabaseSync, learnerId = defaultLearnerId()): PracticeWord[] {
-  const attemptsByWordId = loadAttemptHistoryByWord(db, learnerId);
-  return getPracticeWords(learnerId).map((word) => {
-    const attempts = attemptsByWordId.get(word.id) ?? null;
-    if (!attempts || attempts.length === 0) return word;
-    return {
-      ...word,
-      state: {
-        ...word.state,
-        masteryColour: masteryColourForState(word.state, attempts)
-      }
-    };
-  });
+  return getPracticeWords(learnerId);
 }
 
 function selectedWordIdsForDebug(
@@ -2383,7 +2399,7 @@ function toRoundLearnCardView(
       correctCount: word.state.correctCount,
       wrongCount: word.state.wrongCount,
       masteryColour:
-        word.state.attemptCount === 0 ? null : masteryColourForState(word.state)
+        word.state.attemptCount === 0 ? null : word.state.masteryColour
     }
   };
 }

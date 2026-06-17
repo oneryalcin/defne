@@ -31,6 +31,7 @@ import {
   createOrUpdateParentSpellingItem,
   normaliseParentSpellingWord,
   requestSpellingItemNextRound,
+  setSpellingRoundMixPreference,
   startSpellingPractice,
   startSpellingMission,
   submitSpellingAnswer,
@@ -186,6 +187,19 @@ export async function setNextRoundMixAction(formData: FormData): Promise<void> {
   }, learnerId);
   revalidatePath("/parent");
   redirect(`/parent?learnerId=${encodeURIComponent(learnerId)}`);
+}
+
+export async function setSpellingRoundMixAction(formData: FormData): Promise<void> {
+  await requireRole("parent");
+  const learnerId = resolveSelectedLearnerId(String(formData.get("learnerId") ?? ""));
+  setSpellingRoundMixPreference({
+    new: Number(formData.get("spellingRoundNew") ?? 0),
+    recovery: Number(formData.get("spellingRoundRecovery") ?? 0),
+    review: Number(formData.get("spellingRoundReview") ?? 0),
+    stable: Number(formData.get("spellingRoundStable") ?? 0)
+  }, learnerId);
+  revalidatePath("/parent/spelling");
+  redirect(`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`);
 }
 
 export async function submitAnswerAction(formData: FormData): Promise<void> {

@@ -137,6 +137,7 @@ export interface SessionSummary {
   revisitTomorrow?: string[];
   round?: {
     roundId: string;
+    selectionVersion?: number;
     firstAttemptSecureWords: string[];
     eventuallyCorrectWords: string[];
     revealAndMoveOnWords: string[];

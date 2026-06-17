@@ -35,7 +35,9 @@ import {
   getParentSpellingItems,
   getSpellingPreview,
   getSpellingSessionView,
+  getSpellingRoundMixPreference,
   requestSpellingItemNextRound,
+  setSpellingRoundMixPreference,
   startSpellingPractice,
   startSpellingMission,
   submitSpellingAnswer,
@@ -1091,6 +1093,37 @@ describe("spelling repository orchestration", () => {
     expect(preview.items[0].target).toBe("advice");
   });
 
+  it("uses per-child spelling bucket targets for the normal spelling mission", () => {
+    insertSpellingAttemptHistory("spelling_advice", [false, false, true]);
+    insertSpellingAttemptHistory("spelling_possible", [true, true]);
+    const reviewAt = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    getDb()
+      .prepare(
+        `UPDATE spelling_learner_state
+         SET last_seen_at = ?,
+             last_correct_at = ?,
+             last_practiced_at = ?,
+             last_clean_retrieval_at = ?,
+             updated_at = ?
+         WHERE learner_id = 'learner_defne' AND item_id = 'spelling_possible'`
+      )
+      .run(reviewAt, reviewAt, reviewAt, reviewAt, reviewAt);
+    setSpellingRoundMixPreference({ new: 6, recovery: 1, review: 1, stable: 0 }, "learner_defne");
+
+    const preview = getSpellingPreview(8);
+
+    expect(getSpellingRoundMixPreference("learner_defne")).toEqual({
+      new: 6,
+      recovery: 1,
+      review: 1,
+      stable: 0
+    });
+    expect(preview.items).toHaveLength(8);
+    expect(preview.items.filter((item) => item.attemptCount === 0)).toHaveLength(6);
+    expect(preview.items.some((item) => item.target === "advice")).toBe(true);
+    expect(preview.items.some((item) => item.target === "possible")).toBe(true);
+  });
+
   it("lets parent priority place an assigned spelling word in the next spelling mission once", () => {
     const learnerId = createLearner({ displayName: "Ozan", accessCode: "ozan" });
     const items = getDb()
@@ -1254,7 +1287,8 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   if (!prompt) throw new Error(`Expected a spelling prompt for ${itemId}`);
 
   const sessionId = `test_spelling_session_${itemId}_${outcomes.length}`;
-  const now = "2026-05-10T10:00:00.000Z";
+  const baseTime = Date.now() - 3_600_000;
+  const now = new Date(baseTime).toISOString();
   db.prepare(
     `INSERT INTO spelling_sessions
       (id, learner_id, status, target_item_count, actual_question_count, item_ids_json, started_at, ended_at, summary_json, created_at, updated_at)
@@ -1262,7 +1296,7 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   ).run(sessionId, JSON.stringify([itemId]), now, now, now, now);
 
   outcomes.forEach((isCorrect, index) => {
-    const createdAt = `2026-05-10T10:${String(index).padStart(2, "0")}:00.000Z`;
+    const createdAt = new Date(baseTime + index * 60_000).toISOString();
     db.prepare(
       `INSERT INTO spelling_attempts
         (id, session_id, learner_id, item_id, prompt_id, prompt_json, expected_answer_json, submitted_answer, is_correct, response_time_ms, created_at)
@@ -1282,11 +1316,11 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
   const wrongCount = outcomes.length - correctCount;
   const lastCorrectIndex = outcomes.map((value, index) => (value ? index : -1)).filter((index) => index >= 0).at(-1);
   const lastWrongIndex = outcomes.map((value, index) => (!value ? index : -1)).filter((index) => index >= 0).at(-1);
-  const lastAttemptAt = `2026-05-10T10:${String(outcomes.length - 1).padStart(2, "0")}:00.000Z`;
+  const lastAttemptAt = new Date(baseTime + (outcomes.length - 1) * 60_000).toISOString();
   const lastCorrectAt =
-    lastCorrectIndex === undefined ? null : `2026-05-10T10:${String(lastCorrectIndex).padStart(2, "0")}:00.000Z`;
+    lastCorrectIndex === undefined ? null : new Date(baseTime + lastCorrectIndex * 60_000).toISOString();
   const lastWrongAt =
-    lastWrongIndex === undefined ? null : `2026-05-10T10:${String(lastWrongIndex).padStart(2, "0")}:00.000Z`;
+    lastWrongIndex === undefined ? null : new Date(baseTime + lastWrongIndex * 60_000).toISOString();
 
   db.prepare(
     `INSERT INTO spelling_learner_state
@@ -1322,7 +1356,7 @@ function insertSpellingAttemptHistory(itemId: string, outcomes: boolean[]): void
     Math.max(0, wrongCount - correctCount),
     sessionId,
     outcomes.length,
-    "2026-05-10T10:00:00.000Z",
+    now,
     lastAttemptAt
   );
 }

@@ -31,7 +31,7 @@ describe("SQLite setup", () => {
       count: number;
     };
 
-    expect(migrations.count).toBe(19);
+    expect(migrations.count).toBe(20);
     expect(learners.count).toBe(1);
     expect(words.count).toBeGreaterThanOrEqual(50);
     expect(states.count).toBe(words.count);
@@ -103,10 +103,10 @@ describe("SQLite setup", () => {
       visual_cues_on_learn_cards: 1,
       visual_cues_on_meaning_questions: 0,
       visual_cues_on_context_questions: 0,
-      next_round_new_count: 3,
-      next_round_recovery_count: 4,
-      next_round_review_count: 4,
-      next_round_stable_count: 1
+      next_round_new_count: 6,
+      next_round_recovery_count: 3,
+      next_round_review_count: 3,
+      next_round_stable_count: 0
     });
 
     const accessCode = db

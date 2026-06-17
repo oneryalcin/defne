@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
-import { seedInitialData } from "./seed";
+import { reconcileEarnedVocabularyMastery, seedInitialData } from "./seed";
 import {
   createOrUpdateParentWord,
   findActiveWordByText,
@@ -218,7 +218,7 @@ describe("round repository orchestration", () => {
       responseTimeMs: 1000
     });
 
-    setNextRoundMixPreference({ new: 3, recovery: 4, review: 4, stable: 1 }, learnerId);
+    setNextRoundMixPreference({ new: 6, recovery: 3, review: 3, stable: 0 }, learnerId);
 
     const oldRound = getDb()
       .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
@@ -333,7 +333,61 @@ describe("round repository orchestration", () => {
     const detail = getWordDetail(word.id, learnerId);
 
     expect(detail?.masteryColour).toBe("green");
-    expect(detail?.scoreLowerBound).toBeLessThan(0.8);
+    expect(detail?.scoreLowerBound).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("promotes under-counted earned mastery during startup reconciliation", () => {
+    const learnerId = createLearner({ displayName: "Efe", accessCode: "efe-mastered" });
+    const word = listAvailableVocabularyForLearner(learnerId).find((candidate) => !candidate.assigned);
+    expect(word).toBeTruthy();
+    if (!word) throw new Error("Expected an available vocabulary word.");
+    assignVocabularyWordToLearner(learnerId, word.id);
+
+    const db = getDb();
+    const firstSeenAt = "2026-06-04T17:06:51.073Z";
+    const lastSeenAt = "2026-06-09T16:38:09.839Z";
+    const now = "2026-06-17T12:00:00.000Z";
+    db.prepare(
+      `INSERT INTO learner_word_state
+        (id, learner_id, word_id, stability_days, mastery_colour, last_seen_at, last_correct_at,
+         attempt_count, correct_count, wrong_count, average_hint_level_used, average_response_time_ms,
+         created_at, updated_at)
+       VALUES (?, ?, ?, 5.08, 'light_green', ?, ?, 12, 12, 0, 0, 1000, ?, ?)`
+    ).run(`state_${learnerId}_${word.id}`, learnerId, word.id, lastSeenAt, lastSeenAt, firstSeenAt, firstSeenAt);
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, ended_at, summary_json, created_at, updated_at)
+       VALUES ('session_under_counted_mastery', ?, 'daily_mission', 'completed', 12, 12, ?, ?, '{}', ?, ?)`
+    ).run(learnerId, firstSeenAt, lastSeenAt, firstSeenAt, lastSeenAt);
+    const insertAttempt = db.prepare(
+      `INSERT INTO practice_attempts
+        (id, session_id, learner_id, word_id, question_type, prompt_json, expected_answer_json,
+         submitted_answer, is_correct, hint_level_used, max_hint_level_available, response_time_ms, failure_type, created_at)
+       VALUES (?, 'session_under_counted_mastery', ?, ?, 'definition_choice', '{}', '{}', 'correct', 1, 0, 0, 1000, 'none', ?)`
+    );
+    [
+      "2026-06-04T17:06:51.073Z",
+      "2026-06-04T17:07:52.412Z",
+      "2026-06-05T17:03:28.819Z",
+      "2026-06-05T17:04:46.582Z",
+      "2026-06-06T09:07:15.145Z",
+      "2026-06-06T09:08:39.082Z",
+      "2026-06-07T08:13:02.748Z",
+      "2026-06-07T08:14:20.980Z",
+      "2026-06-08T16:47:39.880Z",
+      "2026-06-08T16:49:37.174Z",
+      "2026-06-09T16:36:32.638Z",
+      "2026-06-09T16:38:09.839Z"
+    ].forEach((answeredAt, index) => {
+      insertAttempt.run(`attempt_under_counted_mastery_${index}`, learnerId, word.id, answeredAt);
+    });
+
+    reconcileEarnedVocabularyMastery(db, now);
+
+    const row = db
+      .prepare("SELECT mastery_colour FROM learner_word_state WHERE learner_id = ? AND word_id = ?")
+      .get(learnerId, word.id) as { mastery_colour: string };
+    expect(row.mastery_colour).toBe("green");
   });
 
   it("does not let stale unfinished rounds override the current priority queue", () => {

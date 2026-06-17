@@ -1,13 +1,9 @@
-// Mastery scoring v2 — Wilson lower-bound on a recency-weighted ratio
-// of clean-correct vs wrong attempts. See
+// Mastery scoring v2 — earned status from answer evidence, with separate
+// recency-weighted confidence for scheduling/debug. See
 // docs/mastery-scoring-and-selection-v2.md for rationale.
 //
-// Why time-weighted instead of raw aggregates? Because "5 corrects last
-// week, 2 wrongs today" should look much weaker than 5/7 raw — the
-// recent wrongs are evidence that the word has been forgotten and the
-// older corrects are stale. The weight of an attempt decays with a
-// 7-day half-life. Recent attempts dominate; older attempts decay
-// toward zero but never disappear entirely.
+// Why separate them? A child should not lose an earned colour because time
+// passed. Time decay is still useful for deciding what to refresh next.
 
 import type {
   AttemptRecord,
@@ -20,12 +16,18 @@ import { DEFAULT_NEAR_REVIEW_SPACING, mistakeRecencyWeight } from "./rounds";
 export interface ScoreBreakdown {
   /** Bucket the UI should render. null when the word has never been answered. */
   colour: MasteryColour | null;
-  /** Naive correct ratio (effectiveCorrect / (effectiveCorrect + wrongs)). */
+  /** Raw correct ratio from earned answer history. */
   pHat: number;
-  /** Wilson 90% lower bound. Drives the colour. */
+  /** Wilson lower bound from earned answer history. Drives earned colour. */
   lowerBound: number;
-  /** Time-weighted sample size (after hint discount). */
+  /** Raw answer count used by the earned scorer. */
   effectiveN: number;
+  /** Recency-weighted Wilson lower bound. Used for debug/scheduling, not colour. */
+  currentLowerBound: number;
+  /** Recency-weighted sample size. */
+  currentEffectiveN: number;
+  /** Estimated recall from spacing. Used for debug/scheduling, not colour. */
+  recallEstimate: number;
   /** Plain-English explanations (one line each) for tooltip / debugging. */
   reasons: string[];
 }
@@ -96,13 +98,18 @@ function hasMasteredEvidence(
 ): boolean {
   return (
     lowerBound >= MASTERED_LOWER &&
-    state.stabilityDays >= MASTERED_STABILITY_DAYS &&
+    state.stabilityDays >= masteredRequiredStabilityDays(state) &&
     state.correctCount >= MASTERED_MIN_CORRECT &&
     state.averageHintLevelUsed <= 0.5 &&
     state.recoveryDebt <= 0 &&
     !state.nearReview &&
     !unresolvedRecentWrong
   );
+}
+
+function masteredRequiredStabilityDays(state: LearnerWordState): number {
+  const extraEvidence = Math.max(0, state.correctCount + state.wrongCount - MASTERED_MIN_CORRECT);
+  return Math.max(3, MASTERED_STABILITY_DAYS - extraEvidence * 0.35);
 }
 
 function hasCleanSuccessHistory(state: LearnerWordState): boolean {
@@ -119,15 +126,6 @@ function hasMostlyCorrectPracticeHistory(state: LearnerWordState): boolean {
 function hasStrongReliableHistory(state: LearnerWordState): boolean {
   if (state.attemptCount < 10) return false;
   return state.correctCount / state.attemptCount >= 0.8 && state.averageHintLevelUsed <= 0.5;
-}
-
-function hasEarnedReliableHistory(state: LearnerWordState): boolean {
-  return (
-    (state.masteryColour === "light_green" || state.masteryColour === "green") &&
-    hasStrongReliableHistory(state) &&
-    state.recoveryDebt <= 0 &&
-    !state.nearReview
-  );
 }
 
 interface WeightedTotals {
@@ -200,17 +198,16 @@ function computeWeightedTotals(
 }
 
 /**
- * Map a learner-word state to a colour + confidence band + readable reasons.
+ * Map a learner-word state to an earned colour + confidence bands.
  *
  * Pipeline:
- *   1. Time-weight every attempt with a 7-day half-life (recent ≫ stale).
- *   2. Discount each correct by the hint level used during that attempt.
- *   3. Compute Wilson 90% lower bound on the weighted ratio.
- *   4. Bucket the lower bound + apply gates:
- *        Reliable requires 2 clean firsts as a floor; Mastered requires
- *        strong current evidence, stability, low hint dependency, and no
- *        active recovery debt. Old mistakes can be outgrown.
- *   5. Knock-down rule: an unresolved recent wrong forces colour down at most
+ *   1. Earned confidence: raw correct/wrong Wilson lower bound.
+ *   2. Current confidence: recency-weighted Wilson lower bound for scheduling.
+ *   3. Bucket earned confidence + apply educational gates:
+ *        Reliable requires two clean successes as a floor; Mastered requires
+ *        strong earned evidence, enough spacing, low hint dependency, and no
+ *        active recovery debt. More clean evidence lowers the spacing needed.
+ *   4. Knock-down rule: an unresolved recent wrong forces colour down at most
  *      one bucket. A mistake stops dragging the colour down after enough clean
  *      follow-up questions clear near-review.
  */
@@ -225,6 +222,9 @@ export function scoreFromState(
       pHat: 0,
       lowerBound: 0,
       effectiveN: 0,
+      currentLowerBound: 0,
+      currentEffectiveN: 0,
+      recallEstimate: 0,
       reasons: ["Not started yet — first practice will set the colour."],
     };
   }
@@ -250,40 +250,26 @@ export function scoreFromState(
     Number.isFinite(totals.newestDays) && totals.newestDays > 0
       ? recallProbability(totals.newestDays, state.stabilityDays)
       : 1;
-  const freshness = 0.6 + 0.4 * recall;
 
-  if (totals.effectiveN < MIN_EVIDENCE_N) {
-    if (hasCleanSuccessHistory(state)) {
-      reasons.push("Clean success evidence is old, so this needs a refresh rather than being treated as a failure.");
-      return {
-        colour: "orange",
-        pHat: 1,
-        lowerBound: BUILDING_LOWER,
-        effectiveN: totals.effectiveN,
-        reasons,
-      };
-    }
-    reasons.push("Not enough clean evidence yet — colour starts at red.");
-    return {
-      colour: "red",
-      pHat: 0,
-      lowerBound: 0,
-      effectiveN: totals.effectiveN,
-      reasons,
-    };
-  }
-
-  const pHat =
+  const earnedN = state.correctCount + state.wrongCount;
+  const pHat = earnedN > 0 ? state.correctCount / earnedN : 0;
+  const lowerBound = wilsonLower(pHat, earnedN);
+  const currentPHat =
     totals.effectiveCorrect /
     Math.max(0.001, totals.effectiveCorrect + totals.wrongs);
-  const wilson = wilsonLower(pHat, totals.effectiveN);
-  let lowerBound = wilson * freshness;
+  const currentLowerBound =
+    totals.effectiveN >= MIN_EVIDENCE_N ? wilsonLower(currentPHat, totals.effectiveN) : 0;
   reasons.push(
-    `Confidence (Wilson 80% lower): ${(wilson * 100).toFixed(0)}% on n_eff=${totals.effectiveN.toFixed(2)}.`
+    `Earned confidence (Wilson 80% lower): ${(lowerBound * 100).toFixed(0)}% on ${earnedN} answered attempt${earnedN === 1 ? "" : "s"}.`
   );
+  if (totals.weighted) {
+    reasons.push(
+      `Current confidence after recency weighting: ${(currentLowerBound * 100).toFixed(0)}% on n_eff=${totals.effectiveN.toFixed(2)}.`
+    );
+  }
   if (Number.isFinite(totals.newestDays) && totals.newestDays >= 1 && recall < 0.85) {
     reasons.push(
-      `Last seen ${totals.newestDays.toFixed(1)}d ago (recall ≈ ${(recall * 100).toFixed(0)}%) — score dampened to ${(lowerBound * 100).toFixed(0)}%.`
+      `Last seen ${totals.newestDays.toFixed(1)}d ago (recall ≈ ${(recall * 100).toFixed(0)}%) — scheduler may queue a refresh, but earned colour does not decay.`
     );
   }
   const unresolvedRecentWrong = totals.hadRecentWrong && needsMistakeRecovery(state, attempts);
@@ -292,12 +278,10 @@ export function scoreFromState(
       `Recent wrong still in recovery — knocked down one bucket until ${DEFAULT_NEAR_REVIEW_SPACING} clean follow-up questions clear it.`
     );
   }
-  if (!unresolvedRecentWrong && hasEarnedReliableHistory(state) && lowerBound < RELIABLE_LOWER) {
-    lowerBound = RELIABLE_LOWER;
-    reasons.push("Strong earned history is stale, so this stays Reliable and is scheduled as a refresh.");
-  } else if (!unresolvedRecentWrong && hasMostlyCorrectPracticeHistory(state) && lowerBound < BUILDING_LOWER) {
-    lowerBound = BUILDING_LOWER;
-    reasons.push("Mostly correct history is stale, so this is treated as a refresh need, not Needs work.");
+  if (!unresolvedRecentWrong && hasCleanSuccessHistory(state) && currentLowerBound < RELIABLE_LOWER && recall < 0.85) {
+    reasons.push("Clean earned history is stale, so this may need a refresh without losing its earned status.");
+  } else if (!unresolvedRecentWrong && hasMostlyCorrectPracticeHistory(state) && currentLowerBound < BUILDING_LOWER) {
+    reasons.push("Mostly correct history is stale, so scheduling treats this as a refresh need, not a failure.");
   }
 
   const clean = firstAttemptsClean(state);
@@ -315,9 +299,10 @@ export function scoreFromState(
       reasons.push(
         `First-pair clean → Reliable; needs ≥${(MASTERED_LOWER * 100).toFixed(0)}% confidence for Mastered.`
       );
-    } else if (state.stabilityDays < MASTERED_STABILITY_DAYS) {
+    } else if (state.stabilityDays < masteredRequiredStabilityDays(state)) {
+      const required = masteredRequiredStabilityDays(state);
       reasons.push(
-        `First-pair clean → Reliable; needs ${MASTERED_STABILITY_DAYS}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+        `First-pair clean → Reliable; needs ${required.toFixed(1)}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
       );
     } else if (state.correctCount < MASTERED_MIN_CORRECT) {
       reasons.push(
@@ -334,12 +319,16 @@ export function scoreFromState(
     colour = "orange";
   } else if (lowerBound < RELIABLE_LOWER) {
     colour = "yellow";
+  } else if (state.averageHintLevelUsed > 0.5) {
+    colour = "yellow";
+    reasons.push("Earned confidence is high, but Reliable needs lower hint dependency.");
   } else {
     colour = "light_green";
     if (lowerBound >= MASTERED_LOWER) {
-      if (state.stabilityDays < MASTERED_STABILITY_DAYS) {
+      const required = masteredRequiredStabilityDays(state);
+      if (state.stabilityDays < required) {
         reasons.push(
-          `Score is high; needs ${MASTERED_STABILITY_DAYS}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+          `Score is high; needs ${required.toFixed(1)}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
         );
       } else if (state.correctCount < MASTERED_MIN_CORRECT) {
         reasons.push(
@@ -366,7 +355,16 @@ export function scoreFromState(
     }
   }
 
-  return { colour, pHat, lowerBound, effectiveN: totals.effectiveN, reasons };
+  return {
+    colour,
+    pHat,
+    lowerBound,
+    effectiveN: earnedN,
+    currentLowerBound,
+    currentEffectiveN: totals.effectiveN,
+    recallEstimate: recall,
+    reasons,
+  };
 }
 
 function needsMistakeRecovery(
@@ -470,7 +468,7 @@ export function priorityBreakdownForState(
   const daysSinceSeen = daysBetween(state.lastSeenAt, nowIso);
   const recall = recallProbability(daysSinceSeen, state.stabilityDays);
   const due = 1 - recall;
-  const weakness = 1 - breakdown.lowerBound;
+  const weakness = 1 - breakdown.currentLowerBound;
 
   factors.push({
     name: "due-by-decay",
@@ -484,7 +482,7 @@ export function priorityBreakdownForState(
     value: weakness,
     weight: 0.8,
     contribution: weakness * 0.8,
-    note: `Lower bound is ${(breakdown.lowerBound * 100).toFixed(0)}% — ${(weakness * 100).toFixed(0)}% of the way to sure.`,
+    note: `Current lower bound is ${(breakdown.currentLowerBound * 100).toFixed(0)}% — ${(weakness * 100).toFixed(0)}% of the way to sure.`,
   });
 
   const hoursSinceWrong = daysBetween(state.lastWrongAt, nowIso) * 24;

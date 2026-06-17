@@ -141,8 +141,10 @@ export function createLearner(input: CreateLearnerInput): string {
   );
   db.prepare(
     `INSERT INTO learner_profiles
-      (learner_id, year_group, locale, interests_json, avatar_style, avatar_traits_json, created_at, updated_at)
-     VALUES (?, ?, ?, '[]', 'pencil_drawing', '{}', ?, ?)`
+      (learner_id, year_group, locale, interests_json, avatar_style, avatar_traits_json,
+       next_round_new_count, next_round_recovery_count, next_round_review_count, next_round_stable_count,
+       created_at, updated_at)
+     VALUES (?, ?, ?, '[]', 'pencil_drawing', '{}', 6, 3, 3, 0, ?, ?)`
   ).run(learnerId, input.yearGroup?.trim() || "Year 5", input.locale?.trim() || "en-GB", now, now);
   db.prepare("INSERT INTO learner_access_codes (access_code, learner_id, created_at, updated_at) VALUES (?, ?, ?, ?)").run(
     accessCode,

@@ -108,8 +108,33 @@ export function updateStateAfterAttempt(
   }
 
   next.nextReviewAt = nextReviewAt(next, outcome.isCorrect, outcome.answeredAt);
-  next.masteryColour = masteryColourForState(next);
+  const computedColour = masteryColourForState(next);
+  next.masteryColour = outcome.isCorrect
+    ? maxMasteryColour(state.masteryColour, computedColour)
+    : computedColour;
   return next;
+}
+
+function maxMasteryColour(
+  previous: MasteryColour,
+  next: MasteryColour
+): MasteryColour {
+  return masteryRank(next) >= masteryRank(previous) ? next : previous;
+}
+
+function masteryRank(colour: MasteryColour): number {
+  switch (colour) {
+    case "red":
+      return 0;
+    case "orange":
+      return 1;
+    case "yellow":
+      return 2;
+    case "light_green":
+      return 3;
+    case "green":
+      return 4;
+  }
 }
 
 export function applyPracticeEventToSelectionState(

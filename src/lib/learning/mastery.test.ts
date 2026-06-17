@@ -65,6 +65,39 @@ describe("mastery scoring", () => {
     expect(scoreFromState(survived, null, "2026-05-01T20:00:00.000Z").colour).toBe("green");
   });
 
+  it("marks a long clean spaced streak as mastered even when it is due for refresh", () => {
+    const state = makeState({
+      attemptCount: 12,
+      correctCount: 12,
+      wrongCount: 0,
+      averageHintLevelUsed: 0,
+      stabilityDays: 5.08,
+      lastSeenAt: "2026-06-09T16:38:09.839Z",
+      lastCorrectAt: "2026-06-09T16:38:09.839Z"
+    });
+    const attempts: AttemptRecord[] = [
+      "2026-06-04T17:06:51.073Z",
+      "2026-06-04T17:07:52.412Z",
+      "2026-06-05T17:03:28.819Z",
+      "2026-06-05T17:04:46.582Z",
+      "2026-06-06T09:07:15.145Z",
+      "2026-06-06T09:08:39.082Z",
+      "2026-06-07T08:13:02.748Z",
+      "2026-06-07T08:14:20.980Z",
+      "2026-06-08T16:47:39.880Z",
+      "2026-06-08T16:49:37.174Z",
+      "2026-06-09T16:36:32.638Z",
+      "2026-06-09T16:38:09.839Z"
+    ].map((answeredAt) => ({ answeredAt, isCorrect: true, hintLevelUsed: 0 }));
+
+    const breakdown = scoreFromState(state, attempts, "2026-06-17T12:00:00.000Z");
+
+    expect(breakdown.colour).toBe("green");
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.9);
+    expect(breakdown.recallEstimate).toBeLessThan(0.3);
+    expect(breakdown.reasons.some((reason) => reason.includes("earned colour does not decay"))).toBe(true);
+  });
+
   it("allows old mistakes to be outgrown into mastered", () => {
     const state = makeState({
       attemptCount: 28,
@@ -196,7 +229,7 @@ describe("mastery scoring", () => {
     expect(unresolved.reasons.some((reason) => reason.startsWith("Recent wrong still"))).toBe(true);
   });
 
-  it("treats old clean success as refresh work instead of red failure", () => {
+  it("keeps old clean success reliable while treating it as refresh work", () => {
     const state = makeState({
       attemptCount: 4,
       correctCount: 4,
@@ -215,9 +248,9 @@ describe("mastery scoring", () => {
 
     const breakdown = scoreFromState(state, attempts, "2026-06-05T12:00:00.000Z");
 
-    expect(breakdown.effectiveN).toBeLessThan(0.3);
-    expect(breakdown.colour).toBe("orange");
-    expect(breakdown.reasons.some((reason) => reason.includes("needs a refresh"))).toBe(true);
+    expect(breakdown.currentEffectiveN).toBeLessThan(0.3);
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.reasons.some((reason) => reason.includes("earned status"))).toBe(true);
   });
 
   it("does not mark one old slip in a strong history as red", () => {
@@ -242,10 +275,10 @@ describe("mastery scoring", () => {
     const breakdown = scoreFromState(state, attempts, "2026-06-05T12:00:00.000Z");
 
     expect(breakdown.colour).not.toBe("red");
-    expect(breakdown.reasons.some((reason) => reason.includes("refresh need"))).toBe(true);
+    expect(breakdown.reasons.some((reason) => reason.includes("scheduler may queue"))).toBe(true);
   });
 
-  it("treats stale 80-percent histories as refresh work rather than red", () => {
+  it("keeps stale 80-percent histories reliable while treating them as refresh work", () => {
     const state = makeState({
       attemptCount: 24,
       correctCount: 20,
@@ -275,8 +308,8 @@ describe("mastery scoring", () => {
 
     const breakdown = scoreFromState(state, attempts, "2026-06-10T12:00:00.000Z");
 
-    expect(breakdown.colour).toBe("orange");
-    expect(breakdown.reasons.some((reason) => reason.includes("refresh need"))).toBe(true);
+    expect(breakdown.colour).toBe("light_green");
+    expect(breakdown.reasons.some((reason) => reason.includes("scheduler may queue"))).toBe(true);
   });
 
   it("keeps stale earned reliable words reliable instead of turning them red", () => {
@@ -311,7 +344,7 @@ describe("mastery scoring", () => {
 
     expect(breakdown.colour).toBe("light_green");
     expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.7);
-    expect(breakdown.reasons.some((reason) => reason.includes("stays Reliable"))).toBe(true);
+    expect(breakdown.reasons.some((reason) => reason.includes("scheduler may queue"))).toBe(true);
   });
 
   it("uses attempt history to clear stale near-review state after three clean follow-ups", () => {
@@ -366,6 +399,30 @@ describe("mastery scoring", () => {
 
     expect(result.eligibleQuestionsSinceLastMistake).toBe(3);
     expect(result.nearReview).toBe(false);
+  });
+
+  it("does not lower earned colour after a correct answer", () => {
+    const base = makeState({
+      masteryColour: "green",
+      attemptCount: 12,
+      correctCount: 12,
+      wrongCount: 0,
+      averageHintLevelUsed: 0,
+      stabilityDays: 5,
+      lastSeenAt: "2026-05-01T10:00:00.000Z"
+    });
+
+    const result = updateStateAfterAttempt(base, {
+      questionType: "definition_choice",
+      isCorrect: true,
+      hintLevelUsed: 4,
+      maxHintLevelAvailable: 4,
+      responseTimeMs: 4000,
+      failureType: "none",
+      answeredAt: "2026-06-01T10:00:00.000Z"
+    });
+
+    expect(result.masteryColour).toBe("green");
   });
 
   it("updates aggregate evidence without maintaining legacy dimension scores", () => {

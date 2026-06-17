@@ -58,9 +58,9 @@ This is doctrinally different from streak mechanics. The honest message is:
 *your tree is the same size today as it was last week, because no new word
 became reliable* — not "you lost progress because you missed a day."
 
-A word that decays from green back to yellow does not reduce the tree's
-stage. It may quietly become eligible to re-trigger growth on its next
-re-mastery, which keeps the engine honest without punishing the child visually.
+A word whose recall estimate decays does not reduce the tree's stage or
+earned colour. It may quietly become eligible for a refresh, which keeps
+the engine honest without punishing the child visually.
 
 ### 3. The reward is silent when pedagogy is failing
 
@@ -378,8 +378,8 @@ The Laurel Journey is implemented correctly when:
   grows on stages where genuine mastery movement happened.
 - A child who attended every day for two weeks but with weak spelling sees
   the tree pause at a sensible early stage, not break through into Act II.
-- The tree never visibly regresses, even when words decay from green back
-  to yellow.
+- The tree never visibly regresses, even when mastered words become due
+  for refresh.
 - No XP number, growth-point count, or "X to next stage" indicator is
   visible to the child anywhere in the app.
 - The parent dashboard tile shows a dated, plain-English reason for the

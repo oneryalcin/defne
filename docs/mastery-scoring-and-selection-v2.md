@@ -18,15 +18,19 @@ The first version had two failure modes the user hit immediately:
    what a learner needs to see — recent failure means the word has been
    forgotten.
 
-The replacement is built on three ideas:
+The replacement is built on four ideas:
 
 - **Wilson lower bound, not naive ratio.** 1/1 isn't the same evidence
   as 5/5 — even though both have a mean of 1.0. The 80% one-sided
   Wilson score interval gives `wilson(1, 1) ≈ 0.59`, `wilson(1, 5) ≈
   0.85`. That's the number we bucket on.
-- **Recency-weighted attempts.** Each correct/wrong is multiplied by
-  `0.5^(age_days / 7)`. An attempt from a week ago counts half. Three
-  weeks ago counts 1/8. Recent evidence dominates.
+- **Earned status is separate from recall risk.** Colour is based on
+  raw earned answer evidence. Time passing can make a word due for a
+  refresh, but it does not demote the child-visible colour.
+- **Recency-weighted confidence is scheduler/debug only.** Each
+  correct/wrong is multiplied by `0.5^(age_days / 7)` to estimate how
+  fresh the evidence is. This can raise review priority; it does not
+  drive the earned colour.
 - **Recent-wrong knockdown.** Independent of the math: a wrong answer
   inside the last 36 hours forces the colour down one bucket. Even if
   the lower bound still puts a word in `light_green`, a fresh failure
@@ -38,60 +42,53 @@ The replacement is built on three ideas:
 attempts          ─┐
    │               │
    ▼               ▼
-recency-weight   firstAttemptsClean()
-   │               │
-   ▼               ▼
-correctW, wrongs  bool
+raw correct/wrong     recency-weighted correct/wrong
+   │                         │
+   ▼                         ▼
+earned Wilson lower     current Wilson lower + recall estimate
+   │                         │
+   ▼                         ▼
+bucket + mastery gates     scheduler priority / debug copy
    │
    ▼
-pHat = correctW / (correctW + wrongs)
-   │
-   ▼
-wilson lower (z = 0.84)
-   │
-   ▼
-× freshness(0.6 + 0.4·recall)   ← lastSeenAt + stabilityDays
-   │
-   ▼
-lowerBound ──→ bucket ──→ knockdown ──→ colour
-                  ▲
-                  │
-       firstAttemptsClean → Reliable floor
+recent-wrong knockdown ──→ earned colour
 ```
 
 ### Inputs read from `LearnerWordState` and `practice_attempts`
 
 | Input | Source | Role |
 |---|---|---|
-| Per-attempt `(answeredAt, isCorrect, hintLevelUsed)` | `practice_attempts` rows | Drives the weighted ratio |
-| `attemptCount`, `correctCount`, `wrongCount` | `learner_word_state` | Aggregate fallback for tests / non-DB callers |
+| Per-attempt `(answeredAt, isCorrect, hintLevelUsed)` | `practice_attempts` rows | Drives current confidence / refresh explanations |
+| `attemptCount`, `correctCount`, `wrongCount` | `learner_word_state` | Drives earned Wilson confidence |
 | `averageHintLevelUsed` | `learner_word_state` | Disables the Reliable gate when > 0.5 |
-| `lastSeenAt`, `stabilityDays` | `learner_word_state` | Freshness multiplier and selection priority |
+| `lastSeenAt`, `stabilityDays` | `learner_word_state` | Recall estimate and selection priority |
 | `lastWrongAt` | `learner_word_state` | Used by selection priority for the `recent-failure` bonus |
 
 ### The Reliable / Mastered gates
 
 The Wilson bound alone is not enough — the spec is "two clean firsts →
-Reliable; Reliable + decay survival → Mastered." So:
+Reliable; strong earned evidence across enough spacing → Mastered." So:
 
 - **`firstAttemptsClean(state)`** = `attemptCount ≥ 2 AND correctCount ≥
   2 AND wrongCount === 0 AND averageHintLevelUsed ≤ 0.5`. When this is
   true, the colour is *at least* Reliable (`light_green`).
 - **Mastered (`green`)** further requires `lowerBound ≥ 0.80`,
-  `stabilityDays ≥ 7`, and `correctCount ≥ 4`. So a kid who answers
-  "fast and clean" twice doesn't immediately leap to Mastered — they
-  need to answer correctly *after a real gap* and accumulate evidence.
+  enough stability, `correctCount ≥ 4`, low hint dependency, and no
+  unresolved mistake recovery. Required stability starts at 7 days for
+  sparse evidence and falls toward 3 days as clean evidence accumulates.
+  Example: 4/4 in one burst is Reliable; 12/12 clean across several
+  days is Mastered even if the word is now due for a refresh.
 
 ### Bucket thresholds
 
-| Wilson lower bound (after freshness) | Colour | Label |
+| Earned Wilson lower bound | Colour | Label |
 |---|---|---|
 | `< 0.30` | `red` | Needs work |
 | `< 0.55` | `orange` | Building |
 | `< 0.70` | `yellow` | Nearly steady |
 | `≥ 0.70` AND not clean firsts | `light_green` | Reliable (capped — never Mastered without clean firsts) |
 | (clean firsts) | `light_green` (Reliable floor) | Reliable |
-| (clean firsts) AND `≥ 0.80` AND `stabilityDays ≥ 7` AND `correctCount ≥ 4` | `green` | Mastered |
+| (clean firsts) AND `≥ 0.80` AND enough stability AND `correctCount ≥ 4` | `green` | Mastered |
 
 Then the recent-wrong knockdown: if any wrong answer in the last 36
 hours, drop one bucket (Mastered → Reliable, Reliable → Nearly steady,
@@ -107,7 +104,8 @@ a word. Factors:
 - `due-by-decay`: `1 − exp(-daysSinceSeen / stabilityDays)`. The Ebbinghaus
   forgetting curve. Recently-seen words score low; long-ignored words
   score high.
-- `confidence-gap`: `1 − lowerBound`. Words far from sure get more practice.
+- `confidence-gap`: `1 − currentLowerBound`. Words whose fresh evidence
+  is weak get more practice without changing earned colour.
 - `recent-failure`: bonus when `lastWrongAt` is fresh (decays over hours).
 - `almost-mastered`: small bump when the lower bound is in
   `[0.55, 0.70)` so words on the edge get one more clean proof.
@@ -118,8 +116,9 @@ a word. Factors:
   minutes and not missed. Avoids back-to-back asks of the same word.
 
 For untouched words: a flat `0.4` so they're picked only when nothing
-needier sits in the queue. For mastered (`green`) words: `0.05 + 0.15 *
-(1 − recall)` so they only resurface as the curve decays.
+needier sits in the queue. For mastered (`green`) words: scheduler
+priority is deliberately tiny and parent bucket caps decide whether any
+stable/mastered refresh belongs in the round at all.
 
 ## Why this is good enough (and where it isn't)
 
@@ -127,8 +126,8 @@ Good enough:
 
 - **Honest about uncertainty.** 1/1 ≠ 5/5 ≠ 1/2. The Wilson interval is
   the right small-sample tool.
-- **Forgetting is real.** The 7-day half-life captures it without needing
-  per-attempt `daysSinceSeen` to be high-quality.
+- **Forgetting is real, but not demoralising.** The 7-day half-life
+  captures refresh need without erasing achievement.
 - **Explainable.** Every colour and every priority factor produces a
   human-readable line. Surface them on hover (heatmap), in the per-word
   page, and in the round preview.
@@ -146,8 +145,8 @@ Not good enough yet — backlog ideas:
   evidence weight (`weight × (1 − hintFraction)`) once hints are
   reliable enough that this matters.
 - **Stability growth on clean correct.** Currently `stabilityDays` grows
-  by × 1.4 on clean correct. We may want × 2 or × 3 to make Reliable
-  → Mastered take a real week.
+  by × 1.4 on clean correct. Keep checking this against real learner
+  histories so Mastered means durable learning without wasting attempts.
 
 ## Where the code lives
 

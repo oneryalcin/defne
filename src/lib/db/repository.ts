@@ -50,10 +50,10 @@ const ROUND_SELECTION_VERSION = 2;
 export interface NextRoundMixPreference extends RoundSelectionBucketTargets {}
 
 export const DEFAULT_NEXT_ROUND_MIX: NextRoundMixPreference = {
-  new: 3,
-  recovery: 4,
-  review: 4,
-  stable: 1
+  new: 6,
+  recovery: 3,
+  review: 3,
+  stable: 0
 };
 
 export interface VisualCue {

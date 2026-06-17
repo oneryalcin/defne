@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { scoreFromState } from "../learning/scoring";
+import type { AttemptRecord, LearnerWordState, MasteryColour } from "../types";
 
 const DEFAULT_LEARNER_ID = "learner_defne";
 const SEEDED_VISUAL_CUE_PROVIDER = "seed_asset";
@@ -44,8 +46,10 @@ export function seedInitialData(db: DatabaseSync): void {
 
   db.prepare(
     `INSERT OR IGNORE INTO learner_profiles
-      (learner_id, year_group, locale, interests_json, avatar_style, avatar_traits_json, created_at, updated_at)
-     VALUES (?, 'Year 5', 'en-GB', ?, 'pencil_drawing', ?, ?, ?)`
+      (learner_id, year_group, locale, interests_json, avatar_style, avatar_traits_json,
+       next_round_new_count, next_round_recovery_count, next_round_review_count, next_round_stable_count,
+       created_at, updated_at)
+     VALUES (?, 'Year 5', 'en-GB', ?, 'pencil_drawing', ?, 6, 3, 3, 0, ?, ?)`
   ).run(DEFAULT_LEARNER_ID, JSON.stringify(["stories", "drawing", "word games"]), JSON.stringify({ style: "warm pencil sketch" }), now, now);
 
   if (tableExists(db, "learner_access_codes")) {
@@ -92,6 +96,8 @@ export function seedInitialData(db: DatabaseSync): void {
       ).run(DEFAULT_LEARNER_ID, row.id, now, now, now);
     }
   }
+
+  reconcileEarnedVocabularyMastery(db, now);
 }
 
 export function defaultLearnerId(): string {
@@ -153,6 +159,143 @@ function upsertSeedWord(db: DatabaseSync, entry: SeedEntry, now: string): void {
 
 function tableExists(db: DatabaseSync, tableName: string): boolean {
   return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName));
+}
+
+export function reconcileEarnedVocabularyMastery(db: DatabaseSync, now: string): void {
+  const rows = db
+    .prepare(
+      `SELECT *
+       FROM learner_word_state
+       WHERE attempt_count > 0`
+    )
+    .all() as unknown as Array<LearnerWordStateRow>;
+  if (rows.length === 0) return;
+
+  const attemptsByKey = new Map<string, AttemptRecord[]>();
+  const attemptRows = db
+    .prepare(
+      `SELECT learner_id, word_id, created_at, is_correct, hint_level_used
+       FROM practice_attempts
+       ORDER BY created_at ASC`
+    )
+    .all() as Array<{
+    learner_id: string;
+    word_id: string;
+    created_at: string;
+    is_correct: number;
+    hint_level_used: number;
+  }>;
+  for (const attempt of attemptRows) {
+    const key = `${attempt.learner_id}\u0000${attempt.word_id}`;
+    const list = attemptsByKey.get(key) ?? [];
+    list.push({
+      answeredAt: attempt.created_at,
+      isCorrect: attempt.is_correct === 1,
+      hintLevelUsed: attempt.hint_level_used
+    });
+    attemptsByKey.set(key, list);
+  }
+
+  const update = db.prepare(
+    `UPDATE learner_word_state
+     SET mastery_colour = ?, updated_at = ?
+     WHERE learner_id = ? AND word_id = ?`
+  );
+  for (const row of rows) {
+    const state = mapLearnerWordState(row);
+    const attempts = attemptsByKey.get(`${row.learner_id}\u0000${row.word_id}`) ?? null;
+    const earned = scoreFromState(state, attempts).colour ?? "red";
+    if (masteryRank(earned) <= masteryRank(state.masteryColour)) continue;
+    update.run(earned, now, row.learner_id, row.word_id);
+  }
+}
+
+interface LearnerWordStateRow {
+  id: string;
+  learner_id: string;
+  word_id: string;
+  stability_days: number;
+  mastery_colour: MasteryColour;
+  last_seen_at: string | null;
+  last_correct_at: string | null;
+  last_wrong_at: string | null;
+  next_review_at: string | null;
+  attempt_count: number;
+  correct_count: number;
+  wrong_count: number;
+  last_hint_level_used: number | null;
+  average_hint_level_used: number;
+  average_response_time_ms: number;
+  failure_types_json: string;
+  confused_with_word_ids_json: string;
+  near_review: number;
+  eligible_questions_since_last_mistake: number;
+  recovery_debt: number;
+  last_practiced_at: string | null;
+  last_clean_retrieval_at: string | null;
+  last_supported_success_at: string | null;
+  last_revealed_at: string | null;
+  last_exposed_at: string | null;
+  last_practiced_session_id: string | null;
+  last_practiced_interaction_index: number | null;
+  learner_state_content_version: number;
+}
+
+function mapLearnerWordState(row: LearnerWordStateRow): LearnerWordState {
+  return {
+    id: row.id,
+    learnerId: row.learner_id,
+    wordId: row.word_id,
+    stabilityDays: row.stability_days,
+    masteryColour: row.mastery_colour,
+    lastSeenAt: row.last_seen_at,
+    lastCorrectAt: row.last_correct_at,
+    lastWrongAt: row.last_wrong_at,
+    nextReviewAt: row.next_review_at,
+    attemptCount: row.attempt_count,
+    correctCount: row.correct_count,
+    wrongCount: row.wrong_count,
+    lastHintLevelUsed: row.last_hint_level_used,
+    averageHintLevelUsed: row.average_hint_level_used,
+    averageResponseTimeMs: row.average_response_time_ms,
+    failureTypes: parseJsonArray(row.failure_types_json) as LearnerWordState["failureTypes"],
+    confusedWithWordIds: parseJsonArray(row.confused_with_word_ids_json),
+    nearReview: row.near_review === 1,
+    eligibleQuestionsSinceLastMistake: row.eligible_questions_since_last_mistake,
+    recoveryDebt: row.recovery_debt,
+    lastPracticedAt: row.last_practiced_at,
+    lastCleanRetrievalAt: row.last_clean_retrieval_at,
+    lastSupportedSuccessAt: row.last_supported_success_at,
+    lastRevealedAt: row.last_revealed_at,
+    lastExposedAt: row.last_exposed_at,
+    lastPracticedSessionId: row.last_practiced_session_id,
+    lastPracticedInteractionIndex: row.last_practiced_interaction_index,
+    learnerStateContentVersion: row.learner_state_content_version
+  };
+}
+
+function parseJsonArray(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function masteryRank(colour: MasteryColour): number {
+  switch (colour) {
+    case "red":
+      return 0;
+    case "orange":
+      return 1;
+    case "yellow":
+      return 2;
+    case "light_green":
+      return 3;
+    case "green":
+      return 4;
+  }
 }
 
 function upsertSeedSpellingItem(db: DatabaseSync, entry: SpellingSeedEntry, now: string): void {

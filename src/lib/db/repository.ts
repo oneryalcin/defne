@@ -1606,7 +1606,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
       wrongCount: attemptRows.filter((r) => r.is_correct === 0).length,
     };
     const breakdown = scoreFromState(liveState, attemptsAsc);
-    masteryColour = breakdown.colour ?? "red";
+    masteryColour = state.masteryColour;
     scoreReasons = breakdown.reasons;
     scoreLowerBound = breakdown.lowerBound;
     scoreEffectiveN = breakdown.effectiveN;

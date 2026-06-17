@@ -10,6 +10,7 @@ import {
   getMissionPreview,
   getParentWords,
   getParentWordForEdit,
+  getWordDetail,
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
@@ -295,6 +296,44 @@ describe("round repository orchestration", () => {
 
     expect(getParentWords("learner_defne").map((word) => word.id)).not.toContain(wordId);
     expect(listAvailableVocabularyForLearner("learner_defne").find((word) => word.id === wordId)?.assigned).toBe(false);
+  });
+
+  it("keeps the word detail badge on the earned colour while live confidence decays", () => {
+    const learnerId = createLearner({ displayName: "Lev", accessCode: "lev-detail" });
+    const word = listAvailableVocabularyForLearner(learnerId).find((candidate) => !candidate.assigned);
+    expect(word).toBeTruthy();
+    if (!word) throw new Error("Expected an available vocabulary word.");
+    assignVocabularyWordToLearner(learnerId, word.id);
+
+    const db = getDb();
+    const oldSeenAt = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO learner_word_state
+        (id, learner_id, word_id, stability_days, mastery_colour, last_seen_at, last_correct_at,
+         attempt_count, correct_count, wrong_count, average_hint_level_used, average_response_time_ms,
+         created_at, updated_at)
+       VALUES (?, ?, ?, 10, 'green', ?, ?, 4, 4, 0, 0, 1000, ?, ?)`
+    ).run(`state_${learnerId}_${word.id}`, learnerId, word.id, oldSeenAt, oldSeenAt, now, now);
+    db.prepare(
+      `INSERT INTO practice_sessions
+        (id, learner_id, mode, status, target_question_count, actual_question_count, started_at, ended_at, summary_json, created_at, updated_at)
+       VALUES ('session_old_mastery_detail', ?, 'daily_mission', 'completed', 4, 4, ?, ?, '{}', ?, ?)`
+    ).run(learnerId, oldSeenAt, oldSeenAt, oldSeenAt, oldSeenAt);
+    const insertAttempt = db.prepare(
+      `INSERT INTO practice_attempts
+        (id, session_id, learner_id, word_id, question_type, prompt_json, expected_answer_json,
+         submitted_answer, is_correct, hint_level_used, max_hint_level_available, response_time_ms, failure_type, created_at)
+       VALUES (?, 'session_old_mastery_detail', ?, ?, 'definition_choice', '{}', '{}', 'correct', 1, 0, 0, 1000, 'none', ?)`
+    );
+    for (let idx = 0; idx < 4; idx += 1) {
+      insertAttempt.run(`attempt_old_mastery_detail_${idx}`, learnerId, word.id, oldSeenAt);
+    }
+
+    const detail = getWordDetail(word.id, learnerId);
+
+    expect(detail?.masteryColour).toBe("green");
+    expect(detail?.scoreLowerBound).toBeLessThan(0.8);
   });
 
   it("does not let stale unfinished rounds override the current priority queue", () => {

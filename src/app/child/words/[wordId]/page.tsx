@@ -385,6 +385,16 @@ function buildLearningPlan(detail: WordDetail): LearningPlan {
     return planForConfidence(detail, status, "Mastered", evidence);
   }
 
+  if (detail.masteryColour === "green") {
+    return {
+      message: "This word is Mastered. It mostly rests now unless a parent asks for it or there is a spare review space.",
+      now: "Mastered",
+      next: "Rest",
+      when: roughNextAppearance(detail),
+      evidence,
+    };
+  }
+
   const stabilityDays = state?.stabilityDays ?? 0;
   if (stabilityDays < requiredStability) {
     const checks = spacedChecksNeeded(stabilityDays, requiredStability);
@@ -414,15 +424,6 @@ function buildLearningPlan(detail: WordDetail): LearningPlan {
       message: "This word is strong. To Master it, try answering without much hint help.",
       now: status,
       next: "Try without hints",
-      when: roughNextAppearance(detail),
-      evidence,
-    };
-  }
-  if (detail.masteryColour === "green") {
-    return {
-      message: "This word is Mastered. It mostly rests now unless a parent asks for it or there is a spare review space.",
-      now: "Mastered",
-      next: "Rest",
       when: roughNextAppearance(detail),
       evidence,
     };

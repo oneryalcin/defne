@@ -95,7 +95,7 @@ export function updateStateAfterAttempt(
     next.stabilityDays =
       outcome.masteryCredit === "recovery"
         ? state.stabilityDays
-        : state.stabilityDays * (daysSinceSeen >= 1 ? 1.4 : 1.1);
+        : nextStabilityDaysAfterCorrect(state.stabilityDays, daysSinceSeen);
   } else {
     next.wrongCount += 1;
     next.lastWrongAt = outcome.answeredAt;
@@ -173,6 +173,13 @@ export function applyPracticeEventToSelectionState(
   const clean = event.firstAttemptCorrect && event.hintLevelUsed === 0;
   if (clean) {
     state.lastCleanRetrievalAt = event.answeredAt;
+    if (
+      previous.nearReview &&
+      !next.nearReview &&
+      next.eligibleQuestionsSinceLastMistake >= DEFAULT_NEAR_REVIEW_SPACING
+    ) {
+      state.recoveryDebt = 0;
+    }
     if (isEligibleRecoveryProof(previous, event)) {
       state.recoveryDebt = Math.max(0, state.recoveryDebt - 1);
     }
@@ -190,6 +197,13 @@ function nextReviewAt(state: LearnerWordState, isCorrect: boolean, answeredAt: s
   const answered = new Date(answeredAt).getTime();
   const hours = isCorrect ? Math.max(12, state.stabilityDays * 18) : 18;
   return new Date(answered + hours * 3_600_000).toISOString();
+}
+
+function nextStabilityDaysAfterCorrect(stabilityDays: number, daysSinceSeen: number): number {
+  if (Number.isFinite(daysSinceSeen) && daysSinceSeen >= 1) {
+    return Math.max(stabilityDays * 1.4, daysSinceSeen);
+  }
+  return stabilityDays * 1.1;
 }
 
 function isEligibleRecoveryProof(

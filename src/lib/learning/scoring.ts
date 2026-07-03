@@ -53,9 +53,9 @@ const WILSON_Z = 0.84;
 const HINT_LEVELS = 4;
 const REVIEW_THRESHOLD = 0.72;
 const RELIABLE_LOWER = 0.7;
-const MASTERED_LOWER = 0.8;
+const MASTERED_LOWER = 0.77;
 const MASTERED_STABILITY_DAYS = 7;
-const MASTERED_MIN_CORRECT = 4;
+const MASTERED_MIN_CORRECT = 5;
 const MINUTES_TOO_RECENT = 12;
 const RECENT_WRONG_KNOCKDOWN_HOURS = 36;
 const MIN_EVIDENCE_N = 0.3;
@@ -94,15 +94,16 @@ function firstAttemptsClean(state: LearnerWordState): boolean {
 function hasMasteredEvidence(
   state: LearnerWordState,
   lowerBound: number,
-  unresolvedRecentWrong: boolean
+  unresolvedRecentWrong: boolean,
+  activeRecoveryDebt: boolean,
+  stabilityDays: number
 ): boolean {
   return (
     lowerBound >= MASTERED_LOWER &&
-    state.stabilityDays >= masteredRequiredStabilityDays(state) &&
+    stabilityDays >= masteredRequiredStabilityDays(state) &&
     state.correctCount >= MASTERED_MIN_CORRECT &&
     state.averageHintLevelUsed <= 0.5 &&
-    state.recoveryDebt <= 0 &&
-    !state.nearReview &&
+    !activeRecoveryDebt &&
     !unresolvedRecentWrong
   );
 }
@@ -197,6 +198,28 @@ function computeWeightedTotals(
   };
 }
 
+function effectiveMasteryStabilityDays(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null
+): number {
+  if (!attempts || attempts.length < 2) return state.stabilityDays;
+
+  let previousCleanCorrectAt: string | null = null;
+  let longestCleanGap = 0;
+  for (const attempt of attempts) {
+    const cleanCorrect = attempt.isCorrect && attempt.hintLevelUsed <= 0;
+    if (!cleanCorrect) continue;
+    if (previousCleanCorrectAt) {
+      longestCleanGap = Math.max(
+        longestCleanGap,
+        daysBetween(previousCleanCorrectAt, attempt.answeredAt)
+      );
+    }
+    previousCleanCorrectAt = attempt.answeredAt;
+  }
+  return Math.max(state.stabilityDays, longestCleanGap);
+}
+
 /**
  * Map a learner-word state to an earned colour + confidence bands.
  *
@@ -284,8 +307,16 @@ export function scoreFromState(
     reasons.push("Mostly correct history is stale, so scheduling treats this as a refresh need, not a failure.");
   }
 
+  const activeRecoveryDebt = hasActiveRecoveryDebt(state, attempts);
+  const effectiveStabilityDays = effectiveMasteryStabilityDays(state, attempts);
   const clean = firstAttemptsClean(state);
-  const masteredEvidence = hasMasteredEvidence(state, lowerBound, unresolvedRecentWrong);
+  const masteredEvidence = hasMasteredEvidence(
+    state,
+    lowerBound,
+    unresolvedRecentWrong,
+    activeRecoveryDebt,
+    effectiveStabilityDays
+  );
   let colour: MasteryColour;
   if (masteredEvidence) {
     colour = "green";
@@ -299,10 +330,10 @@ export function scoreFromState(
       reasons.push(
         `First-pair clean → Reliable; needs ≥${(MASTERED_LOWER * 100).toFixed(0)}% confidence for Mastered.`
       );
-    } else if (state.stabilityDays < masteredRequiredStabilityDays(state)) {
+    } else if (effectiveStabilityDays < masteredRequiredStabilityDays(state)) {
       const required = masteredRequiredStabilityDays(state);
       reasons.push(
-        `First-pair clean → Reliable; needs ${required.toFixed(1)}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+        `First-pair clean → Reliable; needs ${required.toFixed(1)}d stability for Mastered (currently ${effectiveStabilityDays.toFixed(1)}d).`
       );
     } else if (state.correctCount < MASTERED_MIN_CORRECT) {
       reasons.push(
@@ -310,7 +341,7 @@ export function scoreFromState(
       );
     } else if (state.averageHintLevelUsed > 0.5) {
       reasons.push("First-pair clean → Reliable; needs lower hint dependency for Mastered.");
-    } else if (state.recoveryDebt > 0 || state.nearReview) {
+    } else if (activeRecoveryDebt) {
       reasons.push("First-pair clean → Reliable; needs mistake recovery cleared for Mastered.");
     }
   } else if (lowerBound < BUILDING_LOWER) {
@@ -326,9 +357,9 @@ export function scoreFromState(
     colour = "light_green";
     if (lowerBound >= MASTERED_LOWER) {
       const required = masteredRequiredStabilityDays(state);
-      if (state.stabilityDays < required) {
+      if (effectiveStabilityDays < required) {
         reasons.push(
-          `Score is high; needs ${required.toFixed(1)}d stability for Mastered (currently ${state.stabilityDays.toFixed(1)}d).`
+          `Score is high; needs ${required.toFixed(1)}d stability for Mastered (currently ${effectiveStabilityDays.toFixed(1)}d).`
         );
       } else if (state.correctCount < MASTERED_MIN_CORRECT) {
         reasons.push(
@@ -336,7 +367,7 @@ export function scoreFromState(
         );
       } else if (state.averageHintLevelUsed > 0.5) {
         reasons.push("Score is high; needs lower hint dependency for Mastered.");
-      } else if (state.recoveryDebt > 0 || state.nearReview) {
+      } else if (activeRecoveryDebt) {
         reasons.push("Score is high; needs mistake recovery cleared for Mastered.");
       }
     }
@@ -373,6 +404,14 @@ function needsMistakeRecovery(
 ): boolean {
   const cleanFollowUps = cleanCorrectSinceLatestWrong(state, attempts);
   return state.nearReview && cleanFollowUps < DEFAULT_NEAR_REVIEW_SPACING;
+}
+
+function hasActiveRecoveryDebt(
+  state: LearnerWordState,
+  attempts: AttemptRecord[] | null
+): boolean {
+  if (state.recoveryDebt <= 0) return false;
+  return cleanCorrectSinceLatestWrong(state, attempts) < DEFAULT_NEAR_REVIEW_SPACING;
 }
 
 function cleanCorrectSinceLatestWrong(

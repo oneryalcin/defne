@@ -147,7 +147,7 @@ export const BUCKET_THRESHOLDS = {
   red: { upperLowerBound: 0.3, label: "Needs work" },
   orange: { upperLowerBound: 0.55, label: "Building" },
   yellow: { upperLowerBound: 0.7, label: "Nearly steady" },
-  light_green: { upperLowerBound: 0.8, label: "Reliable" },
+  light_green: { upperLowerBound: 0.77, label: "Reliable" },
   green: { upperLowerBound: 1.0, label: "Mastered" },
 } as const;
 
@@ -157,6 +157,6 @@ export function nextBucketTarget(
   if (currentLowerBound < 0.3) return { label: "Building", threshold: 0.3 };
   if (currentLowerBound < 0.55) return { label: "Nearly steady", threshold: 0.55 };
   if (currentLowerBound < 0.7) return { label: "Reliable", threshold: 0.7 };
-  if (currentLowerBound < 0.8) return { label: "Mastered", threshold: 0.8 };
+  if (currentLowerBound < 0.77) return { label: "Mastered", threshold: 0.77 };
   return null;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyPracticeEventToSelectionState,
   masteryColourForState,
   priorityScore,
   recallProbability,
@@ -149,6 +150,44 @@ describe("mastery scoring", () => {
     expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.8);
     expect(breakdown.colour).toBe("light_green");
     expect(breakdown.reasons.some((reason) => reason.includes("mistake recovery cleared"))).toBe(true);
+  });
+
+  it("marks a repaired 8-of-9 spaced history as mastered", () => {
+    const state = makeState({
+      attemptCount: 9,
+      correctCount: 8,
+      wrongCount: 1,
+      masteryColour: "yellow",
+      averageHintLevelUsed: 0,
+      stabilityDays: 2.5565847999999995,
+      lastSeenAt: "2026-07-03T16:18:39.003Z",
+      lastCorrectAt: "2026-07-03T16:18:39.003Z",
+      lastWrongAt: "2026-07-03T16:11:28.466Z",
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 4,
+      recoveryDebt: 2,
+      lastCleanRetrievalAt: "2026-07-03T16:18:39.003Z"
+    });
+    const attempts: AttemptRecord[] = [
+      ["2026-06-18T19:06:00.703Z", true],
+      ["2026-06-18T19:07:40.064Z", true],
+      ["2026-06-20T12:37:26.371Z", true],
+      ["2026-06-22T16:41:47.673Z", true],
+      ["2026-07-03T16:09:45.023Z", true],
+      ["2026-07-03T16:11:28.466Z", false],
+      ["2026-07-03T16:12:57.108Z", true],
+      ["2026-07-03T16:16:30.609Z", true],
+      ["2026-07-03T16:18:39.003Z", true]
+    ].map(([answeredAt, isCorrect]) => ({
+      answeredAt: answeredAt as string,
+      isCorrect: isCorrect as boolean,
+      hintLevelUsed: 0
+    }));
+
+    const breakdown = scoreFromState(state, attempts, "2026-07-03T16:20:00.000Z");
+
+    expect(breakdown.lowerBound).toBeGreaterThanOrEqual(0.77);
+    expect(breakdown.colour).toBe("green");
   });
 
   it("keeps a strong-history word reliable after one fresh slip", () => {
@@ -401,6 +440,42 @@ describe("mastery scoring", () => {
     expect(result.nearReview).toBe(false);
   });
 
+  it("clears recovery debt when a clean answer satisfies near-review follow-up spacing", () => {
+    const base = makeState({
+      nearReview: true,
+      eligibleQuestionsSinceLastMistake: 2,
+      recoveryDebt: 2,
+      lastWrongAt: "2026-05-01T10:00:00.000Z",
+      attemptCount: 5,
+      correctCount: 3,
+      wrongCount: 2,
+      lastPracticedSessionId: "session_1",
+      lastPracticedInteractionIndex: 4
+    });
+    const outcome = {
+      questionType: "fill_sentence" as const,
+      isCorrect: true,
+      hintLevelUsed: 0,
+      maxHintLevelAvailable: 4,
+      responseTimeMs: 4000,
+      failureType: "none" as const,
+      answeredAt: "2026-05-01T12:00:00.000Z"
+    };
+
+    const result = applyPracticeEventToSelectionState(updateStateAfterAttempt(base, outcome), base, {
+      answeredAt: outcome.answeredAt,
+      isCorrect: true,
+      hintLevelUsed: 0,
+      revealAndMoveOn: false,
+      firstAttemptCorrect: true,
+      sessionId: "session_1",
+      interactionIndex: 5
+    });
+
+    expect(result.nearReview).toBe(false);
+    expect(result.recoveryDebt).toBe(0);
+  });
+
   it("does not lower earned colour after a correct answer", () => {
     const base = makeState({
       masteryColour: "green",
@@ -448,6 +523,28 @@ describe("mastery scoring", () => {
     expect(result.correctCount).toBe(2);
     expect(result.averageHintLevelUsed).toBeCloseTo(2 / 3);
     expect(result.stabilityDays).toBeGreaterThan(base.stabilityDays);
+  });
+
+  it("uses the elapsed gap as stability evidence after spaced clean recall", () => {
+    const base = makeState({
+      stabilityDays: 1.5,
+      lastSeenAt: "2026-05-01T10:00:00.000Z",
+      attemptCount: 3,
+      correctCount: 3,
+      wrongCount: 0
+    });
+
+    const result = updateStateAfterAttempt(base, {
+      questionType: "definition_choice",
+      isCorrect: true,
+      hintLevelUsed: 0,
+      maxHintLevelAvailable: 4,
+      responseTimeMs: 4000,
+      failureType: "none",
+      answeredAt: "2026-05-11T10:00:00.000Z"
+    });
+
+    expect(result.stabilityDays).toBe(10);
   });
 
   it("ranks recently failed words above stable green words", () => {

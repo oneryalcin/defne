@@ -72,12 +72,15 @@ Reliable; strong earned evidence across enough spacing → Mastered." So:
 - **`firstAttemptsClean(state)`** = `attemptCount ≥ 2 AND correctCount ≥
   2 AND wrongCount === 0 AND averageHintLevelUsed ≤ 0.5`. When this is
   true, the colour is *at least* Reliable (`light_green`).
-- **Mastered (`green`)** further requires `lowerBound ≥ 0.80`,
-  enough stability, `correctCount ≥ 4`, low hint dependency, and no
+- **Mastered (`green`)** further requires `lowerBound ≥ 0.77`,
+  enough stability, `correctCount ≥ 5`, low hint dependency, and no
   unresolved mistake recovery. Required stability starts at 7 days for
   sparse evidence and falls toward 3 days as clean evidence accumulates.
-  Example: 4/4 in one burst is Reliable; 12/12 clean across several
-  days is Mastered even if the word is now due for a refresh.
+  Stability can come from stored state or from real clean retrieval gaps
+  in the attempt history, so an old low `stability_days` value cannot hide
+  a later multi-day successful recall. Example: 4/4 in one burst is Reliable;
+  8/9 with the miss repaired and multi-day recall can be Mastered; 12/12 clean
+  across several days is Mastered even if the word is now due for a refresh.
 
 ### Bucket thresholds
 
@@ -88,7 +91,7 @@ Reliable; strong earned evidence across enough spacing → Mastered." So:
 | `< 0.70` | `yellow` | Nearly steady |
 | `≥ 0.70` AND not clean firsts | `light_green` | Reliable (capped — never Mastered without clean firsts) |
 | (clean firsts) | `light_green` (Reliable floor) | Reliable |
-| (clean firsts) AND `≥ 0.80` AND enough stability AND `correctCount ≥ 4` | `green` | Mastered |
+| (clean firsts) AND `≥ 0.77` AND enough stability AND `correctCount ≥ 5` | `green` | Mastered |
 
 Then the recent-wrong knockdown: if any wrong answer in the last 36
 hours, drop one bucket (Mastered → Reliable, Reliable → Nearly steady,

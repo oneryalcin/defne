@@ -247,11 +247,11 @@ function MasteryJourney({ detail }: { detail: WordDetail }) {
   const currentRank = stageRank(detail.masteryColour);
   const state = detail.state;
   const correctCount = detail.attempts.filter((attempt) => attempt.isCorrect).length;
-  const recoveryOpen = Boolean(state && (state.recoveryDebt > 0 || state.nearReview));
+  const recoveryOpen = hasOpenRecovery(detail);
   const masteredReady =
-    detail.scoreLowerBound >= 0.8 &&
+    detail.scoreLowerBound >= MASTERED_CONFIDENCE &&
     (state?.stabilityDays ?? 0) >= masteredRequiredStabilityDays(detail) &&
-    correctCount >= 4 &&
+    correctCount >= MASTERED_MIN_CORRECT &&
     (state?.averageHintLevelUsed ?? 0) <= 0.5 &&
     !recoveryOpen;
 
@@ -335,9 +335,10 @@ interface LearningPlan {
   evidence: string[];
 }
 
-const MASTERED_CONFIDENCE = 0.8;
+const MASTERED_CONFIDENCE = 0.77;
 const MASTERED_STABILITY_DAYS = 7;
-const MASTERED_MIN_CORRECT = 4;
+const MASTERED_MIN_CORRECT = 5;
+const MISTAKE_RECOVERY_FOLLOW_UPS = 3;
 const SPACED_CORRECT_STABILITY_MULTIPLIER = 1.4;
 
 function buildLearningPlan(detail: WordDetail): LearningPlan {
@@ -345,7 +346,7 @@ function buildLearningPlan(detail: WordDetail): LearningPlan {
   const wrongCount = detail.attempts.length - correctCount;
   const confidence = Math.round(detail.scoreLowerBound * 100);
   const state = detail.state;
-  const recoveryOpen = Boolean(state && (state.recoveryDebt > 0 || state.nearReview));
+  const recoveryOpen = hasOpenRecovery(detail);
   const status = detail.masteryColour ? COLOUR_LABEL[detail.masteryColour] : "Not started";
   const requiredStability = masteredRequiredStabilityDays(detail);
   const evidence = childEvidence(detail, confidence, correctCount, wrongCount, recoveryOpen, requiredStability);
@@ -501,6 +502,15 @@ function masteredRequiredStabilityDays(detail: WordDetail): number {
   const wrongCount = detail.attempts.length - correctCount;
   const extraEvidence = Math.max(0, correctCount + wrongCount - MASTERED_MIN_CORRECT);
   return Math.max(3, MASTERED_STABILITY_DAYS - extraEvidence * 0.35);
+}
+
+function hasOpenRecovery(detail: WordDetail): boolean {
+  const state = detail.state;
+  if (!state) return false;
+  return (
+    (state.nearReview || state.recoveryDebt > 0) &&
+    state.eligibleQuestionsSinceLastMistake < MISTAKE_RECOVERY_FOLLOW_UPS
+  );
 }
 
 function spacedChecksNeeded(stabilityDays: number, requiredStabilityDays: number): number {

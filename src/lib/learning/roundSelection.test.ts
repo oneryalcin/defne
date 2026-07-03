@@ -31,6 +31,22 @@ describe("round word selection v2.1", () => {
     expect(selection.reasons.find((reason) => reason.word === "fresh_recovery")?.reason).toBe("mistake_recovery");
   });
 
+  it("lets satisfied near-review recovery debt fall back to normal review", () => {
+    const recovered = word("recovered", {
+      attemptCount: 9,
+      correctCount: 8,
+      wrongCount: 1,
+      recoveryDebt: 2,
+      nearReview: false,
+      eligibleQuestionsSinceLastMistake: 4,
+      lastWrongAt: hoursAgo(4),
+      lastPracticedAt: hoursAgo(4),
+      lastExposedAt: hoursAgo(4)
+    });
+
+    expect(computeFeatures(recovered, NOW).recovery).toBe(0);
+  });
+
   it("caps untouched and introduced-only words together when enough retrieval candidates exist", () => {
     const introductions = [
       word("untouched_1"),

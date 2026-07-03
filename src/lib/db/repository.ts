@@ -1396,7 +1396,7 @@ export function getParentWords(learnerId = defaultLearnerId()): ParentWordListIt
         learnerStateContentVersion: row.learner_state_content_version ?? 1
       };
       const breakdown = scoreFromState(state, attemptsByWordId.get(row.id) ?? null);
-      masteryColour = row.mastery_colour ?? "red";
+      masteryColour = maxMasteryColour(row.mastery_colour ?? "red", breakdown.colour ?? "red");
       scoreReasons = breakdown.reasons;
       scoreLowerBound = breakdown.lowerBound;
     }
@@ -1606,7 +1606,7 @@ export function getWordDetail(wordId: string, learnerId = defaultLearnerId()): W
       wrongCount: attemptRows.filter((r) => r.is_correct === 0).length,
     };
     const breakdown = scoreFromState(liveState, attemptsAsc);
-    masteryColour = state.masteryColour;
+    masteryColour = maxMasteryColour(state.masteryColour, breakdown.colour ?? "red");
     scoreReasons = breakdown.reasons;
     scoreLowerBound = breakdown.lowerBound;
     scoreEffectiveN = breakdown.effectiveN;
@@ -2744,6 +2744,28 @@ function mapState(row: StateRow): LearnerWordState {
     lastPracticedInteractionIndex: row.last_practiced_interaction_index,
     learnerStateContentVersion: row.learner_state_content_version
   };
+}
+
+function maxMasteryColour(
+  previous: LearnerWordState["masteryColour"],
+  next: LearnerWordState["masteryColour"]
+): LearnerWordState["masteryColour"] {
+  return masteryRank(next) >= masteryRank(previous) ? next : previous;
+}
+
+function masteryRank(colour: LearnerWordState["masteryColour"]): number {
+  switch (colour) {
+    case "red":
+      return 0;
+    case "orange":
+      return 1;
+    case "yellow":
+      return 2;
+    case "light_green":
+      return 3;
+    case "green":
+      return 4;
+  }
 }
 
 function getTextList(db: DatabaseSync, table: string, column: string, wordId: string): string[] {

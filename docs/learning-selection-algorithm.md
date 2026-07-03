@@ -541,6 +541,7 @@ counts as retrieval evidence
 updates last_clean_retrieval_at
 increases normal mastery state
 may reduce recovery debt if spacing is eligible
+clears active recovery debt once near-review follow-up spacing is satisfied
 ```
 
 Supported success:

@@ -1,4 +1,5 @@
 import type { PracticeWord, RoundSelectionReason, RoundSelectionReasonCode } from "../types";
+import { DEFAULT_NEAR_REVIEW_SPACING } from "./rounds";
 import { scoreFromState } from "./scoring";
 
 const RECOVERY_ACTIVE_WINDOW_DAYS = 14;
@@ -299,7 +300,10 @@ export function computeFeatures(word: PracticeWord, nowIso: string): SelectionFe
     state.attemptCount > 0 ||
     Boolean(state.lastCleanRetrievalAt || state.lastSupportedSuccessAt || state.lastWrongAt || state.lastRevealedAt);
   const lastFailureAt = latestIso(state.lastWrongAt, state.lastRevealedAt);
-  const rawRecoveryDebt = Math.max(0, state.recoveryDebt);
+  const rawRecoveryDebt =
+    state.eligibleQuestionsSinceLastMistake >= DEFAULT_NEAR_REVIEW_SPACING
+      ? 0
+      : Math.max(0, state.recoveryDebt);
   const activeRecovery =
     rawRecoveryDebt > 0 && daysSince(lastFailureAt, nowIso) <= RECOVERY_ACTIVE_WINDOW_DAYS;
   const recovery = activeRecovery ? Math.min(rawRecoveryDebt, 3) / 3 : 0;

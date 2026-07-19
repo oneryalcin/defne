@@ -9,7 +9,16 @@ import {
   requestSpellingItemNextRoundAction,
   unassignSpellingItemAction
 } from "@/app/actions";
+import {
+  SPELLING_KEY,
+  SPELLING_LABELS,
+  SPELLING_ORDER,
+  spellingProgressStatus,
+  type SpellingProgressStatus,
+} from "@/components/ProgressDistribution";
 import type { ParentSpellingLibraryItem, ParentSpellingListItem } from "@/lib/db/spellingRepository";
+
+export type SpellingStatusFilter = SpellingProgressStatus | "all";
 
 function searchRank(fields: {
   target: string;
@@ -32,20 +41,27 @@ export function ParentSpellingList({
   items,
   libraryItems,
   initialSearchQuery,
+  initialStatusFilter,
   learnerId,
   learnerName,
 }: {
   items: ParentSpellingListItem[];
   libraryItems: ParentSpellingLibraryItem[];
   initialSearchQuery: string;
+  initialStatusFilter: SpellingStatusFilter;
   learnerId?: string;
   learnerName: string;
 }) {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [statusFilter, setStatusFilter] = useState<SpellingStatusFilter>(initialStatusFilter);
 
   useEffect(() => {
     setSearchQuery(initialSearchQuery);
   }, [initialSearchQuery]);
+
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter);
+  }, [initialStatusFilter]);
 
   useEffect(() => {
     const normalized = searchQuery.trim();
@@ -54,6 +70,8 @@ export function ParentSpellingList({
       const params = new URLSearchParams(window.location.search);
       if (normalized) params.set("q", normalized);
       else params.delete("q");
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      else params.delete("status");
       if (learnerId) params.set("learnerId", learnerId);
       else params.delete("learnerId");
       const next = params.toString();
@@ -64,17 +82,17 @@ export function ParentSpellingList({
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [searchQuery, learnerId]);
+  }, [searchQuery, statusFilter, learnerId]);
 
   const filteredItems = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
-    if (!normalized) return items;
-
     return items.flatMap((item) => {
+      if (statusFilter !== "all" && spellingProgressStatus(item) !== statusFilter) return [];
+      if (!normalized) return [{ item, rank: 0 }];
       const rank = searchRank(item, normalized);
       return rank === null ? [] : [{ item, rank }];
     }).sort((a, b) => a.rank - b.rank || a.item.target.localeCompare(b.item.target)).map((result) => result.item);
-  }, [items, searchQuery]);
+  }, [items, searchQuery, statusFilter]);
 
   const filteredLibraryItems = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase("en-GB");
@@ -88,17 +106,32 @@ export function ParentSpellingList({
 
   return (
     <>
-      <label className="spelling-search-field">
-        Search spelling words
-        <input
-          className="field"
-          type="search"
-          placeholder="Search by target word, label, or note..."
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          aria-label="Search spelling words"
-        />
-      </label>
+      <div className="spelling-list-controls">
+        <label className="spelling-search-field">
+          Search spelling words
+          <input
+            className="field"
+            type="search"
+            placeholder="Search by target word, label, or note..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            aria-label="Search spelling words"
+          />
+        </label>
+        <label className="spelling-status-filter">
+          Filter by progress
+          <select
+            className="field"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as SpellingStatusFilter)}
+          >
+            <option value="all">All spellings</option>
+            {SPELLING_ORDER.map((status) => (
+              <option key={status} value={status}>{SPELLING_LABELS[status]}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <section className="word-grid">
         {filteredItems.length > 0 ? (
@@ -112,11 +145,13 @@ export function ParentSpellingList({
                 </small>
               </div>
               <div className="spelling-word-actions">
-                {item.promptCount > 0 ? (
-                  <span className="empty-state spelling-word-status">Ready</span>
-                ) : (
-                  <span className="empty-state spelling-word-status">Incomplete</span>
-                )}
+                <span
+                  className={`mastery-mini spelling-word-status ${SPELLING_KEY[spellingProgressStatus(item)]}`}
+                  title={item.promptCount > 0 ? undefined : "No approved sentence is ready for practice yet."}
+                >
+                  <span className="mastery-mini__dot" aria-hidden="true" />
+                  {SPELLING_LABELS[spellingProgressStatus(item)]}
+                </span>
                 {learnerId ? (
                   item.priorityMode === "next_round_once" ? (
                     <form action={clearSpellingItemPriorityAction}>
@@ -151,8 +186,8 @@ export function ParentSpellingList({
           ))
         ) : (
           <p className="empty-state" style={{ gridColumn: "1 / -1" }}>
-            {searchQuery.trim()
-              ? `No assigned spelling words match "${searchQuery.trim()}".`
+            {searchQuery.trim() || statusFilter !== "all"
+              ? `No assigned spelling words match the current search and progress filter.`
               : "No spelling words are assigned to this child yet."}
           </p>
         )}

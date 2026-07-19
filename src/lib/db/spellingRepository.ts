@@ -137,7 +137,9 @@ export interface ParentSpellingListItem {
   source: string;
   promptCount: number;
   attemptCount: number;
+  correctCount: number;
   wrongCount: number;
+  commonMisspelling: string | null;
   priorityMode: "normal" | "next_round_once";
 }
 
@@ -314,10 +316,12 @@ export function getParentSpellingItems(learnerId = defaultLearnerId()): ParentSp
               i.teaching_note,
               i.study_group,
               i.source,
+              i.common_misspelling,
               lsi.priority_mode,
               COUNT(DISTINCT p.id) AS prompt_count,
               COUNT(DISTINCT a.id) AS attempt_count,
-              SUM(CASE WHEN a.is_correct = 0 THEN 1 ELSE 0 END) AS wrong_count
+              COUNT(DISTINCT CASE WHEN a.is_correct = 1 THEN a.id END) AS correct_count,
+              COUNT(DISTINCT CASE WHEN a.is_correct = 0 THEN a.id END) AS wrong_count
        FROM spelling_items i
        JOIN learner_spelling_items lsi ON lsi.item_id = i.id AND lsi.learner_id = ? AND lsi.status = 'active'
        LEFT JOIN spelling_prompts p ON p.item_id = i.id AND p.status = 'approved'
@@ -333,9 +337,11 @@ export function getParentSpellingItems(learnerId = defaultLearnerId()): ParentSp
     teaching_note: string;
     study_group: string;
     source: string;
+    common_misspelling: string | null;
     priority_mode: "normal" | "next_round_once";
     prompt_count: number;
     attempt_count: number;
+    correct_count: number | null;
     wrong_count: number | null;
   }>;
 
@@ -348,7 +354,9 @@ export function getParentSpellingItems(learnerId = defaultLearnerId()): ParentSp
       source: row.source,
       promptCount: row.prompt_count,
       attemptCount: row.attempt_count,
+      correctCount: row.correct_count ?? 0,
       wrongCount: row.wrong_count ?? 0,
+      commonMisspelling: row.common_misspelling,
       priorityMode: row.priority_mode
     }));
 }

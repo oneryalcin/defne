@@ -1611,11 +1611,13 @@
   flex: 0 0 auto;
 }
 .mastery-mini.is-red    { background: var(--mastery-red-bg);    color: #7A2530; }
+.mastery-mini.is-not_started { background: rgba(31, 41, 55, 0.06); color: var(--steel-secondary); }
 .mastery-mini.is-orange { background: var(--mastery-orange-bg); color: #714019; }
 .mastery-mini.is-yellow { background: var(--mastery-yellow-bg); color: #6B5210; }
 .mastery-mini.is-light_green  { background: var(--mastery-light-bg);  color: #3D5C2A; }
 .mastery-mini.is-green  { background: var(--mastery-green-bg);  color: #1F4733; }
 .mastery-mini.is-red    .mastery-mini__dot { background: var(--mastery-red); }
+.mastery-mini.is-not_started .mastery-mini__dot { background: rgba(31, 41, 55, 0.24); }
 .mastery-mini.is-orange .mastery-mini__dot { background: var(--mastery-orange); }
 .mastery-mini.is-yellow .mastery-mini__dot { background: var(--mastery-yellow); }
 .mastery-mini.is-light_green  .mastery-mini__dot { background: var(--mastery-light); }
@@ -2393,6 +2395,14 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--muted-slate);
+}
+.heatmap-cell__action {
+  margin-top: 4px;
+  color: var(--forest-green);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 .heatmap-cell__why {
   list-style: none;

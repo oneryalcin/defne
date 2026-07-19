@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { setSpellingRoundMixAction } from "@/app/actions";
-import { ParentSpellingList } from "@/components/parent/ParentSpellingList";
+import { SPELLING_ORDER, type SpellingProgressStatus } from "@/components/ProgressDistribution";
+import { SpellingHeatmap } from "@/components/SpellingHeatmap";
+import {
+  ParentSpellingList,
+  type SpellingStatusFilter,
+} from "@/components/parent/ParentSpellingList";
 import {
   getSpellingRoundMixPreference,
   getParentSpellingItems,
@@ -9,7 +14,9 @@ import {
 } from "@/lib/db/spellingRepository";
 import { listLearners, resolveSelectedLearnerId } from "@/lib/db/learners";
 
-type SearchParams = Promise<{ q?: string; learnerId?: string }>;
+const HEATMAP_PAGE_SIZE = 140;
+
+type SearchParams = Promise<{ q?: string; status?: string; p?: string; learnerId?: string }>;
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +33,10 @@ export default async function ParentSpellingPage({
   const libraryItems = listAvailableSpellingItemsForLearner(learnerId);
   const spellingMix = getSpellingRoundMixPreference(learnerId);
   const initialQuery = resolvedSearchParams.q ?? "";
+  const initialStatusFilter: SpellingStatusFilter = isSpellingProgressStatus(resolvedSearchParams.status)
+    ? resolvedSearchParams.status
+    : "all";
+  const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
   const learnerName = selectedLearner?.displayName ?? "this child";
 
   return (
@@ -79,13 +90,38 @@ export default async function ParentSpellingPage({
         </form>
       </section>
 
+      <section className="dash-section" aria-labelledby="spelling-heatmap">
+        <header className="section-head">
+          <span className="section-head__label">Spelling heatmap</span>
+          <h2 id="spelling-heatmap" className="section-head__title">Every spelling, at a glance.</h2>
+          <p className="section-head__sub">
+            {items.length} assigned spellings. Each square shows current spelling progress; hover for attempt history or open the item to edit it.
+          </p>
+        </header>
+        <div className="bento col-12">
+          <SpellingHeatmap
+            words={items}
+            page={heatmapPage}
+            pageSize={HEATMAP_PAGE_SIZE}
+            basePath={`/parent/spelling?learnerId=${encodeURIComponent(learnerId)}`}
+            variant="parent"
+            detailQuery={`?learnerId=${encodeURIComponent(learnerId)}`}
+          />
+        </div>
+      </section>
+
       <ParentSpellingList
         items={items}
         libraryItems={libraryItems}
         initialSearchQuery={initialQuery}
+        initialStatusFilter={initialStatusFilter}
         learnerId={learnerId}
         learnerName={learnerName}
       />
     </main>
   );
+}
+
+function isSpellingProgressStatus(value: string | undefined): value is SpellingProgressStatus {
+  return SPELLING_ORDER.some((status) => status === value);
 }

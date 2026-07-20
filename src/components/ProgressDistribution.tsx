@@ -140,6 +140,23 @@ export function spellingProgressStatus(word: SpellingProgressCounts): SpellingPr
   return "spotted_once";
 }
 
+export function spellingProgressColour(word: SpellingProgressCounts): MasteryColour | null {
+  switch (spellingProgressStatus(word)) {
+    case "needs_work":
+      return "red";
+    case "practising":
+      return "orange";
+    case "spotted_once":
+      return "yellow";
+    case "reliable":
+      return "light_green";
+    case "steady":
+      return "green";
+    case "not_started":
+      return null;
+  }
+}
+
 export function ProgressDistribution({
   buckets,
   ariaLabel,

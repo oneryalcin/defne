@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   spellingProgressBuckets,
+  spellingProgressColour,
   spellingProgressStatus,
 } from "./ProgressDistribution";
 
@@ -32,5 +33,18 @@ describe("spelling progress status", () => {
       ["reliable", 1],
       ["steady", 0],
     ]);
+  });
+});
+
+describe("spelling progress colour", () => {
+  it.each([
+    [{ attemptCount: 0, correctCount: 0, wrongCount: 0 }, null],
+    [{ attemptCount: 2, correctCount: 0, wrongCount: 2 }, "red"],
+    [{ attemptCount: 2, correctCount: 1, wrongCount: 1 }, "orange"],
+    [{ attemptCount: 1, correctCount: 1, wrongCount: 0 }, "yellow"],
+    [{ attemptCount: 2, correctCount: 2, wrongCount: 0 }, "light_green"],
+    [{ attemptCount: 3, correctCount: 3, wrongCount: 0 }, "green"],
+  ] as const)("uses the matching child-facing pill colour", (word, expected) => {
+    expect(spellingProgressColour(word)).toBe(expected);
   });
 });

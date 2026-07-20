@@ -1,11 +1,22 @@
 import Link from "next/link";
-import type { ChildSpellingListItem } from "@/lib/db/spellingRepository";
 import {
   SPELLING_FILL,
   SPELLING_LABELS,
   spellingProgressStatus,
   type SpellingProgressStatus,
 } from "@/components/ProgressDistribution";
+
+export interface SpellingHeatmapItem {
+  id: string;
+  target: string;
+  usageLabel?: string | null;
+  teachingNote?: string | null;
+  commonMisspelling?: string | null;
+  promptCount: number;
+  attemptCount: number;
+  correctCount: number;
+  wrongCount: number;
+}
 
 const STATUS_RANK: Record<SpellingProgressStatus, number> = {
   needs_work: 0,
@@ -21,13 +32,17 @@ export function SpellingHeatmap({
   page,
   pageSize,
   basePath,
-  pageParam = "p"
+  pageParam = "p",
+  variant = "child",
+  detailQuery = "",
 }: {
-  words: ChildSpellingListItem[];
+  words: SpellingHeatmapItem[];
   page: number;
   pageSize: number;
   basePath: string;
   pageParam?: string;
+  variant?: "parent" | "child";
+  detailQuery?: string;
 }) {
   const enriched = words
     .map((word) => ({ word, status: spellingProgressStatus(word) }))
@@ -58,28 +73,50 @@ export function SpellingHeatmap({
       </div>
 
       <div className="heatmap__grid" role="list">
-        {slice.map(({ word, status }) => (
-          <div
-            key={word.id}
-            role="listitem"
-            tabIndex={0}
-            className="heatmap-cell spelling-heatmap-cell"
-            style={{ background: SPELLING_FILL[status] }}
-          >
-            <span className="heatmap-cell__word">{word.target}</span>
-            <span className="heatmap-cell__pop" role="tooltip">
-              <strong>{word.target}</strong>
-              <span className="heatmap-cell__state">{SPELLING_LABELS[status]}</span>
-              <span className="heatmap-cell__stats">{spellingStats(word)}</span>
-              <ul className="heatmap-cell__why">
-                {word.usageLabel ? <li>{word.usageLabel}</li> : null}
-                {word.commonMisspelling ? <li>Watch for: {word.commonMisspelling}</li> : null}
-                {word.teachingNote ? <li>{word.teachingNote}</li> : null}
-                <li>{word.promptCount} sentence clue{word.promptCount === 1 ? "" : "s"} ready</li>
-              </ul>
-            </span>
-          </div>
-        ))}
+        {slice.map(({ word, status }) => {
+          const content = (
+            <>
+              <span className="heatmap-cell__word">{word.target}</span>
+              <span className="heatmap-cell__pop" role="tooltip">
+                <strong>{word.target}</strong>
+                <span className="heatmap-cell__state">{SPELLING_LABELS[status]}</span>
+                <span className="heatmap-cell__stats">{spellingStats(word)}</span>
+                <ul className="heatmap-cell__why">
+                  {word.usageLabel ? <li>{word.usageLabel}</li> : null}
+                  {word.commonMisspelling ? <li>Watch for: {word.commonMisspelling}</li> : null}
+                  {word.teachingNote ? <li>{word.teachingNote}</li> : null}
+                  <li>{word.promptCount} sentence clue{word.promptCount === 1 ? "" : "s"} ready</li>
+                </ul>
+                {variant === "parent" ? (
+                  <span className="heatmap-cell__action">Open spelling page →</span>
+                ) : null}
+              </span>
+            </>
+          );
+
+          return variant === "parent" ? (
+            <Link
+              key={word.id}
+              role="listitem"
+              className="heatmap-cell spelling-heatmap-cell"
+              style={{ background: SPELLING_FILL[status] }}
+              href={`/parent/spelling/${word.id}${detailQuery}`}
+              prefetch={false}
+            >
+              {content}
+            </Link>
+          ) : (
+            <div
+              key={word.id}
+              role="listitem"
+              tabIndex={0}
+              className="heatmap-cell spelling-heatmap-cell"
+              style={{ background: SPELLING_FILL[status] }}
+            >
+              {content}
+            </div>
+          );
+        })}
       </div>
 
       <footer className="heatmap__foot">
@@ -92,7 +129,7 @@ export function SpellingHeatmap({
   );
 }
 
-function spellingStats(word: ChildSpellingListItem): string {
+function spellingStats(word: SpellingHeatmapItem): string {
   if (word.attemptCount === 0) return "Not tried yet";
   return `Seen ${word.attemptCount}, correct ${word.correctCount}, missed ${word.wrongCount}`;
 }

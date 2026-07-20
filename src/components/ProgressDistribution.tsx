@@ -59,8 +59,17 @@ export const SPELLING_FILL: Record<SpellingProgressStatus, string> = {
   steady: "var(--mastery-green)",
 };
 
+export const SPELLING_KEY: Record<SpellingProgressStatus, string> = {
+  not_started: "is-not_started",
+  needs_work: "is-red",
+  practising: "is-orange",
+  spotted_once: "is-yellow",
+  reliable: "is-light_green",
+  steady: "is-green",
+};
+
 const MASTERY_ORDER: MasteryColour[] = ["red", "orange", "yellow", "light_green", "green"];
-const SPELLING_ORDER: SpellingProgressStatus[] = [
+export const SPELLING_ORDER: SpellingProgressStatus[] = [
   "not_started",
   "needs_work",
   "practising",
@@ -99,7 +108,12 @@ export function vocabularyProgressBuckets(words: ParentWordListItem[]): Progress
   ];
 }
 
-export function spellingProgressBuckets(words: ChildSpellingListItem[]): ProgressBucket[] {
+type SpellingProgressCounts = Pick<
+  ChildSpellingListItem,
+  "attemptCount" | "correctCount" | "wrongCount"
+>;
+
+export function spellingProgressBuckets(words: SpellingProgressCounts[]): ProgressBucket[] {
   const counts = Object.fromEntries(SPELLING_ORDER.map((status) => [status, 0])) as Record<
     SpellingProgressStatus,
     number
@@ -117,7 +131,7 @@ export function spellingProgressBuckets(words: ChildSpellingListItem[]): Progres
   }));
 }
 
-export function spellingProgressStatus(word: ChildSpellingListItem): SpellingProgressStatus {
+export function spellingProgressStatus(word: SpellingProgressCounts): SpellingProgressStatus {
   if (word.attemptCount === 0) return "not_started";
   if (word.wrongCount > word.correctCount) return "needs_work";
   if (word.wrongCount > 0) return "practising";

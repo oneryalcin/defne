@@ -6,10 +6,11 @@ import {
   getParentDashboard,
   getParentWords,
 } from "@/lib/db/repository";
-import { getChildSpellingWords } from "@/lib/db/spellingRepository";
+import { getParentSpellingItems } from "@/lib/db/spellingRepository";
 import { listLearners, resolveSelectedLearnerId } from "@/lib/db/learners";
 import type { MasteryColour } from "@/lib/types";
 import { WordHeatmap } from "@/components/WordHeatmap";
+import { SpellingHeatmap } from "@/components/SpellingHeatmap";
 import {
   MASTERY_KEY,
   MASTERY_LABELS,
@@ -22,7 +23,7 @@ const HEATMAP_PAGE_SIZE = 200;
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ p?: string; learnerId?: string }>;
+type SearchParams = Promise<{ p?: string; sp?: string; learnerId?: string }>;
 
 export default async function ParentDashboardPage({
   searchParams,
@@ -35,6 +36,7 @@ export default async function ParentDashboardPage({
   const selectedLearner = learners.find((learner) => learner.id === learnerId) ?? learners[0];
   const dashboard = getParentDashboard(learnerId);
   const heatmapPage = Math.max(1, parseInt(resolvedSearchParams.p ?? "1", 10) || 1);
+  const spellingHeatmapPage = Math.max(1, parseInt(resolvedSearchParams.sp ?? "1", 10) || 1);
   const nextRound = (() => {
     try {
       return getMissionPreview(12, learnerId);
@@ -52,7 +54,7 @@ export default async function ParentDashboardPage({
 
   // True deck-wide distribution from the actual learner state (one row per word).
   const allWords = getParentWords(learnerId);
-  const spellingWords = getChildSpellingWords(learnerId);
+  const spellingWords = getParentSpellingItems(learnerId);
   const vocabularyBuckets = vocabularyProgressBuckets(allWords);
   const spellingBuckets = spellingProgressBuckets(spellingWords);
 
@@ -468,6 +470,30 @@ export default async function ParentDashboardPage({
               pageSize={HEATMAP_PAGE_SIZE}
               variant="parent"
               basePath={`/parent?learnerId=${encodeURIComponent(learnerId)}`}
+              detailQuery={`?learnerId=${encodeURIComponent(learnerId)}`}
+            />
+          </div>
+        </section>
+
+        <section className="dash-section" aria-labelledby="spelling-heatmap">
+          <header className="section-head">
+            <span className="section-head__label">Spelling heatmap</span>
+            <h2 id="spelling-heatmap" className="section-head__title">
+              Every spelling, at a glance.
+            </h2>
+            <p className="section-head__sub">
+              {spellingWords.length} spellings assigned. Each square shows spelling progress —
+              hover to see its attempt history, paginate to walk the whole list.
+            </p>
+          </header>
+          <div className="bento col-12">
+            <SpellingHeatmap
+              words={spellingWords}
+              page={spellingHeatmapPage}
+              pageSize={HEATMAP_PAGE_SIZE}
+              basePath={`/parent?learnerId=${encodeURIComponent(learnerId)}`}
+              pageParam="sp"
+              variant="parent"
               detailQuery={`?learnerId=${encodeURIComponent(learnerId)}`}
             />
           </div>

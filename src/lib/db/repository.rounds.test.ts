@@ -1041,6 +1041,26 @@ describe("spelling repository orchestration", () => {
     expect(preview.items.some((item) => item.target === "practice")).toBe(false);
   });
 
+  it("returns correct and wrong counts for parent spelling progress views", () => {
+    const itemId = createOrUpdateParentSpellingItem({
+      target: "separate",
+      usageLabel: "adjective",
+      teachingNote: "Separate has a in the middle.",
+      sentences: [
+        "Keep the wet coats in a separate basket.",
+        "We used a separate page for the diagram.",
+      ],
+    });
+    insertSpellingAttemptHistory(itemId, [true, false, true]);
+
+    expect(getParentSpellingItems().find((item) => item.id === itemId)).toMatchObject({
+      promptCount: 2,
+      attemptCount: 3,
+      correctCount: 2,
+      wrongCount: 1,
+    });
+  });
+
   it("assigns a newly created parent spelling item only to the selected child, even after reseeding", () => {
     const learnerId = createLearner({ displayName: "Noa", accessCode: "noa" });
     const itemId = createOrUpdateParentSpellingItem(

@@ -63,7 +63,7 @@
 - Empty: Explain whether no assigned items exist or no items match the active search/status filter.
 - Error: Preserve server action error handling and use calm language.
 - Success: After a next-round action, show the existing undo state beside the item.
-- Disabled: Pagination uses its current disabled semantics; filters remain usable with zero results.
+- Disabled: Pagination uses its current disabled semantics; filters remain usable with zero results. During an active child round, focus choices remain visible but disabled with an "Available after this round" explanation. A separate, two-step escape hatch may end the round and start a chosen replacement; it must explain that prior answers remain in learning history.
 - Offline/slow network, if applicable: Core data remains local SQLite; client-side search and status filtering work without a request after page load.
 
 ## Content voice

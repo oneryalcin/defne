@@ -660,6 +660,16 @@ export function startSpellingMission(
   return sessionId;
 }
 
+export function replaceSpellingMission(
+  targetItemCount = 8,
+  learnerId = defaultLearnerId(),
+  focus: SpellingFocus | null = null
+): string {
+  const db = getDb();
+  abandonActiveSpellingSessions(db, learnerId);
+  return startSpellingMission(targetItemCount, learnerId, focus);
+}
+
 export function getSpellingSessionView(sessionId: string, attemptId?: string): SpellingSessionView {
   const db = getDb();
   const session = getSpellingSessionRow(db, sessionId);

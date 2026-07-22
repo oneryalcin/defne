@@ -16,6 +16,7 @@ import {
   getSessionSummary,
   getSessionView,
   recordRoundCardView,
+  replaceRoundMission,
   setNextRoundMixPreference,
   startRoundMeaningRecognition,
   startRoundMission,
@@ -40,6 +41,7 @@ import {
   getSpellingSessionView,
   getSpellingRoundMixPreference,
   requestSpellingItemNextRound,
+  replaceSpellingMission,
   setSpellingRoundMixPreference,
   startSpellingPractice,
   startSpellingMission,
@@ -1378,6 +1380,34 @@ describe("spelling repository orchestration", () => {
     const sessionWordIds = getSessionView(sessionId).round?.cards.map((card) => card.id) ?? [];
     expect(sessionWordIds).toEqual(expect.arrayContaining(wordIds));
     expect(sessionWordIds).toHaveLength(2);
+  });
+
+  it("lets a child replace an active vocabulary round before choosing a new focus", () => {
+    const originalSessionId = startRoundMission(6, "learner_defne");
+    const replacementSessionId = replaceRoundMission(6, "learner_defne");
+
+    expect(replacementSessionId).not.toBe(originalSessionId);
+    const oldRound = getDb()
+      .prepare("SELECT status FROM practice_rounds WHERE session_id = ?")
+      .get(originalSessionId) as { status: string };
+    const oldSession = getDb()
+      .prepare("SELECT status FROM practice_sessions WHERE id = ?")
+      .get(originalSessionId) as { status: string };
+
+    expect(oldRound.status).toBe("abandoned");
+    expect(oldSession.status).toBe("abandoned");
+  });
+
+  it("lets a child replace an active spelling round before choosing a new focus", () => {
+    const originalSessionId = startSpellingMission(8, "learner_defne");
+    const replacementSessionId = replaceSpellingMission(8, "learner_defne");
+
+    expect(replacementSessionId).not.toBe(originalSessionId);
+    const oldSession = getDb()
+      .prepare("SELECT status FROM spelling_sessions WHERE id = ?")
+      .get(originalSessionId) as { status: string };
+
+    expect(oldSession.status).toBe("abandoned");
   });
 
   it("keeps active spelling items without approved prompts in the child progress count", () => {

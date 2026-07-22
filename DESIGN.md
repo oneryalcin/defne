@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-07-19
+- Last refreshed: 2026-07-22
 - Primary product surfaces: Parent dashboard, parent vocabulary and spelling libraries, child vocabulary and spelling practice.
 - Evidence reviewed: `AGENTS.md`, `README.md`, `docs/design-system.md`, the parent vocabulary, spelling, and dashboard screenshots supplied on 2026-07-19, `src/app/parent/page.tsx`, `src/app/parent/words/page.tsx`, `src/app/parent/spelling/page.tsx`, `src/components/WordHeatmap.tsx`, `src/components/SpellingHeatmap.tsx`, `src/components/ProgressDistribution.tsx`, `src/components/parent/ParentVocabularyList.tsx`, `src/components/parent/ParentSpellingList.tsx`, `src/app/globals.css`, and `src/app/design-system.css`.
 
@@ -42,7 +42,7 @@
 
 ## Components
 - Existing components to reuse: `ProgressDistribution`, `WordHeatmap`, `SpellingHeatmap`, `MasteryBadge`, parent word rows, buttons, fields, and pagination.
-- New/changed components: Parent spelling rows gain a labelled spelling-status pill and status filter; spelling heatmaps become available on parent spelling and dashboard surfaces.
+- New/changed components: Parent spelling rows gain a labelled spelling-status pill and status filter; spelling heatmaps become available on parent spelling and dashboard surfaces. Both child previews explain why Defne selected a round and offer the same strict, one-round colour focus without replacing the guided plan.
 - Variants and states: Not tried, Needs another look, Practising, Spotted once, Reliable, Steady spelling; all states include a dot, label, and accessible control text.
 - Token/component ownership: Semantic status labels and fills live in `ProgressDistribution.tsx`; page-specific layout stays in parent components and existing CSS files.
 
@@ -69,7 +69,7 @@
 ## Content voice
 - Tone: Calm, direct, descriptive, and non-judgmental.
 - Terminology: Use the established spelling labels exactly: Not tried, Needs another look, Practising, Spotted once, Reliable, Steady spelling.
-- Microcopy rules: Describe evidence and next action. Avoid “failed”, grades, and unexplained numeric scores.
+- Microcopy rules: Describe evidence and next action. Avoid “failed”, grades, and unexplained numeric scores. State separately what a progress colour means and why a word is scheduled now. A child-selected colour must say clearly that no other colour will be added to fill the round.
 
 ## Implementation constraints
 - Framework/styling system: Next.js App Router, React, TypeScript, SQLite, `globals.css`, and `design-system.css`.

@@ -37,6 +37,8 @@ import {
   submitSpellingAnswer,
   unassignSpellingItemFromLearner
 } from "@/lib/db/spellingRepository";
+import { parseSpellingFocus } from "@/lib/learning/spellingProgress";
+import { parseVocabularyFocus } from "@/lib/learning/vocabularyFocus";
 import { normaliseParentVocabularyWord } from "@/lib/normalization";
 import {
   PILOT_SESSION_COOKIE,
@@ -111,15 +113,17 @@ export async function logoutAction(): Promise<void> {
   redirect("/");
 }
 
-export async function startMissionAction(): Promise<void> {
+export async function startMissionAction(formData: FormData): Promise<void> {
   const learnerId = await requireChildLearnerId();
-  const sessionId = startRoundMission(12, learnerId);
+  const focus = parseVocabularyFocus(String(formData.get("focus") ?? ""));
+  const sessionId = startRoundMission(12, learnerId, focus);
   redirect(`/child/session/${sessionId}`);
 }
 
-export async function startSpellingMissionAction(): Promise<void> {
+export async function startSpellingMissionAction(formData: FormData): Promise<void> {
   const learnerId = await requireChildLearnerId();
-  const sessionId = startSpellingMission(8, learnerId);
+  const focus = parseSpellingFocus(String(formData.get("focus") ?? ""));
+  const sessionId = startSpellingMission(8, learnerId, focus);
   redirect(`/child/spelling/session/${sessionId}`);
 }
 

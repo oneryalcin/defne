@@ -6,6 +6,11 @@ import {
   type SpellingPracticeItem,
   type SpellingQuestion
 } from "../learning/spelling";
+import {
+  spellingFocusStatuses,
+  spellingProgressStatus,
+  type SpellingFocus,
+} from "../learning/spellingProgress";
 import { applyPracticeEventToSelectionState, updateStateAfterAttempt } from "../learning/mastery";
 import {
   selectRoundWords,
@@ -76,6 +81,8 @@ export const DEFAULT_SPELLING_ROUND_MIX: SpellingRoundMixPreference = {
 
 export interface SpellingPreview {
   targetItemCount: number;
+  source: "new_round" | "current_round";
+  focus: SpellingFocus | null;
   items: Array<{
     id: string;
     target: string;
@@ -84,6 +91,11 @@ export interface SpellingPreview {
     correctCount: number;
     wrongCount: number;
   }>;
+}
+
+export interface SpellingFocusOption {
+  status: SpellingFocus;
+  eligibleCount: number;
 }
 
 export function getSpellingRoundMixPreference(learnerId = defaultLearnerId()): SpellingRoundMixPreference {
@@ -282,16 +294,22 @@ export function getChildSpellingWords(learnerId = defaultLearnerId()): ChildSpel
   }));
 }
 
-export function getSpellingPreview(targetItemCount = 8, learnerId = defaultLearnerId()): SpellingPreview {
+export function getSpellingPreview(
+  targetItemCount = 8,
+  learnerId = defaultLearnerId(),
+  focus: SpellingFocus | null = null
+): SpellingPreview {
   const db = getDb();
   const existing = getLatestInProgressSpellingSession(db, learnerId);
   const items = existing
     ? getSpellingItemsByIds(db, readJsonStringArray(existing.item_ids_json))
-    : selectSpellingItems(db, targetItemCount, learnerId);
+    : selectSpellingItems(db, targetItemCount, learnerId, focus);
   const stats = getSpellingStatsByItem(db, learnerId);
 
   return {
     targetItemCount: items.length,
+    source: existing ? "current_round" : "new_round",
+    focus: existing ? null : focus,
     items: items.map((item) => {
       const itemStats = stats.get(item.id) ?? { attempts: 0, correct: 0, wrong: 0 };
       return {
@@ -304,6 +322,15 @@ export function getSpellingPreview(targetItemCount = 8, learnerId = defaultLearn
       };
     })
   };
+}
+
+export function getSpellingFocusOptions(learnerId = defaultLearnerId()): SpellingFocusOption[] {
+  const db = getDb();
+  const words = loadSpellingPracticeWordsForSelection(db, new Date().toISOString(), learnerId);
+  return spellingFocusStatuses.map((status) => ({
+    status,
+    eligibleCount: words.filter((word) => spellingProgressStatus(word.state) === status).length
+  }));
 }
 
 export function getParentSpellingItems(learnerId = defaultLearnerId()): ParentSpellingListItem[] {
@@ -589,12 +616,16 @@ export function createOrUpdateParentSpellingItem(input: ParentSpellingItemInput,
   return savedItemId;
 }
 
-export function startSpellingMission(targetItemCount = 8, learnerId = defaultLearnerId()): string {
+export function startSpellingMission(
+  targetItemCount = 8,
+  learnerId = defaultLearnerId(),
+  focus: SpellingFocus | null = null
+): string {
   const db = getDb();
   const existing = getLatestInProgressSpellingSession(db, learnerId);
   if (existing) return existing.id;
 
-  const items = selectSpellingItems(db, targetItemCount, learnerId);
+  const items = selectSpellingItems(db, targetItemCount, learnerId, focus);
   if (items.length === 0) {
     throw new Error("No spelling items are available for practice.");
   }
@@ -850,22 +881,35 @@ function spellingSessionPhase(session: SpellingSessionRow): SpellingSessionView[
   return session.intro_completed_at ? "practice" : "intro";
 }
 
-function selectSpellingItems(db: DatabaseSync, limit: number, learnerId: string): SpellingPracticeItem[] {
+function selectSpellingItems(
+  db: DatabaseSync,
+  limit: number,
+  learnerId: string,
+  focus: SpellingFocus | null = null
+): SpellingPracticeItem[] {
   const nowIso = new Date().toISOString();
   const words = loadSpellingPracticeWordsForSelection(db, nowIso, learnerId);
+  const focusedWords = focus ? words.filter((word) => spellingProgressStatus(word.state) === focus) : words;
   const priorityIds = getSpellingNextRoundPriorityItemIds(db, learnerId)
-    .filter((itemId) => words.some((word) => word.id === itemId))
+    .filter((itemId) => focusedWords.some((word) => word.id === itemId))
     .slice(0, Math.min(2, Math.max(0, limit)));
   const prioritySet = new Set(priorityIds);
   if (limit > 12) {
     const itemIds = [
       ...priorityIds,
-      ...words.map((word) => word.id).filter((itemId) => !prioritySet.has(itemId)).slice(0, limit - priorityIds.length)
+      ...focusedWords.map((word) => word.id).filter((itemId) => !prioritySet.has(itemId)).slice(0, limit - priorityIds.length)
     ];
     return getSpellingItemsByIds(db, itemIds);
   }
 
-  const priorityWords = priorityIds.map((itemId) => words.find((word) => word.id === itemId)).filter((word): word is PracticeWord => Boolean(word));
+  const priorityWords = priorityIds.map((itemId) => focusedWords.find((word) => word.id === itemId)).filter((word): word is PracticeWord => Boolean(word));
+  if (focus) {
+    const selection = selectRoundWords(focusedWords.filter((word) => !prioritySet.has(word.id)), nowIso, limit - priorityIds.length, {
+      revealAndMoveOnWordIds: [],
+      eventuallyCorrectNotFirstAttemptWordIds: []
+    }, { allowPartialCount: true, reserveIntroduction: false });
+    return getSpellingItemsByIds(db, [...priorityIds, ...selection.wordIds].slice(0, limit));
+  }
   const bucketTargets =
     limit >= 8
       ? getAdjustedSpellingBucketTargetsForFill(
@@ -875,7 +919,7 @@ function selectSpellingItems(db: DatabaseSync, limit: number, learnerId: string)
         )
       : undefined;
   const fillCount = limit - priorityIds.length;
-  const selection = selectRoundWords(words.filter((word) => !prioritySet.has(word.id)), nowIso, fillCount, {
+  const selection = selectRoundWords(focusedWords.filter((word) => !prioritySet.has(word.id)), nowIso, fillCount, {
     revealAndMoveOnWordIds: [],
     eventuallyCorrectNotFirstAttemptWordIds: []
   }, { bucketTargets, allowPartialCount: true, reserveIntroduction: limit >= 8 });

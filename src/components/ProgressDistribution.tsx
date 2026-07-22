@@ -1,14 +1,13 @@
 import type { ParentWordListItem } from "@/lib/db/repository";
 import type { ChildSpellingListItem } from "@/lib/db/spellingRepository";
 import type { MasteryColour } from "@/lib/types";
+import {
+  spellingProgressColour,
+  spellingProgressStatus,
+  type SpellingProgressStatus,
+} from "@/lib/learning/spellingProgress";
 
-export type SpellingProgressStatus =
-  | "not_started"
-  | "needs_work"
-  | "practising"
-  | "spotted_once"
-  | "reliable"
-  | "steady";
+export { spellingProgressColour, spellingProgressStatus, type SpellingProgressStatus } from "@/lib/learning/spellingProgress";
 
 export interface ProgressBucket {
   key: string;
@@ -129,32 +128,6 @@ export function spellingProgressBuckets(words: SpellingProgressCounts[]): Progre
     count: counts[status],
     fill: SPELLING_FILL[status],
   }));
-}
-
-export function spellingProgressStatus(word: SpellingProgressCounts): SpellingProgressStatus {
-  if (word.attemptCount === 0) return "not_started";
-  if (word.wrongCount > word.correctCount) return "needs_work";
-  if (word.wrongCount > 0) return "practising";
-  if (word.correctCount >= 3) return "steady";
-  if (word.correctCount >= 2) return "reliable";
-  return "spotted_once";
-}
-
-export function spellingProgressColour(word: SpellingProgressCounts): MasteryColour | null {
-  switch (spellingProgressStatus(word)) {
-    case "needs_work":
-      return "red";
-    case "practising":
-      return "orange";
-    case "spotted_once":
-      return "yellow";
-    case "reliable":
-      return "light_green";
-    case "steady":
-      return "green";
-    case "not_started":
-      return null;
-  }
 }
 
 export function ProgressDistribution({

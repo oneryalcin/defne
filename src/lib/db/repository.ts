@@ -43,6 +43,7 @@ import type {
 import { getDb } from "./index";
 import { defaultLearnerId, deterministicWordId, normalizeWord } from "./seed";
 import { assignVocabularyWordToLearnerInDb } from "./learners";
+import { type VocabularyFocus } from "../learning/vocabularyFocus";
 
 const UNSTARTED_PREVIEW_STALE_HOURS = 20;
 const ROUND_SELECTION_VERSION = 2;
@@ -138,6 +139,8 @@ interface PracticeRoundRow {
 
 export interface MissionPreview {
   targetQuestionCount: number;
+  source: "new_round" | "current_round";
+  focus: VocabularyFocus | null;
   words: Array<{
     id: string;
     word: string;
@@ -154,6 +157,11 @@ export interface MissionPreview {
     }>;
     priorityScore: number;
   }>;
+}
+
+export interface VocabularyFocusOption {
+  colour: VocabularyFocus;
+  eligibleCount: number;
 }
 
 export interface SessionView {
@@ -410,7 +418,24 @@ export function setNextRoundMixPreference(
   }
 }
 
-export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultLearnerId()): MissionPreview {
+export function getVocabularyFocusOptions(learnerId = defaultLearnerId()): VocabularyFocusOption[] {
+  const counts = new Map<VocabularyFocus, number>();
+  for (const word of getPracticeWordsForSelection(getDb(), learnerId)) {
+    if (word.state.attemptCount === 0) continue;
+    counts.set(word.state.masteryColour, (counts.get(word.state.masteryColour) ?? 0) + 1);
+  }
+
+  return (["red", "orange", "yellow", "light_green", "green"] as const).map((colour) => ({
+    colour,
+    eligibleCount: counts.get(colour) ?? 0
+  }));
+}
+
+export function getMissionPreview(
+  targetQuestionCount = 12,
+  learnerId = defaultLearnerId(),
+  focus: VocabularyFocus | null = null
+): MissionPreview {
   const db = getDb();
   const words = getPracticeWordsForSelection(db, learnerId);
   const byId = new Map(words.map((word) => [word.id, word]));
@@ -422,25 +447,28 @@ export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultL
   // to disagree.
   abandonStaleInProgressRounds(db, targetQuestionCount, learnerId);
   abandonUnstartedPreviewRoundForPendingParentPriority(db, learnerId);
+  abandonUnstartedPreviewRoundForFocusChange(db, learnerId, focus);
   if (!hasInProgressRound(db, learnerId)) {
-    startRoundMission(targetQuestionCount, learnerId);
+    startRoundMission(targetQuestionCount, learnerId, focus);
   }
   const liveRound = db
     .prepare(
-      `SELECT word_ids_json, summary_json
+      `SELECT word_ids_json, summary_json, current_step, card_view_counts_json,
+              EXISTS (SELECT 1 FROM practice_attempts pa WHERE pa.session_id = practice_rounds.session_id) AS has_attempts
        FROM practice_rounds
        WHERE learner_id = ? AND status = 'in_progress'
        ORDER BY started_at DESC
        LIMIT 1`
     )
     .get(learnerId) as
-    | { word_ids_json: string; summary_json: string }
+    | { word_ids_json: string; summary_json: string; current_step: string; card_view_counts_json: string; has_attempts: number }
     | undefined;
 
   const nowIso = new Date().toISOString();
   const selection: RoundWordSelection = liveRound
     ? roundSelectionFromLiveRound(liveRound, byId)
     : selectRoundWordsWithParentPriority(db, words, nowIso, targetQuestionCount, learnerId);
+  const activeFocus = liveRound ? focusFromRoundSummary(liveRound.summary_json) : focus;
   const reasonByWordId = new Map(selection.reasons.map((reason) => [reason.wordId, reason]));
   const attemptsByWordId = loadAttemptHistoryByWord(db, learnerId);
   const realAttemptsByWordId = new Map(
@@ -456,6 +484,8 @@ export function getMissionPreview(targetQuestionCount = 12, learnerId = defaultL
 
   return {
     targetQuestionCount: selection.wordIds.length,
+    source: liveRound && !isUnstartedPreviewRound(liveRound) ? "current_round" : "new_round",
+    focus: activeFocus,
     words: selection.wordIds.map((wordId) => {
       const word = byId.get(wordId);
       const selectionReason = reasonByWordId.get(wordId);
@@ -519,14 +549,29 @@ function roundSelectionFromLiveRound(
   return { wordIds, reasons };
 }
 
+function focusFromRoundSummary(summaryJson: string): VocabularyFocus | null {
+  const summary = JSON.parse(summaryJson) as SessionSummary;
+  return summary.round?.selectionFocus ?? null;
+}
+
 function selectRoundWordsWithParentPriority(
   db: DatabaseSync,
   words: PracticeWord[],
   nowIso: string,
   targetCount: number,
-  learnerId: string
+  learnerId: string,
+  focus: VocabularyFocus | null = null
 ): RoundWordSelection {
   const count = Math.max(6, Math.min(12, Math.round(targetCount)));
+  if (focus) {
+    const focusedWords = words.filter(
+      (word) => word.state.attemptCount > 0 && word.state.masteryColour === focus
+    );
+    return selectRoundWords(focusedWords, nowIso, count, getRemediationWordIds(db, learnerId), {
+      allowPartialCount: true,
+      reserveIntroduction: false
+    });
+  }
   const byId = new Map(words.map((word) => [word.id, word]));
   const priorityIds = getVocabularyNextRoundPriorityWordIds(db, learnerId)
     .filter((wordId) => byId.has(wordId))
@@ -611,10 +656,15 @@ function consumeVocabularyNextRoundPriorities(db: DatabaseSync, learnerId: strin
   ).run(now, now, learnerId, ...wordIds);
 }
 
-export function startRoundMission(roundWordCount = 12, learnerId = defaultLearnerId()): string {
+export function startRoundMission(
+  roundWordCount = 12,
+  learnerId = defaultLearnerId(),
+  focus: VocabularyFocus | null = null
+): string {
   const db = getDb();
   abandonStaleInProgressRounds(db, roundWordCount, learnerId);
   abandonUnstartedPreviewRoundForPendingParentPriority(db, learnerId);
+  abandonUnstartedPreviewRoundForFocusChange(db, learnerId, focus);
 
   // Reuse the in-progress round if one already exists. The cover preview
   // commits one when the user lands on /child, so the words shown there
@@ -631,7 +681,7 @@ export function startRoundMission(roundWordCount = 12, learnerId = defaultLearne
 
   const words = getPracticeWordsForSelection(db, learnerId);
   const now = new Date().toISOString();
-  const selection = selectRoundWordsWithParentPriority(db, words, now, roundWordCount, learnerId);
+  const selection = selectRoundWordsWithParentPriority(db, words, now, roundWordCount, learnerId, focus);
   const wordIds = selection.wordIds;
   if (wordIds.length === 0) {
     throw new Error("No complete vocabulary words are available for a round.");
@@ -648,13 +698,16 @@ export function startRoundMission(roundWordCount = 12, learnerId = defaultLearne
     round: {
       roundId,
       selectionVersion: ROUND_SELECTION_VERSION,
+      selectionFocus: focus,
       firstAttemptSecureWords: [],
       eventuallyCorrectWords: [],
       revealAndMoveOnWords: [],
       nearReviewWords: [],
       selectionReasons: selection.reasons,
       mistakeEvidence: [],
-      explanation: "Round started. The word list is selected from recent mistakes, due reviews, and building words."
+      explanation: focus
+        ? `Round started with only ${focus} vocabulary words.`
+        : "Round started. The word list is selected from recent mistakes, due reviews, and building words."
     }
   };
 
@@ -681,7 +734,9 @@ export function startRoundMission(roundWordCount = 12, learnerId = defaultLearne
     now
   );
 
-  consumeVocabularyNextRoundPriorities(db, learnerId, selection.wordIds, now);
+  if (!focus) {
+    consumeVocabularyNextRoundPriorities(db, learnerId, selection.wordIds, now);
+  }
 
   return sessionId;
 }
@@ -889,6 +944,49 @@ function abandonUnstartedPreviewRoundForPendingParentPriority(db: DatabaseSync, 
     return !liveWordIds.has(row.word_id) || (Number.isFinite(requestedAt) && Number.isFinite(startedAt) && requestedAt > startedAt);
   });
   if (!needsNewPreview) return;
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE practice_rounds
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.id);
+  db.prepare(
+    `UPDATE practice_sessions
+     SET status = 'abandoned', ended_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'in_progress'`
+  ).run(now, now, liveRound.session_id);
+}
+
+function abandonUnstartedPreviewRoundForFocusChange(
+  db: DatabaseSync,
+  learnerId: string,
+  focus: VocabularyFocus | null
+): void {
+  const liveRound = db
+    .prepare(
+      `SELECT pr.id, pr.session_id, pr.current_step, pr.card_view_counts_json,
+              EXISTS (SELECT 1 FROM practice_attempts pa WHERE pa.session_id = pr.session_id) AS has_attempts,
+              pr.summary_json
+       FROM practice_rounds pr
+       WHERE pr.learner_id = ? AND pr.status = 'in_progress'
+       ORDER BY pr.started_at DESC, pr.created_at DESC
+       LIMIT 1`
+    )
+    .get(learnerId) as
+    | {
+        id: string;
+        session_id: string;
+        current_step: string;
+        card_view_counts_json: string;
+        has_attempts: number;
+        summary_json: string;
+      }
+    | undefined;
+
+  if (!liveRound || !isUnstartedPreviewRound(liveRound) || focusFromRoundSummary(liveRound.summary_json) === focus) {
+    return;
+  }
 
   const now = new Date().toISOString();
   db.prepare(
@@ -2288,6 +2386,7 @@ function buildCompletedRoundSummary(db: DatabaseSync, round: PracticeRoundRow, c
     revisitTomorrow: unique([...nearReviewWords, ...revealAndMoveOnWords]).slice(0, 8),
     round: {
       roundId: round.id,
+      selectionFocus: startedSummary.round?.selectionFocus ?? null,
       firstAttemptSecureWords,
       eventuallyCorrectWords,
       revealAndMoveOnWords,

@@ -138,6 +138,7 @@ export interface SessionSummary {
   round?: {
     roundId: string;
     selectionVersion?: number;
+    selectionFocus?: MasteryColour | null;
     firstAttemptSecureWords: string[];
     eventuallyCorrectWords: string[];
     revealAndMoveOnWords: string[];

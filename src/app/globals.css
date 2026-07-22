@@ -1278,6 +1278,97 @@ button, input, textarea, select { font: inherit; }
   gap: 18px;
 }
 
+.practice-plan-note,
+.practice-focus {
+  border: 1px solid var(--whisper-border);
+  border-radius: var(--radius-input);
+  background: rgba(255, 255, 255, 0.72);
+  padding: clamp(18px, 3vw, 24px);
+}
+
+.practice-plan-note {
+  border-left: 4px solid rgba(63, 125, 92, 0.72);
+}
+
+.practice-plan-note.is-focus {
+  border-left-color: var(--mastery-orange);
+}
+
+.practice-plan-note.is-focus-needs_work,
+.practice-plan-note.is-vocabulary-focus-red { border-left-color: var(--mastery-red); }
+.practice-plan-note.is-focus-practising,
+.practice-plan-note.is-vocabulary-focus-orange { border-left-color: var(--mastery-orange); }
+.practice-plan-note.is-focus-spotted_once,
+.practice-plan-note.is-vocabulary-focus-yellow { border-left-color: var(--mastery-yellow); }
+.practice-plan-note.is-focus-reliable,
+.practice-plan-note.is-vocabulary-focus-light_green { border-left-color: var(--mastery-light); }
+.practice-plan-note.is-focus-steady,
+.practice-plan-note.is-vocabulary-focus-green { border-left-color: var(--mastery-green); }
+
+.practice-plan-note h2,
+.practice-focus h2 {
+  margin: 8px 0 0;
+  font-family: var(--font-editorial);
+  font-style: italic;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 500;
+  color: var(--graphite-ink);
+}
+
+.practice-plan-note p,
+.practice-focus__head p,
+.practice-focus__waiting {
+  margin: 8px 0 0;
+  max-width: 640px;
+  color: var(--steel-secondary);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.practice-focus__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.practice-focus__choice {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(31, 41, 55, 0.18);
+  border-radius: 999px;
+  background: var(--paper-canvas);
+  padding: 8px 12px;
+  color: var(--graphite-ink);
+  text-decoration: none;
+}
+
+.practice-focus__choice:hover,
+.practice-focus__choice.is-active {
+  border-color: var(--forest-green);
+  background: rgba(63, 125, 92, 0.08);
+}
+
+.practice-focus__choice.is-active {
+  box-shadow: inset 0 0 0 1px var(--forest-green);
+}
+
+.practice-focus__choice-label {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.practice-focus__choice small {
+  color: var(--steel-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .spelling-question {
   display: grid;
   gap: 18px;

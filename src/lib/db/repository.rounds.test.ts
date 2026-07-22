@@ -4,10 +4,12 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getDb, resetDbForTests } from "./index";
 import { reconcileEarnedVocabularyMastery, seedInitialData } from "./seed";
+import { spellingProgressStatus } from "../learning/spellingProgress";
 import {
   createOrUpdateParentWord,
   findActiveWordByText,
   getMissionPreview,
+  getVocabularyFocusOptions,
   getParentWords,
   getParentWordForEdit,
   getWordDetail,
@@ -1316,6 +1318,66 @@ describe("spelling repository orchestration", () => {
       correctCount: 0,
       wrongCount: 1
     });
+  });
+
+  it("lets a child run a strict one-round spelling colour focus", () => {
+    insertSpellingAttemptHistory("spelling_advice", [false, false]);
+    insertSpellingAttemptHistory("spelling_possible", [false, false]);
+
+    const preview = getSpellingPreview(8, "learner_defne", "needs_work");
+    expect(preview.focus).toBe("needs_work");
+    expect(preview.source).toBe("new_round");
+    expect(preview.targetItemCount).toBe(2);
+    expect(preview.items.every((item) => spellingProgressStatus(item) === "needs_work")).toBe(true);
+
+    const sessionId = startSpellingMission(8, "learner_defne", "needs_work");
+    const sessionTargets = getSpellingSessionView(sessionId).wordBank;
+    const statusByTarget = new Map(
+      getChildSpellingWords().map((item) => [item.target, spellingProgressStatus(item)])
+    );
+
+    expect(sessionTargets).toHaveLength(2);
+    expect(sessionTargets.every((target) => statusByTarget.get(target) === "needs_work")).toBe(true);
+  });
+
+  it("lets a child run a strict one-round vocabulary colour focus", () => {
+    const db = getDb();
+    const wordIds = (
+      db.prepare(
+        `SELECT w.id
+         FROM words w
+         JOIN learner_vocabulary_words lvw ON lvw.word_id = w.id AND lvw.learner_id = 'learner_defne'
+         WHERE w.status = 'active' AND lvw.status = 'active'
+         ORDER BY w.word
+         LIMIT 2`
+      ).all() as Array<{ id: string }>
+    ).map((row) => row.id);
+    expect(wordIds).toHaveLength(2);
+
+    db.prepare(
+      `UPDATE learner_word_state
+       SET attempt_count = 2,
+           wrong_count = 2,
+           correct_count = 0,
+           mastery_colour = 'red',
+           last_seen_at = '2026-01-01T00:00:00.000Z',
+           last_wrong_at = '2026-01-01T00:00:00.000Z',
+           recovery_debt = 2
+       WHERE learner_id = 'learner_defne' AND word_id IN (?, ?)`
+    ).run(...wordIds);
+
+    expect(getVocabularyFocusOptions("learner_defne").find((option) => option.colour === "red")?.eligibleCount).toBe(2);
+
+    const preview = getMissionPreview(12, "learner_defne", "red");
+    expect(preview.focus).toBe("red");
+    expect(preview.source).toBe("new_round");
+    expect(preview.targetQuestionCount).toBe(2);
+    expect(preview.words.every((word) => word.masteryColour === "red")).toBe(true);
+
+    const sessionId = startRoundMission(12, "learner_defne", "red");
+    const sessionWordIds = getSessionView(sessionId).round?.cards.map((card) => card.id) ?? [];
+    expect(sessionWordIds).toEqual(expect.arrayContaining(wordIds));
+    expect(sessionWordIds).toHaveLength(2);
   });
 
   it("keeps active spelling items without approved prompts in the child progress count", () => {

@@ -231,7 +231,7 @@ export function getChildSpellingWords(learnerId = defaultLearnerId()): ChildSpel
               stats.last_attempt_at
        FROM spelling_items i
        JOIN learner_spelling_items lsi ON lsi.item_id = i.id AND lsi.learner_id = ? AND lsi.status = 'active'
-       JOIN (
+       LEFT JOIN (
          SELECT item_id, COUNT(*) AS prompt_count
          FROM spelling_prompts
          WHERE status = 'approved'
@@ -260,7 +260,7 @@ export function getChildSpellingWords(learnerId = defaultLearnerId()): ChildSpel
     teaching_note: string;
     study_group: string;
     common_misspelling: string | null;
-    prompt_count: number;
+    prompt_count: number | null;
     attempt_count: number;
     correct_count: number | null;
     wrong_count: number | null;
@@ -274,7 +274,7 @@ export function getChildSpellingWords(learnerId = defaultLearnerId()): ChildSpel
     teachingNote: row.teaching_note,
     studyGroup: row.study_group,
     commonMisspelling: row.common_misspelling,
-    promptCount: row.prompt_count,
+    promptCount: row.prompt_count ?? 0,
     attemptCount: row.attempt_count,
     correctCount: row.correct_count ?? 0,
     wrongCount: row.wrong_count ?? 0,

@@ -1288,7 +1288,7 @@ describe("spelling repository orchestration", () => {
     expect(preview.items.map((item) => item.target)).not.toContain("advice");
   });
 
-  it("builds a child spelling word wall from active spelling prompts and attempts", () => {
+  it("builds a child spelling word wall from active spelling items and attempts", () => {
     const initial = getChildSpellingWords();
     expect(initial.length).toBeGreaterThan(100);
     expect(initial[0]).toMatchObject({
@@ -1316,6 +1316,29 @@ describe("spelling repository orchestration", () => {
       correctCount: 0,
       wrongCount: 1
     });
+  });
+
+  it("keeps active spelling items without approved prompts in the child progress count", () => {
+    const now = new Date().toISOString();
+    getDb()
+      .prepare(
+        `INSERT INTO spelling_items
+          (id, target_word, normalized_target, difficulty_level, source, status, teaching_note, study_group, usage_label, created_at, updated_at)
+         VALUES (?, ?, ?, 1, 'parent', 'active', '', '', '', ?, ?)`
+      )
+      .run("spelling_no_prompt", "unprompted", "unprompted", now, now);
+    assignSpellingItemToLearner("learner_defne", "spelling_no_prompt");
+
+    const childItem = getChildSpellingWords().find((word) => word.id === "spelling_no_prompt");
+    const parentItem = getParentSpellingItems().find((word) => word.id === "spelling_no_prompt");
+
+    expect(childItem).toMatchObject({
+      promptCount: 0,
+      attemptCount: 0,
+      correctCount: 0,
+      wrongCount: 0
+    });
+    expect(parentItem).toMatchObject({ promptCount: 0, attemptCount: 0 });
   });
 
   it("logs wrong spelling selections without advancing until the child finds the answer", () => {

@@ -741,6 +741,16 @@ export function startRoundMission(
   return sessionId;
 }
 
+export function replaceRoundMission(
+  roundWordCount = 12,
+  learnerId = defaultLearnerId(),
+  focus: VocabularyFocus | null = null
+): string {
+  const db = getDb();
+  abandonActiveVocabularyRoundsForMixChange(db, learnerId);
+  return startRoundMission(roundWordCount, learnerId, focus);
+}
+
 function abandonStaleInProgressRounds(
   db: DatabaseSync,
   expectedWordCount = 12,

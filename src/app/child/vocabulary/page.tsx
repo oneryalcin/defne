@@ -1,7 +1,7 @@
 import { Footprints } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { startMissionAction } from "@/app/actions";
+import { replaceMissionAction, startMissionAction } from "@/app/actions";
 import { getMissionPreview, getVocabularyFocusOptions } from "@/lib/db/repository";
 import { getLearnerAccessByCode } from "@/lib/db/learners";
 import { MASTERY_LABELS } from "@/components/ProgressDistribution";
@@ -13,7 +13,7 @@ import type { MasteryColour } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ focus?: string }>;
+type SearchParams = Promise<{ focus?: string; replace?: string }>;
 
 export default async function ChildVocabularyPage({
   searchParams,
@@ -22,6 +22,7 @@ export default async function ChildVocabularyPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const requestedFocus = parseVocabularyFocus(params.focus);
+  const replacingRound = params.replace === "1";
   const cookieStore = await cookies();
   const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
   const learnerId = session?.learnerId ?? (session?.role === "child" ? getLearnerAccessByCode(session.accessCode)?.learnerId : undefined);
@@ -37,6 +38,7 @@ export default async function ChildVocabularyPage({
   const words = preview.words;
   const focusOptions = learnerId ? getVocabularyFocusOptions(learnerId) : [];
   const activeFocus = preview.focus;
+  const canReplaceRound = preview.source === "current_round" && replacingRound;
 
   const pills = words.map((word) => ({
     word: word.word,
@@ -65,10 +67,19 @@ export default async function ChildVocabularyPage({
                   what is most useful today.
                 </p>
               </header>
-              {preview.source === "current_round" ? (
-                <p className="practice-focus__waiting">Finish your current round before choosing another focus.</p>
+              {preview.source === "current_round" && !canReplaceRound ? (
+                <p className="practice-focus__waiting">Available after this round. Finish your words, then choose one.</p>
+              ) : null}
+              {canReplaceRound ? (
+                <ReplaceVocabularyRoundChoices focusOptions={focusOptions} />
               ) : (
-                <div className="practice-focus__choices">
+                <div className="practice-focus__choices" aria-disabled={preview.source === "current_round" || undefined}>
+                  {preview.source === "current_round" ? (
+                  <button className="practice-focus__choice" type="button" disabled>
+                    <span className="practice-focus__choice-label">Let Defne choose</span>
+                    <small>Guided plan</small>
+                  </button>
+                  ) : (
                   <Link
                     className={activeFocus === null ? "practice-focus__choice is-active" : "practice-focus__choice"}
                     href="/child/vocabulary"
@@ -77,16 +88,23 @@ export default async function ChildVocabularyPage({
                     <span className="practice-focus__choice-label">Let Defne choose</span>
                     <small>Guided plan</small>
                   </Link>
+                  )}
                   {focusOptions.map((option) => (
-                    <VocabularyFocusChoice
-                      key={option.colour}
-                      focus={option.colour}
-                      eligibleCount={option.eligibleCount}
-                      active={activeFocus === option.colour}
-                    />
+                  <VocabularyFocusChoice
+                    key={option.colour}
+                    focus={option.colour}
+                    eligibleCount={option.eligibleCount}
+                    active={activeFocus === option.colour}
+                    disabled={preview.source === "current_round"}
+                  />
                   ))}
                 </div>
               )}
+              {preview.source === "current_round" && !canReplaceRound ? (
+                <Link className="practice-focus__replace-link" href="/child/vocabulary?replace=1">
+                  Choose a different round instead
+                </Link>
+              ) : null}
             </section>
 
             <WordPills
@@ -100,7 +118,7 @@ export default async function ChildVocabularyPage({
               {activeFocus ? <input type="hidden" name="focus" value={activeFocus} /> : null}
               <button className="ribbon" type="submit" disabled={words.length === 0}>
                 <Footprints size={18} />
-                {words.length === 0 ? "No words ready" : "Start"}
+                {words.length === 0 ? "No words ready" : preview.source === "current_round" ? "Continue round" : "Start"}
               </button>
               <Link className="ribbon ribbon--ghost" href="/child/words">
                 Words so far
@@ -110,6 +128,41 @@ export default async function ChildVocabularyPage({
         </section>
       </article>
     </main>
+  );
+}
+
+function ReplaceVocabularyRoundChoices({
+  focusOptions,
+}: {
+  focusOptions: Array<{ colour: VocabularyFocus; eligibleCount: number }>;
+}) {
+  return (
+    <div className="practice-focus__replacement">
+      <p>
+        Starting another round ends this one. Any answers you have already given still count in your learning history.
+      </p>
+      <div className="practice-focus__choices">
+        <form action={replaceMissionAction}>
+          <button className="practice-focus__choice" type="submit">
+            <span className="practice-focus__choice-label">Let Defne choose</span>
+            <small>Start new round</small>
+          </button>
+        </form>
+        {focusOptions.map((option) => (
+          <form key={option.colour} action={replaceMissionAction}>
+            <input type="hidden" name="focus" value={option.colour} />
+            <button className="practice-focus__choice" type="submit">
+              <span className={`word-pill__dot l-${option.colour}`} aria-hidden="true" />
+              <span className="practice-focus__choice-label">{MASTERY_LABELS[option.colour]}</span>
+              <small>{option.eligibleCount} words</small>
+            </button>
+          </form>
+        ))}
+      </div>
+      <Link className="practice-focus__keep-link" href="/child/vocabulary">
+        Keep this round
+      </Link>
+    </div>
   );
 }
 
@@ -175,11 +228,23 @@ function VocabularyFocusChoice({
   focus,
   eligibleCount,
   active,
+  disabled,
 }: {
   focus: VocabularyFocus;
   eligibleCount: number;
   active: boolean;
+  disabled: boolean;
 }) {
+  if (disabled) {
+    return (
+      <button className="practice-focus__choice" type="button" disabled aria-label={`${MASTERY_LABELS[focus]}: ${eligibleCount} words, available after this round`}>
+        <span className={`word-pill__dot l-${focus}`} aria-hidden="true" />
+        <span className="practice-focus__choice-label">{MASTERY_LABELS[focus]}</span>
+        <small>{eligibleCount} words</small>
+      </button>
+    );
+  }
+
   return (
     <Link
       className={active ? "practice-focus__choice is-active" : "practice-focus__choice"}

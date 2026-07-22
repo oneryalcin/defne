@@ -1,7 +1,7 @@
 import { Keyboard } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { startSpellingMissionAction } from "@/app/actions";
+import { replaceSpellingMissionAction, startSpellingMissionAction } from "@/app/actions";
 import { GuideRail } from "@/components/GuideRail";
 import { WordPills } from "@/components/WordPills";
 import {
@@ -15,7 +15,7 @@ import { PILOT_SESSION_COOKIE, parsePilotSession } from "@/lib/pilotAuth";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ focus?: string }>;
+type SearchParams = Promise<{ focus?: string; replace?: string }>;
 
 export default async function ChildSpellingPage({
   searchParams,
@@ -24,6 +24,7 @@ export default async function ChildSpellingPage({
 }) {
   const params = searchParams ? await searchParams : {};
   const requestedFocus = parseSpellingFocus(params.focus);
+  const replacingRound = params.replace === "1";
   const cookieStore = await cookies();
   const session = parsePilotSession(cookieStore.get(PILOT_SESSION_COOKIE)?.value);
   const learnerId = session?.learnerId ?? (session?.role === "child" ? getLearnerAccessByCode(session.accessCode)?.learnerId : undefined);
@@ -38,6 +39,7 @@ export default async function ChildSpellingPage({
     : { targetItemCount: 0, source: "new_round" as const, focus: requestedFocus, items: [] };
   const focusOptions = learnerId ? getSpellingFocusOptions(learnerId) : [];
   const activeFocus = preview.focus;
+  const canReplaceRound = preview.source === "current_round" && replacingRound;
   const pills = preview.items.map((item) => ({
     word: item.target,
     level: spellingProgressColour(item),
@@ -65,10 +67,19 @@ export default async function ChildSpellingPage({
                   or let Defne choose what is most useful today.
                 </p>
               </header>
-              {preview.source === "current_round" ? (
-                <p className="practice-focus__waiting">Finish your current round before choosing another focus.</p>
+              {preview.source === "current_round" && !canReplaceRound ? (
+                <p className="practice-focus__waiting">Available after this round. Finish your spellings, then choose one.</p>
+              ) : null}
+              {canReplaceRound ? (
+                <ReplaceSpellingRoundChoices focusOptions={focusOptions} />
               ) : (
-                <div className="practice-focus__choices">
+                <div className="practice-focus__choices" aria-disabled={preview.source === "current_round" || undefined}>
+                  {preview.source === "current_round" ? (
+                  <button className="practice-focus__choice" type="button" disabled>
+                    <span className="practice-focus__choice-label">Let Defne choose</span>
+                    <small>Guided plan</small>
+                  </button>
+                  ) : (
                   <Link
                     className={activeFocus === null ? "practice-focus__choice is-active" : "practice-focus__choice"}
                     href="/child/spelling"
@@ -77,16 +88,23 @@ export default async function ChildSpellingPage({
                     <span className="practice-focus__choice-label">Let Defne choose</span>
                     <small>Guided plan</small>
                   </Link>
+                  )}
                   {focusOptions.map((option) => (
-                    <FocusChoice
-                      key={option.status}
-                      focus={option.status}
-                      eligibleCount={option.eligibleCount}
-                      active={activeFocus === option.status}
-                    />
+                  <FocusChoice
+                    key={option.status}
+                    focus={option.status}
+                    eligibleCount={option.eligibleCount}
+                    active={activeFocus === option.status}
+                    disabled={preview.source === "current_round"}
+                  />
                   ))}
                 </div>
               )}
+              {preview.source === "current_round" && !canReplaceRound ? (
+                <Link className="practice-focus__replace-link" href="/child/spelling?replace=1">
+                  Choose a different round instead
+                </Link>
+              ) : null}
             </section>
 
             <WordPills
@@ -100,7 +118,7 @@ export default async function ChildSpellingPage({
               {activeFocus ? <input type="hidden" name="focus" value={activeFocus} /> : null}
               <button className="ribbon" type="submit" disabled={preview.items.length === 0}>
                 <Keyboard size={18} />
-                {preview.items.length === 0 ? "No spellings ready" : "Start spelling"}
+                {preview.items.length === 0 ? "No spellings ready" : preview.source === "current_round" ? "Continue round" : "Start spelling"}
               </button>
               <Link className="ribbon ribbon--ghost" href="/child/spelling/words">
                 Spelling words
@@ -113,6 +131,41 @@ export default async function ChildSpellingPage({
         </section>
       </article>
     </main>
+  );
+}
+
+function ReplaceSpellingRoundChoices({
+  focusOptions,
+}: {
+  focusOptions: Array<{ status: SpellingFocus; eligibleCount: number }>;
+}) {
+  return (
+    <div className="practice-focus__replacement">
+      <p>
+        Starting another round ends this one. Any answers you have already given still count in your learning history.
+      </p>
+      <div className="practice-focus__choices">
+        <form action={replaceSpellingMissionAction}>
+          <button className="practice-focus__choice" type="submit">
+            <span className="practice-focus__choice-label">Let Defne choose</span>
+            <small>Start new round</small>
+          </button>
+        </form>
+        {focusOptions.map((option) => (
+          <form key={option.status} action={replaceSpellingMissionAction}>
+            <input type="hidden" name="focus" value={option.status} />
+            <button className="practice-focus__choice" type="submit">
+              <span className={`word-pill__dot l-${spellingFocusColours[option.status]}`} aria-hidden="true" />
+              <span className="practice-focus__choice-label">{SPELLING_LABELS[option.status]}</span>
+              <small>{option.eligibleCount} ready</small>
+            </button>
+          </form>
+        ))}
+      </div>
+      <Link className="practice-focus__keep-link" href="/child/spelling">
+        Keep this round
+      </Link>
+    </div>
   );
 }
 
@@ -179,13 +232,25 @@ function FocusChoice({
   focus,
   eligibleCount,
   active,
+  disabled,
 }: {
   focus: SpellingFocus;
   eligibleCount: number;
   active: boolean;
+  disabled: boolean;
 }) {
   const colour = spellingFocusColours[focus];
   const label = SPELLING_LABELS[focus];
+
+  if (disabled) {
+    return (
+      <button className="practice-focus__choice" type="button" disabled aria-label={`${label}: ${eligibleCount} spellings, available after this round`}>
+        <span className={`word-pill__dot l-${colour}`} aria-hidden="true" />
+        <span className="practice-focus__choice-label">{label}</span>
+        <small>{eligibleCount} ready</small>
+      </button>
+    );
+  }
 
   return (
     <Link

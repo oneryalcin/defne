@@ -1355,6 +1355,26 @@ button, input, textarea, select { font: inherit; }
   box-shadow: inset 0 0 0 1px var(--forest-green);
 }
 
+.practice-focus__choice:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.practice-focus__replace-link,
+.practice-focus__keep-link {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--forest-green);
+  font-weight: 700;
+}
+
+.practice-focus__replacement > p {
+  margin: 16px 0 0;
+  max-width: 640px;
+  color: var(--steel-secondary);
+  line-height: 1.55;
+}
+
 .practice-focus__choice-label {
   font-family: var(--font-body);
   font-size: 0.9rem;

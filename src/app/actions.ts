@@ -9,6 +9,7 @@ import {
   recordRoundCardView,
   setNextRoundMixPreference,
   setVisualCuePreference,
+  replaceRoundMission,
   startRoundMeaningRecognition,
   startRoundMission,
   submitSessionAnswer,
@@ -31,6 +32,7 @@ import {
   createOrUpdateParentSpellingItem,
   normaliseParentSpellingWord,
   requestSpellingItemNextRound,
+  replaceSpellingMission,
   setSpellingRoundMixPreference,
   startSpellingPractice,
   startSpellingMission,
@@ -120,10 +122,24 @@ export async function startMissionAction(formData: FormData): Promise<void> {
   redirect(`/child/session/${sessionId}`);
 }
 
+export async function replaceMissionAction(formData: FormData): Promise<void> {
+  const learnerId = await requireChildLearnerId();
+  const focus = parseVocabularyFocus(String(formData.get("focus") ?? ""));
+  const sessionId = replaceRoundMission(12, learnerId, focus);
+  redirect(`/child/session/${sessionId}`);
+}
+
 export async function startSpellingMissionAction(formData: FormData): Promise<void> {
   const learnerId = await requireChildLearnerId();
   const focus = parseSpellingFocus(String(formData.get("focus") ?? ""));
   const sessionId = startSpellingMission(8, learnerId, focus);
+  redirect(`/child/spelling/session/${sessionId}`);
+}
+
+export async function replaceSpellingMissionAction(formData: FormData): Promise<void> {
+  const learnerId = await requireChildLearnerId();
+  const focus = parseSpellingFocus(String(formData.get("focus") ?? ""));
+  const sessionId = replaceSpellingMission(8, learnerId, focus);
   redirect(`/child/spelling/session/${sessionId}`);
 }
 
